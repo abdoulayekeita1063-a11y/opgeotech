@@ -25,12 +25,15 @@ import {
   Archive,
   Bomb,
   ClipboardList,
+  Compass,
+  Drill,
   LayoutDashboard,
   Layers,
   LogOut,
   Mountain,
   PanelLeft,
   Ruler,
+  Triangle,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -44,6 +47,9 @@ const menuItems = [
   { icon: ClipboardList, label: "Daily Inspections", path: "/inspections" },
   { icon: Bomb, label: "Post-Blast Assessment", path: "/blast" },
   { icon: Ruler, label: "Design Compliance", path: "/compliance" },
+  { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
+  { icon: Compass, label: "Structural Mapping", path: "/mapping" },
+  { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: Archive, label: "Archive", path: "/archive" },
 ];
 
@@ -79,7 +85,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-3">
               <span className="swiss-square" />
               <h1 className="text-2xl font-extrabold tracking-tight text-center uppercase">
-                GeoTech AI
+                OPGeotech
               </h1>
             </div>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
@@ -189,7 +195,7 @@ function DashboardLayoutContent({
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="swiss-square" style={{ width: "0.6rem", height: "0.6rem" }} />
                   <span className="font-extrabold tracking-tight truncate uppercase">
-                    GeoTech AI
+                    OPGeotech
                   </span>
                 </div>
               ) : null}

@@ -1,4 +1,4 @@
-import { double, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { double, int, json, longtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -138,3 +138,75 @@ export type RockClassification = typeof rockClassifications.$inferSelect;
 export type InspectionReport = typeof inspectionReports.$inferSelect;
 export type BlastAssessment = typeof blastAssessments.$inferSelect;
 export type ComplianceCheck = typeof complianceChecks.$inferSelect;
+
+// ── OPGeotech expansion ────────────────────────────────────────────────
+
+/** Imported DXF site plans used as base maps for drillhole planning. */
+export const dxfPlans = mysqlTable("dxf_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  fileKey: text("fileKey").notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  /** Parsed geometry (polylines/lines/points/texts) as JSON for fast client rendering. */
+  geometryJson: longtext("geometryJson"),
+  entityCount: int("entityCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Planned geotechnical drillholes. */
+export const drillholes = mysqlTable("drillholes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  planId: int("planId"),
+  holeId: varchar("holeId", { length: 64 }).notNull(),
+  collarX: double("collarX").notNull(),
+  collarY: double("collarY").notNull(),
+  collarZ: double("collarZ").default(0).notNull(),
+  azimuth: double("azimuth").default(0).notNull(), // degrees from north
+  dip: double("dip").default(-90).notNull(), // negative down
+  depth: double("depth").notNull(), // m
+  purpose: varchar("purpose", { length: 128 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Structural mapping measurements (discontinuities). */
+export const structures = mysqlTable("structures", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  structureId: varchar("structureId", { length: 64 }),
+  zone: varchar("zone", { length: 128 }),
+  structureType: varchar("structureType", { length: 64 }).default("joint").notNull(),
+  dip: double("dip").notNull(), // 0-90 degrees
+  dipDirection: double("dipDirection").notNull(), // 0-360 degrees
+  alteration: varchar("alteration", { length: 128 }),
+  infill: varchar("infill", { length: 128 }),
+  roughness: varchar("roughness", { length: 128 }),
+  jrc: double("jrc"), // joint roughness coefficient 0-20
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Kinematic analysis runs with Barton-Bandis strength and block FS results. */
+export const kinematicAnalyses = mysqlTable("kinematic_analyses", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  zone: varchar("zone", { length: 128 }),
+  slopeDipDirection: double("slopeDipDirection").notNull(),
+  slopeDip: double("slopeDip").notNull(),
+  slopeHeight: double("slopeHeight").notNull(), // m
+  unitWeight: double("unitWeight").notNull(), // kN/m3
+  basicFrictionAngle: double("basicFrictionAngle").notNull(), // phi_b degrees
+  jcs: double("jcs").notNull(), // joint wall compressive strength, MPa
+  lateralLimit: double("lateralLimit").default(20).notNull(), // degrees
+  inputJson: longtext("inputJson"),
+  resultJson: longtext("resultJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DxfPlan = typeof dxfPlans.$inferSelect;
+export type Drillhole = typeof drillholes.$inferSelect;
+export type Structure = typeof structures.$inferSelect;
+export type KinematicAnalysis = typeof kinematicAnalyses.$inferSelect;

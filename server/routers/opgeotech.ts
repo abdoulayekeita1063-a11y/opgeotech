@@ -1,0 +1,228 @@
+/**
+ * Routers for the OPGeotech expansion modules:
+ * Drillhole planning (DXF import), Structural Mapping and Kinematic Analysis.
+ */
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import * as db from "../db";
+import { protectedProcedure, router } from "../_core/trpc";
+import { storagePut } from "../storage";
+import { parseDxf } from "../geotech/dxf";
+import { runKinematicAnalysis } from "../geotech/kinematics";
+
+// ── Drillhole module ─────────────────────────────────────────────────
+
+export const drillholeRouter = router({
+  importDxf: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(255),
+        base64: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const buffer = Buffer.from(input.base64, "base64");
+      if (buffer.length > 25 * 1024 * 1024) {
+        throw new Error("DXF file exceeds the 25 MB limit");
+      }
+      const content = buffer.toString("utf-8");
+      const geometry = parseDxf(content);
+
+      const key = `dxf/${ctx.user.id}/${nanoid(10)}-${input.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { key: fileKey, url } = await storagePut(key, buffer, "application/dxf");
+
+      const id = await db.insertDxfPlan({
+        userId: ctx.user.id,
+        name: input.name,
+        fileKey,
+        fileUrl: url,
+        geometryJson: JSON.stringify(geometry),
+        entityCount: geometry.entityCount,
+      });
+      return { id, entityCount: geometry.entityCount, layers: geometry.layers, bounds: geometry.bounds };
+    }),
+
+  listPlans: protectedProcedure.query(({ ctx }) => db.listDxfPlans(ctx.user.id)),
+
+  getPlan: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    const plan = await db.getDxfPlan(input.id);
+    if (!plan || plan.userId !== ctx.user.id) throw new Error("Plan not found");
+    return plan;
+  }),
+
+  deletePlan: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteDxfPlan(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
+
+  createHole: protectedProcedure
+    .input(
+      z.object({
+        planId: z.number().nullish(),
+        holeId: z.string().min(1).max(64),
+        collarX: z.number(),
+        collarY: z.number(),
+        collarZ: z.number().default(0),
+        azimuth: z.number().min(0).max(360).default(0),
+        dip: z.number().min(-90).max(0).default(-90),
+        depth: z.number().positive(),
+        purpose: z.string().max(128).optional(),
+        notes: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const id = await db.insertDrillhole({
+        userId: ctx.user.id,
+        planId: input.planId ?? null,
+        holeId: input.holeId,
+        collarX: input.collarX,
+        collarY: input.collarY,
+        collarZ: input.collarZ,
+        azimuth: input.azimuth,
+        dip: input.dip,
+        depth: input.depth,
+        purpose: input.purpose ?? null,
+        notes: input.notes ?? null,
+      });
+      return { id };
+    }),
+
+  listHoles: protectedProcedure.query(({ ctx }) => db.listDrillholes(ctx.user.id)),
+
+  deleteHole: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteDrillhole(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
+});
+
+// ── Structural Mapping module ────────────────────────────────────────
+
+const structureShape = {
+  structureId: z.string().max(64).optional(),
+  zone: z.string().max(128).optional(),
+  structureType: z.string().max(64).default("joint"),
+  dip: z.number().min(0).max(90),
+  dipDirection: z.number().min(0).max(360),
+  alteration: z.string().max(128).optional(),
+  infill: z.string().max(128).optional(),
+  roughness: z.string().max(128).optional(),
+  jrc: z.number().min(0).max(20).nullish(),
+  notes: z.string().max(2000).optional(),
+};
+
+export const mappingRouter = router({
+  create: protectedProcedure.input(z.object(structureShape)).mutation(async ({ ctx, input }) => {
+    const id = await db.insertStructure({
+      userId: ctx.user.id,
+      structureId: input.structureId ?? null,
+      zone: input.zone ?? null,
+      structureType: input.structureType,
+      dip: input.dip,
+      dipDirection: input.dipDirection,
+      alteration: input.alteration ?? null,
+      infill: input.infill ?? null,
+      roughness: input.roughness ?? null,
+      jrc: input.jrc ?? null,
+      notes: input.notes ?? null,
+    });
+    return { id };
+  }),
+
+  importCsv: protectedProcedure
+    .input(z.object({ rows: z.array(z.object(structureShape)).min(1).max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      const count = await db.insertStructuresBulk(
+        input.rows.map(r => ({
+          userId: ctx.user.id,
+          structureId: r.structureId ?? null,
+          zone: r.zone ?? null,
+          structureType: r.structureType ?? "joint",
+          dip: r.dip,
+          dipDirection: r.dipDirection,
+          alteration: r.alteration ?? null,
+          infill: r.infill ?? null,
+          roughness: r.roughness ?? null,
+          jrc: r.jrc ?? null,
+          notes: r.notes ?? null,
+        }))
+      );
+      return { count };
+    }),
+
+  list: protectedProcedure.query(({ ctx }) => db.listStructures(ctx.user.id)),
+
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await db.deleteStructure(input.id, ctx.user.id);
+    return { success: true } as const;
+  }),
+});
+
+// ── Kinematic Analysis module ────────────────────────────────────────
+
+export const kinematicsRouter = router({
+  run: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(255),
+        zone: z.string().max(128).optional(),
+        slopeDipDirection: z.number().min(0).max(360),
+        slopeDip: z.number().min(1).max(90),
+        slopeHeight: z.number().positive().max(1000),
+        unitWeight: z.number().positive().max(50),
+        basicFrictionAngle: z.number().min(5).max(60),
+        jcs: z.number().positive().max(500),
+        lateralLimit: z.number().min(5).max(45).default(20),
+        structureIds: z.array(z.number()).min(1).max(50),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const all = await db.listStructures(ctx.user.id);
+      const selected = all.filter(s => input.structureIds.includes(s.id));
+      if (!selected.length) throw new Error("No valid structures selected");
+
+      const result = runKinematicAnalysis({
+        slopeDip: input.slopeDip,
+        slopeDipDirection: input.slopeDipDirection,
+        slopeHeight: input.slopeHeight,
+        unitWeight: input.unitWeight,
+        basicFrictionAngle: input.basicFrictionAngle,
+        jcs: input.jcs,
+        lateralLimit: input.lateralLimit,
+        structures: selected.map(s => ({
+          id: s.structureId || `#${s.id}`,
+          dip: s.dip,
+          dipDirection: s.dipDirection,
+          jrc: s.jrc,
+          structureType: s.structureType,
+        })),
+      });
+
+      const id = await db.insertKinematicAnalysis({
+        userId: ctx.user.id,
+        title: input.title,
+        zone: input.zone ?? null,
+        slopeDipDirection: input.slopeDipDirection,
+        slopeDip: input.slopeDip,
+        slopeHeight: input.slopeHeight,
+        unitWeight: input.unitWeight,
+        basicFrictionAngle: input.basicFrictionAngle,
+        jcs: input.jcs,
+        lateralLimit: input.lateralLimit,
+        inputJson: JSON.stringify({ structureIds: input.structureIds }),
+        resultJson: JSON.stringify(result),
+      });
+      return { id, result };
+    }),
+
+  list: protectedProcedure.query(({ ctx }) => db.listKinematicAnalyses(ctx.user.id)),
+
+  get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    const rec = await db.getKinematicAnalysis(input.id);
+    if (!rec || rec.userId !== ctx.user.id) throw new Error("Analysis not found");
+    return rec;
+  }),
+});

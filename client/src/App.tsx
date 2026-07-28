@@ -12,6 +12,9 @@ import DailyInspections from "./pages/DailyInspections";
 import PostBlast from "./pages/PostBlast";
 import DesignCompliance from "./pages/DesignCompliance";
 import Archive from "./pages/Archive";
+import Drillhole from "./pages/Drillhole";
+import StructuralMapping from "./pages/StructuralMapping";
+import KinematicAnalysis from "./pages/KinematicAnalysis";
 
 function Router() {
   return (
@@ -23,6 +26,9 @@ function Router() {
         <Route path={"/inspections"} component={DailyInspections} />
         <Route path={"/blast"} component={PostBlast} />
         <Route path={"/compliance"} component={DesignCompliance} />
+        <Route path={"/drillhole"} component={Drillhole} />
+        <Route path={"/mapping"} component={StructuralMapping} />
+        <Route path={"/kinematics"} component={KinematicAnalysis} />
         <Route path={"/archive"} component={Archive} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}

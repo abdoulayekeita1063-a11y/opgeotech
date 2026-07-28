@@ -49,4 +49,16 @@
 - [x] Service worker (cache app shell, offline fallback for static assets)
 - [x] Service worker registration in the client
 - [x] Verify installability and re-test pages (manifest/sw/icons all 200, 16 tests pass)
-- [ ] Checkpoint PWA
+- [x] Checkpoint PWA (version 6623373b, auto-published)
+
+## OPGeotech Expansion (user request)
+- [x] Rename app to OPGeotech everywhere (UI, title, manifest, icons, sidebar, login page)
+- [x] Drillhole module: DXF file import and 2D plan visualization
+- [x] Drillhole module: geotechnical hole planning (ID, collar X/Y/Z, azimuth, dip, depth) overlaid on DXF plan, saved to DB
+- [x] Structural Mapping module: manual entry of structures (dip, dip direction, type, alteration, infill, roughness/JRC)
+- [x] Structural Mapping module: CSV import of structural data
+- [x] Structural Mapping module: stereonet visualization (pole plot)
+- [x] Kinematic Analysis module: planar, wedge, toppling failure screening from slope orientation + structures
+- [x] Kinematic Analysis module: Barton-Bandis shear strength (JRC, JCS, phi_b) → instantaneous cohesion and friction angle
+- [x] Kinematic Analysis module: block weight from slope geometry and factor of safety for planar and wedge blocks
+- [ ] Update dashboard with new modules, re-test all, checkpoint

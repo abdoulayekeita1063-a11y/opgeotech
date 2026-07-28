@@ -1,12 +1,16 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   blastAssessments,
   complianceChecks,
+  drillholes,
+  dxfPlans,
   inspectionReports,
   InsertUser,
+  kinematicAnalyses,
   rockClassifications,
   stabilityCalcs,
+  structures,
   users,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -231,6 +235,105 @@ export async function getComplianceCheck(id: number) {
     .select()
     .from(complianceChecks)
     .where(eq(complianceChecks.id, id))
+    .limit(1);
+  return rows[0];
+}
+
+// DXF plans
+export async function insertDxfPlan(values: typeof dxfPlans.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(dxfPlans).values(values);
+  return res.insertId;
+}
+export async function listDxfPlans(userId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: dxfPlans.id,
+      userId: dxfPlans.userId,
+      name: dxfPlans.name,
+      fileUrl: dxfPlans.fileUrl,
+      entityCount: dxfPlans.entityCount,
+      createdAt: dxfPlans.createdAt,
+    })
+    .from(dxfPlans)
+    .where(eq(dxfPlans.userId, userId))
+    .orderBy(desc(dxfPlans.createdAt));
+}
+export async function getDxfPlan(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(dxfPlans).where(eq(dxfPlans.id, id)).limit(1);
+  return rows[0];
+}
+export async function deleteDxfPlan(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(dxfPlans).where(and(eq(dxfPlans.id, id), eq(dxfPlans.userId, userId)));
+}
+
+// Drillholes
+export async function insertDrillhole(values: typeof drillholes.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(drillholes).values(values);
+  return res.insertId;
+}
+export async function listDrillholes(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(drillholes)
+    .where(eq(drillholes.userId, userId))
+    .orderBy(desc(drillholes.createdAt));
+}
+export async function deleteDrillhole(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(drillholes).where(and(eq(drillholes.id, id), eq(drillholes.userId, userId)));
+}
+
+// Structures
+export async function insertStructure(values: typeof structures.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(structures).values(values);
+  return res.insertId;
+}
+export async function insertStructuresBulk(values: (typeof structures.$inferInsert)[]) {
+  const db = await requireDb();
+  if (!values.length) return 0;
+  await db.insert(structures).values(values);
+  return values.length;
+}
+export async function listStructures(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(structures)
+    .where(eq(structures.userId, userId))
+    .orderBy(desc(structures.createdAt));
+}
+export async function deleteStructure(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(structures).where(and(eq(structures.id, id), eq(structures.userId, userId)));
+}
+
+// Kinematic analyses
+export async function insertKinematicAnalysis(values: typeof kinematicAnalyses.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(kinematicAnalyses).values(values);
+  return res.insertId;
+}
+export async function listKinematicAnalyses(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(kinematicAnalyses)
+    .where(eq(kinematicAnalyses.userId, userId))
+    .orderBy(desc(kinematicAnalyses.createdAt));
+}
+export async function getKinematicAnalysis(id: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(kinematicAnalyses)
+    .where(eq(kinematicAnalyses.id, id))
     .limit(1);
   return rows[0];
 }

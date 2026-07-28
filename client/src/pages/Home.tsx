@@ -5,9 +5,12 @@ import {
   ArrowUpRight,
   Bomb,
   ClipboardList,
+  Compass,
+  Drill,
   Layers,
   Mountain,
   Ruler,
+  Triangle,
 } from "lucide-react";
 
 const modules = [
@@ -51,6 +54,30 @@ const modules = [
     path: "/compliance",
     icon: Ruler,
   },
+  {
+    index: "06",
+    title: "Drillhole Planning",
+    description:
+      "DXF site plan import and geotechnical drillhole design: collar coordinates, azimuth, dip and depth on the plan.",
+    path: "/drillhole",
+    icon: Drill,
+  },
+  {
+    index: "07",
+    title: "Structural Mapping",
+    description:
+      "Discontinuity data capture — dip, dip direction, alteration, infill, roughness — with CSV import and stereonet.",
+    path: "/mapping",
+    icon: Compass,
+  },
+  {
+    index: "08",
+    title: "Kinematic Analysis",
+    description:
+      "Planar, wedge and toppling screening with Barton-Bandis shear strength, block weight and factor of safety.",
+    path: "/kinematics",
+    icon: Triangle,
+  },
 ];
 
 export default function Home() {
@@ -60,6 +87,8 @@ export default function Home() {
   const inspections = trpc.inspection.list.useQuery(undefined, { enabled: !!user });
   const blasts = trpc.blast.list.useQuery(undefined, { enabled: !!user });
   const compliance = trpc.compliance.list.useQuery(undefined, { enabled: !!user });
+  const structures = trpc.mapping.list.useQuery(undefined, { enabled: !!user });
+  const kinematics = trpc.kinematics.list.useQuery(undefined, { enabled: !!user });
 
   const counts = [
     { label: "Stability analyses", value: stability.data?.length },
@@ -67,6 +96,8 @@ export default function Home() {
     { label: "Inspection reports", value: inspections.data?.length },
     { label: "Blast assessments", value: blasts.data?.length },
     { label: "Compliance checks", value: compliance.data?.length },
+    { label: "Mapped structures", value: structures.data?.length },
+    { label: "Kinematic analyses", value: kinematics.data?.length },
   ];
 
   return (
@@ -79,9 +110,10 @@ export default function Home() {
             <span className="swiss-label">Geotechnical Engineering Platform</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold uppercase tracking-tight leading-[0.95]">
-            GeoTech
+            OP
+            <span className="text-primary">Geotech</span>
             <br />
-            <span className="text-primary">AI</span>
+            <span className="text-foreground/40 text-2xl md:text-4xl">Open-Pit Suite</span>
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-6 max-w-xl">
             Slope stability, rock mass classification, daily inspection
@@ -131,7 +163,7 @@ export default function Home() {
           className="group bg-foreground text-background p-6 flex flex-col gap-4 hover:bg-primary transition-colors min-h-[210px]"
         >
           <div className="flex items-start justify-between">
-            <span className="swiss-number text-xs opacity-60">06</span>
+            <span className="swiss-number text-xs opacity-60">09</span>
             <ArrowUpRight className="h-4 w-4 opacity-60" />
           </div>
           <div className="mt-auto">
