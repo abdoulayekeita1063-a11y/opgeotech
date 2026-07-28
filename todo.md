@@ -41,4 +41,12 @@
 - [x] Tests vitest : design compliance
 - [x] Vérification visuelle par captures d'écran (7 pages)
 - [x] Smoke tests IA : génération rapport inspection + analyse photos blast (LLM réel)
-- [ ] Checkpoint final
+- [x] Checkpoint final (version e62103ad)
+
+## PWA — Installable Software (user request)
+- [x] Web app manifest (name, icons, standalone display, theme colors)
+- [x] App icons (192/512 px, maskable) in Swiss style
+- [x] Service worker (cache app shell, offline fallback for static assets)
+- [x] Service worker registration in the client
+- [x] Verify installability and re-test pages (manifest/sw/icons all 200, 16 tests pass)
+- [ ] Checkpoint PWA

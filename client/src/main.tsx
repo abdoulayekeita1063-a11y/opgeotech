@@ -79,3 +79,13 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// PWA: register the service worker (production only, to avoid interfering
+// with Vite HMR during development).
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(err => {
+      console.warn("[PWA] Service worker registration failed:", err);
+    });
+  });
+}
