@@ -306,17 +306,46 @@ export default function Drillhole() {
                   )}
                   {/* planned holes */}
                   {planHoles.map(h => (
-                    <g key={h.id}>
-                      <circle cx={h.collarX} cy={h.collarY} r={strokeW * 6} fill="#d32f2f" />
-                      <circle
-                        cx={h.collarX}
-                        cy={h.collarY}
-                        r={strokeW * 10}
-                        fill="none"
-                        stroke="#d32f2f"
-                        strokeWidth={strokeW}
-                      />
-                    </g>
+                    (() => {
+                      // Project the hole trace in plan view:
+                      // Horizontal projection length = depth * cos(dip)
+                      // dip is stored as negative (e.g. -90 = vertical, -60 = 60° from horizontal)
+                      const dipRad = Math.abs(h.dip) * Math.PI / 180;
+                      const horizLen = h.depth * Math.cos(dipRad);
+                      // Azimuth: 0=North(+Y), 90=East(+X)
+                      const azRad = (h.azimuth) * Math.PI / 180;
+                      const dx = horizLen * Math.sin(azRad);
+                      const dy = horizLen * Math.cos(azRad);
+                      const toeX = h.collarX + dx;
+                      const toeY = h.collarY + dy;
+                      return (
+                        <g key={h.id}>
+                          {/* Hole trace line */}
+                          <line
+                            x1={h.collarX}
+                            y1={h.collarY}
+                            x2={toeX}
+                            y2={toeY}
+                            stroke="#d32f2f"
+                            strokeWidth={strokeW * 2.5}
+                            strokeLinecap="round"
+                          />
+                          {/* Collar point (filled) */}
+                          <circle cx={h.collarX} cy={h.collarY} r={strokeW * 5} fill="#d32f2f" />
+                          {/* Toe point (open) */}
+                          <circle cx={toeX} cy={toeY} r={strokeW * 4} fill="none" stroke="#d32f2f" strokeWidth={strokeW * 1.5} />
+                          {/* Direction arrow at midpoint */}
+                          {horizLen > strokeW * 20 && (
+                            <circle
+                              cx={(h.collarX + toeX) / 2}
+                              cy={(h.collarY + toeY) / 2}
+                              r={strokeW * 2}
+                              fill="#d32f2f"
+                            />
+                          )}
+                        </g>
+                      );
+                    })()
                   ))}
                   {pendingXY && (
                     <circle
@@ -332,16 +361,27 @@ export default function Drillhole() {
                 </g>
                 {/* hole labels (unflipped) */}
                 {planHoles.map(h => (
-                  <text
-                    key={`t${h.id}`}
-                    x={h.collarX + strokeW * 12}
-                    y={-h.collarY}
-                    fontSize={strokeW * 14}
-                    fill="#d32f2f"
-                    fontFamily="IBM Plex Mono, monospace"
-                  >
-                    {h.holeId}
-                  </text>
+                  <g key={`t${h.id}`}>
+                    <text
+                      x={h.collarX + strokeW * 12}
+                      y={-h.collarY}
+                      fontSize={strokeW * 12}
+                      fill="#d32f2f"
+                      fontWeight="bold"
+                      fontFamily="IBM Plex Mono, monospace"
+                    >
+                      {h.holeId}
+                    </text>
+                    <text
+                      x={h.collarX + strokeW * 12}
+                      y={-h.collarY + strokeW * 14}
+                      fontSize={strokeW * 9}
+                      fill="#666"
+                      fontFamily="IBM Plex Mono, monospace"
+                    >
+                      {h.depth}m · az{h.azimuth}° / dip{h.dip}°
+                    </text>
+                  </g>
                 ))}
               </svg>
             ) : (
