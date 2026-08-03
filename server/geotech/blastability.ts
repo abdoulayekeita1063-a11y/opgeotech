@@ -15,9 +15,9 @@ export interface BlastabilityInput {
   jps: number;
   /** Joint Plane Orientation (JPO): 10=horizontal, 20=dip out of face, 30=strike ⊥ face, 40=dip into face */
   jpo: number;
-  /** Specific Gravity Influence (SGI) = 25 * SG - 50 */
+  /** Density in t/m³ (same as specific gravity numerically). SGI = 25 * density - 50 */
   specificGravity: number;
-  /** Hardness (H): 1–10 Mohs scale or equivalent (1=talc, 5=apatite, 7=quartz, 10=diamond) */
+  /** UCS in MPa — converted internally to Hardness rating (H): UCS mapped to 1–10 scale */
   hardness: number;
 }
 
@@ -37,8 +37,16 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
   // SGI = 25 * SG - 50
   const sgi = 25 * specificGravity - 50;
 
+  // Convert UCS (MPa) to Hardness rating (1–10 scale, Lilly)
+  // Approximate mapping: 1=<5MPa, 2=5-25, 3=25-50, 4=50-75, 5=75-100,
+  // 6=100-125, 7=125-150, 8=150-200, 9=200-250, 10=>250
+  const ucs = hardness; // input is UCS in MPa
+  const h = ucs <= 5 ? 1 : ucs <= 25 ? 2 : ucs <= 50 ? 3 : ucs <= 75 ? 4
+    : ucs <= 100 ? 5 : ucs <= 125 ? 6 : ucs <= 150 ? 7
+    : ucs <= 200 ? 8 : ucs <= 250 ? 9 : 10;
+
   // BI = 0.5 * (RMD + JPS + JPO + SGI + H)
-  const bi = 0.5 * (rmd + jps + jpo + sgi + hardness);
+  const bi = 0.5 * (rmd + jps + jpo + sgi + h);
 
   // Classification
   let classification: string;

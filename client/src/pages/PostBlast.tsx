@@ -111,7 +111,7 @@ function BlastabilityTab() {
   const [jps, setJps] = useState("20");
   const [jpo, setJpo] = useState("20");
   const [sg, setSg] = useState("2.7");
-  const [hardness, setHardness] = useState("5");
+  const [ucs, setUcs] = useState("100");
   const [result, setResult] = useState<any>(null);
 
   const compute = trpc.blast.blastabilityIndex.useMutation({
@@ -125,7 +125,7 @@ function BlastabilityTab() {
       jps: Number(jps),
       jpo: Number(jpo),
       specificGravity: Number(sg),
-      hardness: Number(hardness),
+      hardness: Number(ucs),
     });
   };
 
@@ -175,7 +175,7 @@ function BlastabilityTab() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label className="swiss-label mb-1.5 block">Specific Gravity</Label>
+            <Label className="swiss-label mb-1.5 block">Density (t/m³)</Label>
             <Input
               type="number"
               step="0.1"
@@ -186,13 +186,13 @@ function BlastabilityTab() {
             />
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">Hardness (1–10)</Label>
+            <Label className="swiss-label mb-1.5 block">UCS (MPa)</Label>
             <Input
               type="number"
               min="1"
-              max="10"
-              value={hardness}
-              onChange={e => setHardness(e.target.value)}
+              max="350"
+              value={ucs}
+              onChange={e => setUcs(e.target.value)}
             />
           </div>
         </div>
@@ -221,6 +221,7 @@ function BlastabilityTab() {
               <div className="bg-background p-5">
                 <div className="swiss-label mb-1 text-xs">SGI</div>
                 <div className="swiss-number text-2xl font-bold">{result.sgi}</div>
+                <div className="text-xs text-muted-foreground">Density influence</div>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">{result.description}</p>
