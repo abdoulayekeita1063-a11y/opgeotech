@@ -1,9 +1,17 @@
 /**
- * Blastability Index (BI) engine based on Lilly (1986) and extensions.
- * Provides:
- * 1. BI calculation from rock mass parameters
- * 2. Powder factor recommendation based on BI and wall proximity
- * 3. Wall control compliance evaluation
+ * Blastability Index (BI) engine based on Lilly (1986) — SME reference.
+ * 
+ * Formula: BI = 0.5 * (RMD + JPS + JPO + RDI + Strength)
+ * Where:
+ *   RMD = Rock Mass Description: 10 (Powdery/Friable), 20 (Blocky), 50 (Massive)
+ *   JPS = Joint Plane Spacing: 10 (Close <0.1m), 20 (Intermediate 0.1–1m), 50 (Wide >1m)
+ *   JPO = Joint Plane Orientation: 10 (Horizontal), 20 (Dip out of face), 30 (Strike ⊥ face), 40 (Dip into face)
+ *   RDI = Rock Density Index = 25 * Density(t/m³) - 50
+ *   Strength = 0.05 * UCS(MPa)
+ *
+ * Suggested Powder Factor (kg/m³) = 0.004 * BI * Density
+ * Wall proximity PF is reduced by 30–50% from production PF.
+ * RQD adjustment: high RQD (massive) increases PF need; low RQD (fractured) reduces it.
  */
 
 // ─── Blastability Index (Lilly 1986) ─────────────────────────────────────────
@@ -15,38 +23,37 @@ export interface BlastabilityInput {
   jps: number;
   /** Joint Plane Orientation (JPO): 10=horizontal, 20=dip out of face, 30=strike ⊥ face, 40=dip into face */
   jpo: number;
-  /** Density in t/m³ (same as specific gravity numerically). SGI = 25 * density - 50 */
-  specificGravity: number;
-  /** UCS in MPa — converted internally to Hardness rating (H): UCS mapped to 1–10 scale */
-  hardness: number;
+  /** Density in t/m³. RDI = 25 * density - 50 */
+  density: number;
+  /** UCS in MPa. Strength = 0.05 * UCS */
+  ucs: number;
+  /** RQD (%) — Rock Quality Designation, 0–100. Used to refine PF recommendation. */
+  rqd: number;
 }
 
 export interface BlastabilityResult {
   bi: number;
-  sgi: number;
+  rdi: number;
+  strength: number;
   classification: string;
   description: string;
-  suggestedPowderFactor: { min: number; max: number; unit: string };
+  suggestedPowderFactor: { value: number; min: number; max: number; unit: string };
   wallProximityPF: { min: number; max: number; unit: string };
+  rqdAdjustment: string;
   recommendations: string[];
 }
 
 export function computeBlastabilityIndex(input: BlastabilityInput): BlastabilityResult {
-  const { rmd, jps, jpo, specificGravity, hardness } = input;
+  const { rmd, jps, jpo, density, ucs, rqd } = input;
 
-  // SGI = 25 * SG - 50
-  const sgi = 25 * specificGravity - 50;
+  // RDI = 25 * Density - 50
+  const rdi = 25 * density - 50;
 
-  // Convert UCS (MPa) to Hardness rating (1–10 scale, Lilly)
-  // Approximate mapping: 1=<5MPa, 2=5-25, 3=25-50, 4=50-75, 5=75-100,
-  // 6=100-125, 7=125-150, 8=150-200, 9=200-250, 10=>250
-  const ucs = hardness; // input is UCS in MPa
-  const h = ucs <= 5 ? 1 : ucs <= 25 ? 2 : ucs <= 50 ? 3 : ucs <= 75 ? 4
-    : ucs <= 100 ? 5 : ucs <= 125 ? 6 : ucs <= 150 ? 7
-    : ucs <= 200 ? 8 : ucs <= 250 ? 9 : 10;
+  // Strength = 0.05 * UCS
+  const strength = 0.05 * ucs;
 
-  // BI = 0.5 * (RMD + JPS + JPO + SGI + H)
-  const bi = 0.5 * (rmd + jps + jpo + sgi + h);
+  // BI = 0.5 * (RMD + JPS + JPO + RDI + Strength)
+  const bi = 0.5 * (rmd + jps + jpo + rdi + strength);
 
   // Classification
   let classification: string;
@@ -68,20 +75,46 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
     description = "Very difficult to blast; massive, hard rock requiring maximum energy and close spacing.";
   }
 
-  // Powder Factor recommendation (kg/m³) based on BI
-  // Empirical correlation: PF ≈ 0.004 * BI + 0.15 (general blasting)
-  // Range: BI=20 → ~0.23, BI=40 → ~0.31, BI=60 → ~0.39, BI=80 → ~0.47
-  const pfCenter = 0.004 * bi + 0.15;
+  // Suggested Powder Factor (kg/m³) = 0.004 * BI * Density (per SME reference)
+  const pfBase = 0.004 * bi * density;
+
+  // RQD adjustment factor:
+  // RQD > 75% (massive) → increase PF by up to 15%
+  // RQD 50–75% (fair) → no adjustment
+  // RQD 25–50% (poor) → decrease PF by up to 10%
+  // RQD < 25% (very poor) → decrease PF by up to 20%
+  let rqdFactor = 1.0;
+  let rqdAdjustment: string;
+  if (rqd >= 90) {
+    rqdFactor = 1.15;
+    rqdAdjustment = `RQD ${rqd}% (Excellent) — PF increased by 15% due to massive, intact rock requiring more energy.`;
+  } else if (rqd >= 75) {
+    rqdFactor = 1.08;
+    rqdAdjustment = `RQD ${rqd}% (Good) — PF increased by 8% due to relatively intact rock.`;
+  } else if (rqd >= 50) {
+    rqdFactor = 1.0;
+    rqdAdjustment = `RQD ${rqd}% (Fair) — No PF adjustment; standard conditions.`;
+  } else if (rqd >= 25) {
+    rqdFactor = 0.90;
+    rqdAdjustment = `RQD ${rqd}% (Poor) — PF reduced by 10%; pre-existing fractures assist fragmentation.`;
+  } else {
+    rqdFactor = 0.80;
+    rqdAdjustment = `RQD ${rqd}% (Very Poor) — PF reduced by 20%; highly fractured rock fragments easily.`;
+  }
+
+  const pfAdjusted = pfBase * rqdFactor;
+
   const suggestedPowderFactor = {
-    min: round3(pfCenter * 0.85),
-    max: round3(pfCenter * 1.15),
+    value: round3(pfAdjusted),
+    min: round3(pfAdjusted * 0.9),
+    max: round3(pfAdjusted * 1.1),
     unit: "kg/m³",
   };
 
-  // Wall proximity PF: reduced by 30–50% to minimize damage
+  // Wall proximity PF: reduced by 35–50% to minimize damage
   const wallProximityPF = {
-    min: round3(pfCenter * 0.5),
-    max: round3(pfCenter * 0.7),
+    min: round3(pfAdjusted * 0.50),
+    max: round3(pfAdjusted * 0.65),
     unit: "kg/m³",
   };
 
@@ -96,6 +129,12 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
   if (bi < 25) {
     recommendations.push("Low BI — risk of over-fragmentation; consider reducing charge per hole.");
   }
+  if (rqd < 25) {
+    recommendations.push("Very low RQD — rock is heavily fractured; minimal explosive energy needed.");
+  }
+  if (rqd >= 90) {
+    recommendations.push("Very high RQD — massive intact rock; ensure adequate charge concentration.");
+  }
   recommendations.push(
     `For wall control (trim/buffer rows), use powder factor ${wallProximityPF.min}–${wallProximityPF.max} kg/m³.`
   );
@@ -105,11 +144,13 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
 
   return {
     bi: round3(bi),
-    sgi: round3(sgi),
+    rdi: round3(rdi),
+    strength: round3(strength),
     classification,
     description,
     suggestedPowderFactor,
     wallProximityPF,
+    rqdAdjustment,
     recommendations,
   };
 }
@@ -177,7 +218,6 @@ export function evaluateWallControl(input: WallControlInput): WallControlResult 
       checks.push({ parameter: "Pre-split spacing", status: "Fail", detail: `${input.preSplitSpacing} m — too wide for effective pre-split (>1.8 m)` });
       score -= 20;
     }
-    // Diameter check: typical 76–115 mm
     if (input.preSplitDiameter >= 64 && input.preSplitDiameter <= 127) {
       checks.push({ parameter: "Pre-split diameter", status: "Pass", detail: `${input.preSplitDiameter} mm — standard range` });
     } else {
@@ -242,7 +282,6 @@ export function evaluateWallControl(input: WallControlInput): WallControlResult 
     input.measuredCrestLoss <= 1.0 ? "Minor" :
     input.measuredCrestLoss <= 2.0 ? "Moderate" : "Severe";
 
-  // Deductions for damage
   if (backbreakSeverity === "Moderate") score -= 10;
   else if (backbreakSeverity === "Severe") score -= 25;
 
@@ -285,7 +324,6 @@ export function evaluateWallControl(input: WallControlInput): WallControlResult 
     comments,
   };
 
-  // Backbreak/crest checks
   checks.push({
     parameter: "Backbreak",
     status: backbreakSeverity === "None" || backbreakSeverity === "Minor" ? "Pass" : backbreakSeverity === "Moderate" ? "Warning" : "Fail",

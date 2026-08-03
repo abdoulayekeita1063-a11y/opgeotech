@@ -275,8 +275,9 @@ export const blastRouter = router({
         rmd: z.number().min(10).max(50),
         jps: z.number().min(10).max(50),
         jpo: z.number().min(10).max(40),
-        specificGravity: z.number().min(1.5).max(5.0),
-        hardness: z.number().min(1).max(350),
+        density: z.number().min(1.5).max(5.0),
+        ucs: z.number().min(1).max(400),
+        rqd: z.number().min(0).max(100),
       }),
     )
     .mutation(({ input }) => computeBlastabilityIndex(input)),

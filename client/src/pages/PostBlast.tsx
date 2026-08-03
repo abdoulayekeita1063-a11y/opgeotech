@@ -112,6 +112,7 @@ function BlastabilityTab() {
   const [jpo, setJpo] = useState("20");
   const [sg, setSg] = useState("2.7");
   const [ucs, setUcs] = useState("100");
+  const [rqd, setRqd] = useState("60");
   const [result, setResult] = useState<any>(null);
 
   const compute = trpc.blast.blastabilityIndex.useMutation({
@@ -124,8 +125,9 @@ function BlastabilityTab() {
       rmd: Number(rmd),
       jps: Number(jps),
       jpo: Number(jpo),
-      specificGravity: Number(sg),
-      hardness: Number(ucs),
+      density: Number(sg),
+      ucs: Number(ucs),
+      rqd: Number(rqd),
     });
   };
 
@@ -196,6 +198,18 @@ function BlastabilityTab() {
             />
           </div>
         </div>
+        <div>
+          <Label className="swiss-label mb-1.5 block">RQD (%)</Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            value={rqd}
+            onChange={e => setRqd(e.target.value)}
+            className="max-w-[180px]"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Rock Quality Designation — refines the powder factor recommendation.</p>
+        </div>
         <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>
           {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute Blastability Index"}
         </Button>
@@ -219,19 +233,24 @@ function BlastabilityTab() {
                 <div className="font-bold text-lg">{result.classification}</div>
               </div>
               <div className="bg-background p-5">
-                <div className="swiss-label mb-1 text-xs">SGI</div>
-                <div className="swiss-number text-2xl font-bold">{result.sgi}</div>
-                <div className="text-xs text-muted-foreground">Density influence</div>
+                <div className="swiss-label mb-1 text-xs">RDI / Strength</div>
+                <div className="swiss-number text-2xl font-bold">{result.rdi} / {result.strength}</div>
+                <div className="text-xs text-muted-foreground">Density index / UCS factor</div>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">{result.description}</p>
+            {result.rqdAdjustment && (
+              <p className="text-sm border-l-2 border-primary pl-3 text-muted-foreground">{result.rqdAdjustment}</p>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="border border-foreground p-4">
-                <div className="swiss-label text-xs mb-2">Production Powder Factor</div>
+                <div className="swiss-label text-xs mb-2">Suggested Powder Factor</div>
                 <div className="text-2xl font-bold">
-                  {result.suggestedPowderFactor.min} – {result.suggestedPowderFactor.max}
+                  {result.suggestedPowderFactor.value}
                 </div>
-                <div className="text-xs text-muted-foreground">{result.suggestedPowderFactor.unit}</div>
+                <div className="text-xs text-muted-foreground">
+                  Range: {result.suggestedPowderFactor.min} – {result.suggestedPowderFactor.max} {result.suggestedPowderFactor.unit}
+                </div>
               </div>
               <div className="border border-primary p-4 bg-primary/5">
                 <div className="swiss-label text-xs mb-2 text-primary">Wall Proximity PF (reduced)</div>
