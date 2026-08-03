@@ -7,7 +7,7 @@
  *  - API calls (/api/*): network-only — geotechnical computations and AI
  *    analysis require the server; never serve stale engineering results.
  */
-const CACHE = "geotech-ai-v1";
+const CACHE = "opgeotech-v2";
 const OFFLINE_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

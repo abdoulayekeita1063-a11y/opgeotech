@@ -45,7 +45,7 @@ const menuItems = [
   { icon: Mountain, label: "Slope Stability", path: "/stability" },
   { icon: Layers, label: "Rock Classification", path: "/classification" },
   { icon: ClipboardList, label: "Daily Inspections", path: "/inspections" },
-  { icon: Bomb, label: "Post-Blast Assessment", path: "/blast" },
+  { icon: Bomb, label: "Blast Assessment", path: "/blast" },
   { icon: Ruler, label: "Design Compliance", path: "/compliance" },
   { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
@@ -83,7 +83,7 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <div className="flex items-center gap-3">
-              <span className="swiss-square" />
+              <img src="/favicon.png" alt="OPGeotech logo" className="h-9 w-9" />
               <h1 className="text-2xl font-extrabold tracking-tight text-center uppercase">
                 OPGeotech
               </h1>
@@ -193,7 +193,7 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="swiss-square" style={{ width: "0.6rem", height: "0.6rem" }} />
+                  <img src="/favicon.png" alt="" className="h-5 w-5 shrink-0" />
                   <span className="font-extrabold tracking-tight truncate uppercase">
                     OPGeotech
                   </span>

@@ -122,7 +122,7 @@ export async function analyzeBlastPhotos(params: {
 }
 
 /**
- * Generates a structured, professional post-blast report (markdown) from the analysis.
+ * Generates a structured, professional blast report (markdown) from the analysis.
  */
 export async function generateBlastReport(params: {
   title: string;
@@ -136,11 +136,11 @@ export async function generateBlastReport(params: {
       {
         role: "system",
         content:
-          "You are a senior geotechnical engineer writing formal post-blast assessment reports for an open-pit mining operation. Write in professional English, in a structured, concise, and technical style. Output clean markdown with clear section headings. Do not invent data not provided.",
+          "You are a senior geotechnical engineer writing formal blast assessment reports for an open-pit mining operation. Write in professional English, in a structured, concise, and technical style. Output clean markdown with clear section headings. Do not invent data not provided.",
       },
       {
         role: "user",
-        content: `Write a formal post-blast assessment report in markdown using this data:\n\nTitle: ${params.title}\nZone: ${params.zone}\nBlast date: ${params.blastDate}\nField notes: ${params.notes || "None"}\n\nAI photo analysis results:\n- Overall quality score: ${params.analysis.qualityScore}/100\n- Fragmentation: ${params.analysis.fragmentationRating} — ${params.analysis.fragmentationComment}\n- Overbreak/Underbreak: ${params.analysis.overbreakDetected} — ${params.analysis.overbreakComment}\n- Muckpile: ${params.analysis.muckpileComment}\n- Wall condition: ${params.analysis.wallConditionComment}\n- Recommendations: ${params.analysis.recommendations.join("; ")}\n\nStructure the report with: 1. Summary, 2. Blast Details, 3. Fragmentation Assessment, 4. Excavation Limit Conformance (Overbreak/Underbreak), 5. Muckpile & Diggability, 6. Wall Condition, 7. Overall Quality Score & Rating, 8. Recommendations. Keep it under 600 words. Start with a level-1 heading containing the title.`,
+        content: `Write a formal blast assessment report in markdown using this data:\n\nTitle: ${params.title}\nZone: ${params.zone}\nBlast date: ${params.blastDate}\nField notes: ${params.notes || "None"}\n\nAI photo analysis results:\n- Overall quality score: ${params.analysis.qualityScore}/100\n- Fragmentation: ${params.analysis.fragmentationRating} — ${params.analysis.fragmentationComment}\n- Overbreak/Underbreak: ${params.analysis.overbreakDetected} — ${params.analysis.overbreakComment}\n- Muckpile: ${params.analysis.muckpileComment}\n- Wall condition: ${params.analysis.wallConditionComment}\n- Recommendations: ${params.analysis.recommendations.join("; ")}\n\nStructure the report with: 1. Summary, 2. Blast Details, 3. Fragmentation Assessment, 4. Excavation Limit Conformance (Overbreak/Underbreak), 5. Muckpile & Diggability, 6. Wall Condition, 7. Overall Quality Score & Rating, 8. Recommendations. Keep it under 600 words. Start with a level-1 heading containing the title.`,
       },
     ],
   });

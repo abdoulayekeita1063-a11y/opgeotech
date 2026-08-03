@@ -32,7 +32,7 @@ const catLabel: Record<Exclude<Category, "all">, string> = {
   stability: "Slope Stability",
   classification: "Rock Classification",
   inspection: "Daily Inspection",
-  blast: "Post-Blast",
+  blast: "Blast",
   compliance: "Design Compliance",
 };
 
@@ -308,7 +308,7 @@ export default function Archive() {
               ["stability", "Stability"],
               ["classification", "Classification"],
               ["inspection", "Inspections"],
-              ["blast", "Post-Blast"],
+              ["blast", "Blast"],
               ["compliance", "Compliance"],
             ] as Array<[Category, string]>
           ).map(([v, l]) => (

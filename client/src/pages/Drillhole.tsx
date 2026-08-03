@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ export default function Drillhole() {
   const [depth, setDepth] = useState("30");
   const [purpose, setPurpose] = useState("geotechnical");
   const [notes, setNotes] = useState("");
+  const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number } | null>(null);
 
   const plans = trpc.drillhole.listPlans.useQuery();
   const holes = trpc.drillhole.listHoles.useQuery();
@@ -154,14 +156,26 @@ export default function Drillhole() {
     const ctm = svg.getScreenCTM();
     if (!ctm) return;
     const p = pt.matrixTransform(ctm.inverse());
-    const x = Math.round(p.x * 100) / 100;
-    const y = Math.round(-p.y * 100) / 100;
+    const x = Math.round(p.x * 1000) / 1000;
+    const y = Math.round(-p.y * 1000) / 1000;
     setCollarX(String(x));
     setCollarY(String(y));
     setPendingXY({ x, y });
     setPlacing(false);
     toast.success(`Collar set at X=${x}, Y=${y}`);
   };
+
+  const onSvgMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!geometry) return;
+    const svg = e.currentTarget;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const p = pt.matrixTransform(ctm.inverse());
+    setCursorCoords({ x: Math.round(p.x * 100) / 100, y: Math.round(-p.y * 100) / 100 });
+  }, [geometry]);
 
   const planHoles = (holes.data ?? []).filter(
     h => selectedPlanId == null || h.planId === selectedPlanId
@@ -172,7 +186,7 @@ export default function Drillhole() {
       <ModuleHeader
         index="06"
         title="Drillhole Planning"
-        description="Import a DXF site plan, visualize it, and plan geotechnical drillholes — collar coordinates, azimuth, dip and depth — directly on the plan."
+        description="Import a DXF site plan with its original real-world coordinates (Easting/Northing), visualize it, and plan geotechnical drillholes — collar coordinates, azimuth, dip and depth — directly on the plan."
       />
 
       <div className="grid grid-cols-12 gap-8">
@@ -260,6 +274,8 @@ export default function Drillhole() {
                 viewBox={viewBox}
                 className={`w-full h-[480px] ${placing ? "cursor-crosshair" : ""}`}
                 onClick={onSvgClick}
+                onMouseMove={onSvgMove}
+                onMouseLeave={() => setCursorCoords(null)}
                 preserveAspectRatio="xMidYMid meet"
               >
                 {/* flip Y: CAD Y-up vs SVG Y-down */}
@@ -339,11 +355,18 @@ export default function Drillhole() {
             )}
           </div>
           {geometry && (
-            <p className="text-xs text-muted-foreground mt-2 font-mono">
-              {geometry.entityCount} entities · layers: {geometry.layers.slice(0, 6).join(", ")}
-              {geometry.layers.length > 6 ? "…" : ""} · bounds X [{geometry.bounds.minX} –{" "}
-              {geometry.bounds.maxX}] Y [{geometry.bounds.minY} – {geometry.bounds.maxY}]
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-muted-foreground font-mono">
+                {geometry.entityCount} entities · layers: {geometry.layers.slice(0, 6).join(", ")}
+                {geometry.layers.length > 6 ? "…" : ""} · bounds E [{geometry.bounds.minX} –{" "}
+                {geometry.bounds.maxX}] N [{geometry.bounds.minY} – {geometry.bounds.maxY}]
+              </p>
+              {cursorCoords && (
+                <p className="text-xs font-mono font-bold">
+                  E {cursorCoords.x} &nbsp; N {cursorCoords.y}
+                </p>
+              )}
+            </div>
           )}
         </div>
 

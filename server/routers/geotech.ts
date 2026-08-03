@@ -10,6 +10,10 @@ import {
   generateBlastReport,
   generateInspectionReport,
 } from "../geotech/ai";
+import {
+  computeBlastabilityIndex,
+  evaluateWallControl,
+} from "../geotech/blastability";
 import { TRPCError } from "@trpc/server";
 
 function assertOwner(row: { userId: number } | undefined, userId: number) {
@@ -265,6 +269,34 @@ export const blastRouter = router({
     assertOwner(row, ctx.user.id);
     return row;
   }),
+  blastabilityIndex: protectedProcedure
+    .input(
+      z.object({
+        rmd: z.number().min(10).max(50),
+        jps: z.number().min(10).max(50),
+        jpo: z.number().min(10).max(40),
+        specificGravity: z.number().min(1.5).max(5.0),
+        hardness: z.number().min(1).max(10),
+      }),
+    )
+    .mutation(({ input }) => computeBlastabilityIndex(input)),
+  wallControl: protectedProcedure
+    .input(
+      z.object({
+        preSplit: z.boolean(),
+        preSplitSpacing: z.number().min(0).max(5).default(0),
+        preSplitDiameter: z.number().min(0).max(200).default(89),
+        trimBlast: z.boolean(),
+        trimBurden: z.number().min(0).max(10).default(2.5),
+        bufferRows: z.number().min(0).max(10).default(2),
+        standoffDistance: z.number().min(0).max(30).default(5),
+        measuredBackbreak: z.number().min(0).max(20).default(0),
+        measuredCrestLoss: z.number().min(0).max(10).default(0),
+        designBermWidth: z.number().min(0).max(30).default(8),
+        actualBermWidth: z.number().min(0).max(30).default(7),
+      }),
+    )
+    .mutation(({ input }) => evaluateWallControl(input)),
 });
 
 export const complianceRouter = router({

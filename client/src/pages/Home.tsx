@@ -40,7 +40,7 @@ const modules = [
   },
   {
     index: "04",
-    title: "Post-Blast Assessment",
+    title: "Blast Assessment",
     description:
       "Before/after photo analysis by multimodal AI: fragmentation, overbreak detection and quantified quality score.",
     path: "/blast",
@@ -106,7 +106,7 @@ export default function Home() {
       <div className="grid grid-cols-12 gap-6 border-b-2 border-foreground pb-10 mb-10">
         <div className="col-span-12 md:col-span-8">
           <div className="flex items-center gap-3 mb-4">
-            <span className="swiss-square" />
+            <img src="/favicon.png" alt="OPGeotech logo" className="h-6 w-6" />
             <span className="swiss-label">Geotechnical Engineering Platform</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold uppercase tracking-tight leading-[0.95]">
@@ -117,7 +117,7 @@ export default function Home() {
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-6 max-w-xl">
             Slope stability, rock mass classification, daily inspection
-            reporting, post-blast assessment and design compliance — unified in
+            reporting, blast assessment and design compliance — unified in
             one precision-driven workspace for open-pit operations.
           </p>
         </div>

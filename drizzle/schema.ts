@@ -84,7 +84,7 @@ export const inspectionReports = mysqlTable("inspection_reports", {
 });
 
 /**
- * Évaluations post-blast avec analyse photo IA
+ * Blast assessments avec analyse photo IA
  */
 export const blastAssessments = mysqlTable("blast_assessments", {
   id: int("id").autoincrement().primaryKey(),
