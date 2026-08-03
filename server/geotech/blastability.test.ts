@@ -14,7 +14,6 @@ describe("Blastability Index (Lilly 1986) — SME reference", () => {
       jpo: 20,
       density: 2.6,
       ucs: 100,
-      rqd: 60, // fair — no adjustment
     });
     expect(result.bi).toBeCloseTo(50.0, 1);
     expect(result.rdi).toBeCloseTo(15, 1);
@@ -30,7 +29,6 @@ describe("Blastability Index (Lilly 1986) — SME reference", () => {
       jpo: 20,
       density: 2.7,
       ucs: 100,
-      rqd: 60,
     });
     // RDI = 25*2.7-50 = 17.5, Strength = 0.05*100 = 5
     // BI = 0.5*(20+20+20+17.5+5) = 41.25
@@ -40,30 +38,6 @@ describe("Blastability Index (Lilly 1986) — SME reference", () => {
     expect(result.suggestedPowderFactor.value).toBeCloseTo(0.4455, 2);
   });
 
-  it("RQD adjustment increases PF for massive rock (RQD=95)", () => {
-    const base = computeBlastabilityIndex({
-      rmd: 20, jps: 20, jpo: 20, density: 2.7, ucs: 100, rqd: 60,
-    });
-    const highRqd = computeBlastabilityIndex({
-      rmd: 20, jps: 20, jpo: 20, density: 2.7, ucs: 100, rqd: 95,
-    });
-    // RQD 95 → factor 1.15 → PF should be 15% higher
-    expect(highRqd.suggestedPowderFactor.value).toBeGreaterThan(base.suggestedPowderFactor.value);
-    expect(highRqd.suggestedPowderFactor.value).toBeCloseTo(base.suggestedPowderFactor.value * 1.15, 2);
-  });
-
-  it("RQD adjustment decreases PF for fractured rock (RQD=15)", () => {
-    const base = computeBlastabilityIndex({
-      rmd: 20, jps: 20, jpo: 20, density: 2.7, ucs: 100, rqd: 60,
-    });
-    const lowRqd = computeBlastabilityIndex({
-      rmd: 20, jps: 20, jpo: 20, density: 2.7, ucs: 100, rqd: 15,
-    });
-    // RQD 15 → factor 0.80 → PF should be 20% lower
-    expect(lowRqd.suggestedPowderFactor.value).toBeLessThan(base.suggestedPowderFactor.value);
-    expect(lowRqd.suggestedPowderFactor.value).toBeCloseTo(base.suggestedPowderFactor.value * 0.80, 2);
-  });
-
   it("classifies massive hard dense rock as Very Difficult", () => {
     const result = computeBlastabilityIndex({
       rmd: 50,
@@ -71,12 +45,23 @@ describe("Blastability Index (Lilly 1986) — SME reference", () => {
       jpo: 40,
       density: 3.5,
       ucs: 250,
-      rqd: 90,
     });
     // RDI = 25*3.5-50 = 37.5, Strength = 0.05*250 = 12.5
     // BI = 0.5*(50+50+40+37.5+12.5) = 95
     expect(result.bi).toBeCloseTo(95, 1);
     expect(result.classification).toBe("Very Difficult");
+  });
+
+  it("wall proximity PF is 50-65% of production PF", () => {
+    const result = computeBlastabilityIndex({
+      rmd: 10,
+      jps: 50,
+      jpo: 20,
+      density: 2.6,
+      ucs: 100,
+    });
+    expect(result.wallProximityPF.min).toBeCloseTo(0.52 * 0.5, 2);
+    expect(result.wallProximityPF.max).toBeCloseTo(0.52 * 0.65, 2);
   });
 });
 

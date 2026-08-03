@@ -112,7 +112,6 @@ function BlastabilityTab() {
   const [jpo, setJpo] = useState("20");
   const [sg, setSg] = useState("2.7");
   const [ucs, setUcs] = useState("100");
-  const [rqd, setRqd] = useState("60");
   const [result, setResult] = useState<any>(null);
 
   const compute = trpc.blast.blastabilityIndex.useMutation({
@@ -127,7 +126,6 @@ function BlastabilityTab() {
       jpo: Number(jpo),
       density: Number(sg),
       ucs: Number(ucs),
-      rqd: Number(rqd),
     });
   };
 
@@ -198,18 +196,6 @@ function BlastabilityTab() {
             />
           </div>
         </div>
-        <div>
-          <Label className="swiss-label mb-1.5 block">RQD (%)</Label>
-          <Input
-            type="number"
-            min="0"
-            max="100"
-            value={rqd}
-            onChange={e => setRqd(e.target.value)}
-            className="max-w-[180px]"
-          />
-          <p className="text-xs text-muted-foreground mt-1">Rock Quality Designation — refines the powder factor recommendation.</p>
-        </div>
         <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>
           {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute Blastability Index"}
         </Button>
@@ -239,18 +225,13 @@ function BlastabilityTab() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground">{result.description}</p>
-            {result.rqdAdjustment && (
-              <p className="text-sm border-l-2 border-primary pl-3 text-muted-foreground">{result.rqdAdjustment}</p>
-            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="border border-foreground p-4">
-                <div className="swiss-label text-xs mb-2">Suggested Powder Factor</div>
+                <div className="swiss-label text-xs mb-2">Suggested Powder Factor (Lilly)</div>
                 <div className="text-2xl font-bold">
                   {result.suggestedPowderFactor.value}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Range: {result.suggestedPowderFactor.min} – {result.suggestedPowderFactor.max} {result.suggestedPowderFactor.unit}
-                </div>
+                <div className="text-xs text-muted-foreground">{result.suggestedPowderFactor.unit}</div>
               </div>
               <div className="border border-primary p-4 bg-primary/5">
                 <div className="swiss-label text-xs mb-2 text-primary">Wall Proximity PF (reduced)</div>

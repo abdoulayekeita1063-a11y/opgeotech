@@ -27,8 +27,6 @@ export interface BlastabilityInput {
   density: number;
   /** UCS in MPa. Strength = 0.05 * UCS */
   ucs: number;
-  /** RQD (%) — Rock Quality Designation, 0–100. Used to refine PF recommendation. */
-  rqd: number;
 }
 
 export interface BlastabilityResult {
@@ -37,14 +35,13 @@ export interface BlastabilityResult {
   strength: number;
   classification: string;
   description: string;
-  suggestedPowderFactor: { value: number; min: number; max: number; unit: string };
+  suggestedPowderFactor: { value: number; unit: string };
   wallProximityPF: { min: number; max: number; unit: string };
-  rqdAdjustment: string;
   recommendations: string[];
 }
 
 export function computeBlastabilityIndex(input: BlastabilityInput): BlastabilityResult {
-  const { rmd, jps, jpo, density, ucs, rqd } = input;
+  const { rmd, jps, jpo, density, ucs } = input;
 
   // RDI = 25 * Density - 50
   const rdi = 25 * density - 50;
@@ -78,43 +75,15 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
   // Suggested Powder Factor (kg/m³) = 0.004 * BI * Density (per SME reference)
   const pfBase = 0.004 * bi * density;
 
-  // RQD adjustment factor:
-  // RQD > 75% (massive) → increase PF by up to 15%
-  // RQD 50–75% (fair) → no adjustment
-  // RQD 25–50% (poor) → decrease PF by up to 10%
-  // RQD < 25% (very poor) → decrease PF by up to 20%
-  let rqdFactor = 1.0;
-  let rqdAdjustment: string;
-  if (rqd >= 90) {
-    rqdFactor = 1.15;
-    rqdAdjustment = `RQD ${rqd}% (Excellent) — PF increased by 15% due to massive, intact rock requiring more energy.`;
-  } else if (rqd >= 75) {
-    rqdFactor = 1.08;
-    rqdAdjustment = `RQD ${rqd}% (Good) — PF increased by 8% due to relatively intact rock.`;
-  } else if (rqd >= 50) {
-    rqdFactor = 1.0;
-    rqdAdjustment = `RQD ${rqd}% (Fair) — No PF adjustment; standard conditions.`;
-  } else if (rqd >= 25) {
-    rqdFactor = 0.90;
-    rqdAdjustment = `RQD ${rqd}% (Poor) — PF reduced by 10%; pre-existing fractures assist fragmentation.`;
-  } else {
-    rqdFactor = 0.80;
-    rqdAdjustment = `RQD ${rqd}% (Very Poor) — PF reduced by 20%; highly fractured rock fragments easily.`;
-  }
-
-  const pfAdjusted = pfBase * rqdFactor;
-
   const suggestedPowderFactor = {
-    value: round3(pfAdjusted),
-    min: round3(pfAdjusted * 0.9),
-    max: round3(pfAdjusted * 1.1),
+    value: round3(pfBase),
     unit: "kg/m³",
   };
 
   // Wall proximity PF: reduced by 35–50% to minimize damage
   const wallProximityPF = {
-    min: round3(pfAdjusted * 0.50),
-    max: round3(pfAdjusted * 0.65),
+    min: round3(pfBase * 0.50),
+    max: round3(pfBase * 0.65),
     unit: "kg/m³",
   };
 
@@ -129,17 +98,11 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
   if (bi < 25) {
     recommendations.push("Low BI — risk of over-fragmentation; consider reducing charge per hole.");
   }
-  if (rqd < 25) {
-    recommendations.push("Very low RQD — rock is heavily fractured; minimal explosive energy needed.");
-  }
-  if (rqd >= 90) {
-    recommendations.push("Very high RQD — massive intact rock; ensure adequate charge concentration.");
-  }
   recommendations.push(
     `For wall control (trim/buffer rows), use powder factor ${wallProximityPF.min}–${wallProximityPF.max} kg/m³.`
   );
   recommendations.push(
-    `For production blasting, use powder factor ${suggestedPowderFactor.min}–${suggestedPowderFactor.max} kg/m³.`
+    `For production blasting, use powder factor ${suggestedPowderFactor.value} kg/m³.`
   );
 
   return {
@@ -150,7 +113,6 @@ export function computeBlastabilityIndex(input: BlastabilityInput): Blastability
     description,
     suggestedPowderFactor,
     wallProximityPF,
-    rqdAdjustment,
     recommendations,
   };
 }
