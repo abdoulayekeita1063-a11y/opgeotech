@@ -26,6 +26,7 @@ import {
   Bomb,
   ClipboardList,
   Compass,
+  Download,
   Drill,
   LayoutDashboard,
   Layers,
@@ -51,6 +52,7 @@ const menuItems = [
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: Archive, label: "Archive", path: "/archive" },
+  { icon: Download, label: "Download App", path: "/download" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

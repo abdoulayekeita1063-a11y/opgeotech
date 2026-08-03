@@ -64,11 +64,11 @@
 - [x] Update dashboard with new modules, re-test all, checkpoint (version fce6ad82; repo-wide rename verified, 27 tests pass, 4 pages screenshot-verified)
 
 ## Desktop App + New Logo (user request)
-- [ ] Design new open-pit logo (concentric benches) in Swiss red/black style
-- [ ] Apply new logo everywhere: PWA icons (192/512/maskable), favicon, sidebar, login page, VITE_APP_LOGO
-- [ ] Build Electron desktop app (Windows installer .exe) that loads the published site
-- [ ] Host the installer for download and add a Download page/link in the app
-- [ ] Test everything, checkpoint (auto-published)
+- [x] Design new open-pit logo (concentric benches) in Swiss red/black style
+- [x] Apply new logo everywhere: PWA icons (192/512/maskable), favicon, sidebar, login page, VITE_APP_LOGO
+- [x] Build Electron desktop app (Windows installer .exe) that loads the published site
+- [x] Host the installer for download and add a Download page/link in the app
+- [x] Test everything, checkpoint (auto-published)
 
 ## DXF Real Coordinates + Blast Assessment Expansion (user request)
 - [x] DXF import preserves real-world coordinates (no normalization to 0,0) in Drillhole Planning
