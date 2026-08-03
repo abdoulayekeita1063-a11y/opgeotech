@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload, Trash2, Crosshair } from "lucide-react";
+import { Loader2, Upload, Trash2, Crosshair, FileDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 
@@ -511,8 +511,40 @@ export default function Drillhole() {
             Save Drillhole
           </Button>
 
-          <div className="mt-8">
-            <SectionLabel>Planned holes ({(holes.data ?? []).length})</SectionLabel>
+         <div className="mt-8">
+            <div className="flex items-center justify-between">
+              <SectionLabel>Planned holes ({(holes.data ?? []).length})</SectionLabel>
+              {(holes.data ?? []).length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-none border-foreground text-xs font-bold uppercase"
+                  onClick={() => {
+                    const rows = (holes.data ?? []).map(h => {
+                      const dipRad = Math.abs(h.dip) * Math.PI / 180;
+                      const horizLen = h.depth * Math.cos(dipRad);
+                      const azRad = h.azimuth * Math.PI / 180;
+                      const toeX = Math.round((h.collarX + horizLen * Math.sin(azRad)) * 1000) / 1000;
+                      const toeY = Math.round((h.collarY + horizLen * Math.cos(azRad)) * 1000) / 1000;
+                      const toeZ = Math.round((h.collarZ - h.depth * Math.sin(dipRad)) * 1000) / 1000;
+                      return [h.holeId, h.collarX, h.collarY, h.collarZ, h.azimuth, h.dip, h.depth, toeX, toeY, toeZ, h.purpose, h.notes || ""].join(",");
+                    });
+                    const header = "HoleID,CollarX,CollarY,CollarZ,Azimuth,Dip,Depth,ToeX,ToeY,ToeZ,Purpose,Notes";
+                    const csv = [header, ...rows].join("\n");
+                    const blob = new Blob([csv], { type: "text/csv" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "drillholes_planned.csv";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success("CSV exported");
+                  }}
+                >
+                  <FileDown className="h-3.5 w-3.5 mr-1" /> Export CSV
+                </Button>
+              )}
+            </div>
             <div className="border border-foreground divide-y divide-border mt-3 max-h-[320px] overflow-y-auto">
               {(holes.data ?? []).length === 0 && (
                 <p className="p-4 text-sm text-muted-foreground">No drillholes planned yet.</p>
