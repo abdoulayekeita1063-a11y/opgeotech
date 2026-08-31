@@ -63,9 +63,6 @@ export default function Monitoring() {
     moderateVelocityMmPerDay: 1,
     highVelocityMmPerDay: 5,
     criticalVelocityMmPerDay: 10,
-    moderateAccelerationMmPerDay2: 0.1,
-    highAccelerationMmPerDay2: 0.5,
-    criticalAccelerationMmPerDay2: 1,
   });
   const records = trpc.monitoring.list.useQuery();
   const radarReadings = trpc.monitoring.radarReadings.useQuery(
@@ -334,15 +331,14 @@ export default function Monitoring() {
                   <SelectContent>{Array.from(new Set((radarReadings.data ?? []).map(reading => reading.radarPointId))).map(point => <SelectItem key={point} value={point}>{point}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="text-xs text-muted-foreground pb-2">CSV: radarPointId, measuredAt, displacementMm, velocityMmPerDay, accelerationMmPerDay2</div>
+              <div className="text-xs text-muted-foreground pb-2">CSV: radarPointId, measuredAt, displacementMm, velocityMmPerDay</div>
             </div>
             <div className="border border-foreground bg-muted/30 p-4 mt-5">
-              <div className="flex items-center justify-between gap-3 flex-wrap"><div><div className="swiss-label text-[10px]">Radar trigger thresholds</div><p className="text-xs text-muted-foreground mt-1">Configure the site-specific warning levels used by the trend classification.</p></div><Button type="button" variant="outline" size="sm" className="rounded-none" onClick={() => setThresholds({ moderateVelocityMmPerDay: 1, highVelocityMmPerDay: 5, criticalVelocityMmPerDay: 10, moderateAccelerationMmPerDay2: 0.1, highAccelerationMmPerDay2: 0.5, criticalAccelerationMmPerDay2: 1 })}>Reset defaults</Button></div>
+              <div className="flex items-center justify-between gap-3 flex-wrap"><div><div className="swiss-label text-[10px]">Radar velocity thresholds</div><p className="text-xs text-muted-foreground mt-1">Configure the site-specific warning levels used by the velocity trend classification.</p></div><Button type="button" variant="outline" size="sm" className="rounded-none" onClick={() => setThresholds({ moderateVelocityMmPerDay: 1, highVelocityMmPerDay: 5, criticalVelocityMmPerDay: 10 })}>Reset defaults</Button></div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
-                {(["moderateVelocityMmPerDay", "highVelocityMmPerDay", "criticalVelocityMmPerDay", "moderateAccelerationMmPerDay2", "highAccelerationMmPerDay2", "criticalAccelerationMmPerDay2"] as const).map(field => {
-                  const isAcceleration = field.includes("Acceleration");
+                {(["moderateVelocityMmPerDay", "highVelocityMmPerDay", "criticalVelocityMmPerDay"] as const).map(field => {
                   const label = field.startsWith("moderate") ? "Moderate" : field.startsWith("high") ? "High" : "Critical";
-                  return <div key={field}><Label className="text-[10px] uppercase">{label} {isAcceleration ? "acceleration" : "velocity"}</Label><Input type="number" min="0.001" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds[field]} onChange={event => setThresholds(previous => ({ ...previous, [field]: Math.max(0.001, Number(event.target.value) || 0.001) }))} /><div className="text-[10px] text-muted-foreground mt-1">{isAcceleration ? "mm/day²" : "mm/day"}</div></div>;
+                  return <div key={field}><Label className="text-[10px] uppercase">{label} velocity</Label><Input type="number" min="0.001" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds[field]} onChange={event => setThresholds(previous => ({ ...previous, [field]: Math.max(0.001, Number(event.target.value) || 0.001) }))} /><div className="text-[10px] text-muted-foreground mt-1">mm/day</div></div>;
                 })}
               </div>
             </div>
@@ -355,7 +351,6 @@ export default function Monitoring() {
                     ["Samples", radarAnalysis.data.sampleCount],
                     ["Displacement change", `${radarAnalysis.data.displacementChangeMm} mm`],
                     ["Latest velocity", radarAnalysis.data.latestVelocityMmPerDay === null ? "—" : `${radarAnalysis.data.latestVelocityMmPerDay} mm/day`],
-                    ["Latest acceleration", radarAnalysis.data.latestAccelerationMmPerDay2 === null ? "—" : `${radarAnalysis.data.latestAccelerationMmPerDay2} mm/day²`],
                   ].map(([label, value]) => <div key={String(label)} className="border border-foreground p-3"><div className="swiss-label text-[10px] mb-2">{label}</div><div className={`font-bold ${label === "Risk indication" ? riskClass(String(value)) + " inline-flex px-2 py-1" : ""}`}>{value}</div></div>)}
                 </div>
                 <div className="border-l-4 border-primary bg-muted/30 p-4 mt-4 text-sm"><strong>{radarAnalysis.data.alert}</strong><div className="text-xs text-muted-foreground mt-2">Trend warning only — verify radar quality, prisms, visual inspections and the site Trigger Action Response Plan before taking operational action.</div></div>
@@ -394,8 +389,8 @@ export default function Monitoring() {
               <div className="border border-foreground mt-5 overflow-x-auto">
                 <div className="p-4 border-b border-foreground"><div className="swiss-label text-[10px]">Imported radar measurements</div><div className="text-xs text-muted-foreground mt-1">{radarReadings.data.filter(reading => !selectedPointId || reading.radarPointId === selectedPointId).length} readings shown for the selected point.</div></div>
                 <table className="w-full min-w-[680px] text-sm">
-                  <thead className="border-b border-foreground bg-muted/40"><tr className="text-left"><th className="p-3 swiss-label text-[10px]">Point</th><th className="p-3 swiss-label text-[10px]">Measured UTC</th><th className="p-3 swiss-label text-[10px]">Displacement (mm)</th><th className="p-3 swiss-label text-[10px]">Velocity (mm/day)</th><th className="p-3 swiss-label text-[10px]">Acceleration (mm/day²)</th><th className="p-3 swiss-label text-[10px]">Source</th></tr></thead>
-                  <tbody className="divide-y divide-border">{radarReadings.data.filter(reading => !selectedPointId || reading.radarPointId === selectedPointId).map(reading => <tr key={reading.id}><td className="p-3 font-mono">{reading.radarPointId}</td><td className="p-3 text-xs whitespace-nowrap">{new Date(reading.measuredAt).toLocaleString()}</td><td className="p-3 font-mono">{reading.displacementMm.toFixed(2)}</td><td className="p-3 font-mono">{reading.velocityMmPerDay === null ? "—" : reading.velocityMmPerDay.toFixed(3)}</td><td className="p-3 font-mono">{reading.accelerationMmPerDay2 === null ? "—" : reading.accelerationMmPerDay2.toFixed(3)}</td><td className="p-3 text-xs text-muted-foreground">{reading.source || "—"}</td></tr>)}</tbody>
+                  <thead className="border-b border-foreground bg-muted/40"><tr className="text-left"><th className="p-3 swiss-label text-[10px]">Point</th><th className="p-3 swiss-label text-[10px]">Measured UTC</th><th className="p-3 swiss-label text-[10px]">Displacement (mm)</th><th className="p-3 swiss-label text-[10px]">Velocity (mm/day)</th><th className="p-3 swiss-label text-[10px]">Source</th></tr></thead>
+                  <tbody className="divide-y divide-border">{radarReadings.data.filter(reading => !selectedPointId || reading.radarPointId === selectedPointId).map(reading => <tr key={reading.id}><td className="p-3 font-mono">{reading.radarPointId}</td><td className="p-3 text-xs whitespace-nowrap">{new Date(reading.measuredAt).toLocaleString()}</td><td className="p-3 font-mono">{reading.displacementMm.toFixed(2)}</td><td className="p-3 font-mono">{reading.velocityMmPerDay === null ? "—" : reading.velocityMmPerDay.toFixed(3)}</td><td className="p-3 text-xs text-muted-foreground">{reading.source || "—"}</td></tr>)}</tbody>
                 </table>
               </div>
             )}

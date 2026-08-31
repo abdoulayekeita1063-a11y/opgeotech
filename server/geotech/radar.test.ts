@@ -4,7 +4,7 @@ import { analyzeRadarTrend } from "./radar";
 const day = 86_400_000;
 
 describe("Radar trend analysis", () => {
-  it("derives velocity and acceleration from displacement time series", () => {
+  it("derives velocity from displacement time series", () => {
     const result = analyzeRadarTrend([
       { radarPointId: "P-01", measuredAt: 0 + day, displacementMm: 0 },
       { radarPointId: "P-01", measuredAt: 2 * day, displacementMm: 2 },
@@ -14,8 +14,7 @@ describe("Radar trend analysis", () => {
     expect(result.sampleCount).toBe(3);
     expect(result.displacementChangeMm).toBe(5);
     expect(result.latestVelocityMmPerDay).toBe(3);
-    expect(result.latestAccelerationMmPerDay2).toBe(1);
-    expect(result.risk).toBe("Critical");
+    expect(result.risk).toBe("Moderate");
   });
 
   it("returns an inverse-velocity forecast when the speed trend accelerates consistently", () => {
@@ -40,23 +39,19 @@ describe("Radar trend analysis", () => {
       moderateVelocityMmPerDay: 3,
       highVelocityMmPerDay: 6,
       criticalVelocityMmPerDay: 9,
-      moderateAccelerationMmPerDay2: 0.2,
-      highAccelerationMmPerDay2: 0.6,
-      criticalAccelerationMmPerDay2: 1.2,
     });
 
     expect(result.latestVelocityMmPerDay).toBe(2);
     expect(result.risk).toBe("Low");
   });
 
-  it("uses supplied velocity and acceleration when available", () => {
+  it("uses supplied velocity when available", () => {
     const result = analyzeRadarTrend([
-      { radarPointId: "P-02", measuredAt: day, displacementMm: 10, velocityMmPerDay: 0.4, accelerationMmPerDay2: 0.02 },
-      { radarPointId: "P-02", measuredAt: 2 * day, displacementMm: 10.4, velocityMmPerDay: 0.5, accelerationMmPerDay2: 0.03 },
+      { radarPointId: "P-02", measuredAt: day, displacementMm: 10, velocityMmPerDay: 0.4 },
+      { radarPointId: "P-02", measuredAt: 2 * day, displacementMm: 10.4, velocityMmPerDay: 0.5 },
     ]);
 
     expect(result.latestVelocityMmPerDay).toBe(0.5);
-    expect(result.latestAccelerationMmPerDay2).toBe(0.03);
     expect(result.risk).toBe("Low");
   });
 
@@ -68,6 +63,6 @@ describe("Radar trend analysis", () => {
 
     expect(result.latestVelocityMmPerDay).toBe(2);
     expect(result.risk).toBe("Moderate");
-    expect(result.alert).toContain("Moderate movement trend");
+    expect(result.alert).toContain("Moderate movement velocity");
   });
 });

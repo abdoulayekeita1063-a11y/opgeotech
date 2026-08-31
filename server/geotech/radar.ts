@@ -6,12 +6,10 @@ export type RadarReadingInput = {
   measuredAt: number;
   displacementMm: number;
   velocityMmPerDay?: number | null;
-  accelerationMmPerDay2?: number | null;
 };
 
 export type RadarTrendPoint = RadarReadingInput & {
   calculatedVelocityMmPerDay: number | null;
-  calculatedAccelerationMmPerDay2: number | null;
 };
 
 export type RadarFailureForecast = {
@@ -34,9 +32,7 @@ export type RadarTrendResult = {
   displacementChangeMm: number;
   latestDisplacementMm: number;
   latestVelocityMmPerDay: number | null;
-  latestAccelerationMmPerDay2: number | null;
   peakVelocityMmPerDay: number | null;
-  peakAccelerationMmPerDay2: number | null;
   risk: RadarRisk;
   alert: string;
   basis: string[];
@@ -48,9 +44,6 @@ export const DEFAULT_RADAR_THRESHOLDS = {
   moderateVelocityMmPerDay: 1,
   highVelocityMmPerDay: 5,
   criticalVelocityMmPerDay: 10,
-  moderateAccelerationMmPerDay2: 0.1,
-  highAccelerationMmPerDay2: 0.5,
-  criticalAccelerationMmPerDay2: 1,
 };
 
 function finiteOrNull(value: number | null | undefined) {
@@ -119,7 +112,7 @@ function inverseVelocityForecast(points: RadarTrendPoint[], firstMeasuredAt: num
 
   if (slope >= 0 || !isForwardForecast || rSquared < 0.5) {
     const reason = slope >= 0
-      ? "Inverse velocity is not declining, so the supplied trend does not support a forward failure-time estimate."
+      ? "Inverse velocity is not declining, so the supplied displacement/velocity trend does not support a forward failure-time estimate."
       : !isForwardForecast
         ? "The fitted inverse-velocity line reaches zero before or at the latest observation."
         : `The inverse-velocity fit is weak (R² = ${rSquared.toFixed(2)}).`;
@@ -138,7 +131,6 @@ function inverseVelocityForecast(points: RadarTrendPoint[], firstMeasuredAt: num
 
   const predictedFailureAt = firstMeasuredAt + predictedTimeDays * 86_400_000;
   const leadTimeHours = Math.max(0, (predictedFailureAt - lastMeasuredAt) / 3_600_000);
-  const confidence = rSquared >= 0.8 ? "High" : "Moderate";
   return {
     method: "Inverse velocity",
     status: "Forecast available",
@@ -147,7 +139,7 @@ function inverseVelocityForecast(points: RadarTrendPoint[], firstMeasuredAt: num
     rSquared: round(rSquared),
     fitSampleCount: n,
     inverseVelocitySlopePerDay: round(slope),
-    confidence,
+    confidence: rSquared >= 0.8 ? "High" : "Moderate",
     message: `Extrapolated inverse velocity reaches zero in approximately ${leadTimeHours.toFixed(1)} hours. Treat this as a trend warning, not a deterministic failure time.`,
   };
 }
@@ -165,53 +157,42 @@ export function analyzeRadarTrend(
     const current = sorted[i];
     const previous = sorted[i - 1];
     let velocity = finiteOrNull(current.velocityMmPerDay);
-    let acceleration = finiteOrNull(current.accelerationMmPerDay2);
 
     if (velocity === null && previous) {
       const days = (current.measuredAt - previous.measuredAt) / 86_400_000;
       if (days > 0) velocity = (current.displacementMm - previous.displacementMm) / days;
     }
-    if (acceleration === null && previous && velocity !== null) {
-      const previousVelocity = points[i - 1].calculatedVelocityMmPerDay;
-      const days = (current.measuredAt - previous.measuredAt) / 86_400_000;
-      if (previousVelocity !== null && days > 0) acceleration = (velocity - previousVelocity) / days;
-    }
 
     points.push({
       ...current,
       calculatedVelocityMmPerDay: round(velocity),
-      calculatedAccelerationMmPerDay2: round(acceleration),
     });
   }
 
   const firstMeasuredAt = sorted[0].measuredAt;
   const latest = points[points.length - 1];
   const velocities = points.map(point => point.calculatedVelocityMmPerDay).filter((value): value is number => value !== null);
-  const accelerations = points.map(point => point.calculatedAccelerationMmPerDay2).filter((value): value is number => value !== null);
   const latestVelocity = latest.calculatedVelocityMmPerDay;
-  const latestAcceleration = latest.calculatedAccelerationMmPerDay2;
   const absoluteVelocity = latestVelocity === null ? 0 : Math.abs(latestVelocity);
-  const absoluteAcceleration = latestAcceleration === null ? 0 : Math.abs(latestAcceleration);
 
   let risk: RadarRisk = "Low";
-  if (absoluteVelocity >= thresholds.criticalVelocityMmPerDay || absoluteAcceleration >= thresholds.criticalAccelerationMmPerDay2) risk = "Critical";
-  else if (absoluteVelocity >= thresholds.highVelocityMmPerDay || absoluteAcceleration >= thresholds.highAccelerationMmPerDay2) risk = "High";
-  else if (absoluteVelocity >= thresholds.moderateVelocityMmPerDay || absoluteAcceleration >= thresholds.moderateAccelerationMmPerDay2) risk = "Moderate";
+  if (absoluteVelocity >= thresholds.criticalVelocityMmPerDay) risk = "Critical";
+  else if (absoluteVelocity >= thresholds.highVelocityMmPerDay) risk = "High";
+  else if (absoluteVelocity >= thresholds.moderateVelocityMmPerDay) risk = "Moderate";
 
   const failureForecast = inverseVelocityForecast(points, firstMeasuredAt, latest.measuredAt);
   const basis = [
     `Latest velocity: ${latestVelocity === null ? "not available" : `${latestVelocity} mm/day`}.`,
-    `Latest acceleration: ${latestAcceleration === null ? "not available" : `${latestAcceleration} mm/day²`}.`,
     `Thresholds: moderate ${thresholds.moderateVelocityMmPerDay}, high ${thresholds.highVelocityMmPerDay}, critical ${thresholds.criticalVelocityMmPerDay} mm/day.`,
     `Failure forecast: ${failureForecast.status} using ${failureForecast.method}.`,
   ];
   const alert = risk === "Critical"
-    ? "Critical movement trend — immediately follow the site Trigger Action Response Plan and confirm with the geotechnical engineer."
+    ? "Critical movement velocity — immediately follow the site Trigger Action Response Plan and confirm with the geotechnical engineer."
     : risk === "High"
-      ? "High movement trend — increase observation frequency and verify the radar signal, prism data and field conditions."
+      ? "High movement velocity — increase observation frequency and verify the radar signal, prism data and field conditions."
       : risk === "Moderate"
-        ? "Moderate movement trend — continue close monitoring and review the trend against site trigger levels."
-        : "No threshold exceedance detected in the supplied trend; maintain the monitoring plan.";
+        ? "Moderate movement velocity — continue close monitoring and review the trend against site trigger levels."
+        : "No velocity threshold exceedance detected in the supplied trend; maintain the monitoring plan.";
 
   return {
     pointId: latest.radarPointId,
@@ -221,9 +202,7 @@ export function analyzeRadarTrend(
     displacementChangeMm: round(latest.displacementMm - sorted[0].displacementMm) ?? 0,
     latestDisplacementMm: latest.displacementMm,
     latestVelocityMmPerDay: latestVelocity,
-    latestAccelerationMmPerDay2: latestAcceleration,
     peakVelocityMmPerDay: velocities.length ? round(Math.max(...velocities.map(Math.abs))) : null,
-    peakAccelerationMmPerDay2: accelerations.length ? round(Math.max(...accelerations.map(Math.abs))) : null,
     risk,
     alert,
     basis,

@@ -303,7 +303,6 @@ export const monitoringRouter = router({
         measuredAt: z.number().positive(),
         displacementMm: z.number(),
         velocityMmPerDay: z.number().nullable().optional(),
-        accelerationMmPerDay2: z.number().nullable().optional(),
       })).min(1).max(10000),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -316,7 +315,6 @@ export const monitoringRouter = router({
         measuredAt: reading.measuredAt,
         displacementMm: reading.displacementMm,
         velocityMmPerDay: reading.velocityMmPerDay ?? null,
-        accelerationMmPerDay2: reading.accelerationMmPerDay2 ?? null,
         source: input.source ?? null,
       })));
       return { count };
@@ -337,9 +335,6 @@ export const monitoringRouter = router({
       moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
       highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
       criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
-      moderateAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateAccelerationMmPerDay2),
-      highAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highAccelerationMmPerDay2),
-      criticalAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalAccelerationMmPerDay2),
     }))
     .query(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
@@ -352,14 +347,10 @@ export const monitoringRouter = router({
         measuredAt: reading.measuredAt,
         displacementMm: reading.displacementMm,
         velocityMmPerDay: reading.velocityMmPerDay,
-        accelerationMmPerDay2: reading.accelerationMmPerDay2,
       })), {
         moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
         highVelocityMmPerDay: input.highVelocityMmPerDay,
         criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
-        moderateAccelerationMmPerDay2: input.moderateAccelerationMmPerDay2,
-        highAccelerationMmPerDay2: input.highAccelerationMmPerDay2,
-        criticalAccelerationMmPerDay2: input.criticalAccelerationMmPerDay2,
       });
     }),
 });

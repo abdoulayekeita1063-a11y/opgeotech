@@ -116,3 +116,9 @@
 - [x] Create a separate Radar Failure Report section with radar trend, risk level and inverse-velocity failure-date estimate
 - [x] Add report export/print action and explicit engineering limitations in English
 - [x] Test the new report flow and save a checkpoint (39 automated tests pass; UI routes screenshot-verified)
+
+## Displacement and Velocity Only (user request)
+- [x] Remove acceleration from active Monitoring and Radar Failure Report inputs, tables and labels
+- [x] Make radar risk classification depend only on velocity thresholds
+- [x] Keep Inverse Velocity failure-date prediction based only on displacement-derived or supplied velocity
+- [x] Update tests, verify the UI and save a fresh checkpoint

@@ -3,7 +3,6 @@ export type ParsedRadarReading = {
   measuredAt: number;
   displacementMm: number;
   velocityMmPerDay?: number;
-  accelerationMmPerDay2?: number;
 };
 
 function parseCsvLine(line: string) {
@@ -32,7 +31,6 @@ export function parseRadarCsv(text: string): ParsedRadarReading[] {
   const timeIndex = find("measuredat", "timestamp", "datetime", "date", "time");
   const displacementIndex = find("displacementmm", "displacement", "deformationmm", "deformation");
   const velocityIndex = find("velocitymmperday", "velocity", "velocitymmd", "rate");
-  const accelerationIndex = find("accelerationmmperday2", "acceleration", "accelerationrate");
   if (timeIndex < 0 || displacementIndex < 0) throw new Error("CSV needs measuredAt/timestamp and displacementMm columns");
   const parseTime = (value: string) => {
     const numeric = Number(value);
@@ -51,7 +49,6 @@ export function parseRadarCsv(text: string): ParsedRadarReading[] {
       measuredAt: parseTime(cells[timeIndex]),
       displacementMm,
       velocityMmPerDay: optional(velocityIndex),
-      accelerationMmPerDay2: optional(accelerationIndex),
     };
   });
 }
