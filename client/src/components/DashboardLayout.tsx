@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   Activity,
   Archive,
+  FileText,
   Bomb,
   ClipboardList,
   Compass,
@@ -53,6 +54,7 @@ const menuItems = [
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: Activity, label: "Monitoring", path: "/monitoring" },
+  { icon: FileText, label: "Radar Failure Report", path: "/radar-report" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];

@@ -2,11 +2,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import {
+  Activity,
   ArrowUpRight,
   Bomb,
   ClipboardList,
   Compass,
   Drill,
+  FileText,
   Layers,
   Mountain,
   Ruler,
@@ -78,6 +80,22 @@ const modules = [
     path: "/kinematics",
     icon: Triangle,
   },
+  {
+    index: "09",
+    title: "Monitoring",
+    description:
+      "Exposed wall register with radar displacement trends, velocity, acceleration and risk warnings.",
+    path: "/monitoring",
+    icon: Activity,
+  },
+  {
+    index: "10",
+    title: "Radar Failure Report",
+    description:
+      "Structured report with radar risk level, inverse-velocity analysis and estimated failure date.",
+    path: "/radar-report",
+    icon: FileText,
+  },
 ];
 
 export default function Home() {
@@ -89,6 +107,7 @@ export default function Home() {
   const compliance = trpc.compliance.list.useQuery(undefined, { enabled: !!user });
   const structures = trpc.mapping.list.useQuery(undefined, { enabled: !!user });
   const kinematics = trpc.kinematics.list.useQuery(undefined, { enabled: !!user });
+  const monitoring = trpc.monitoring.list.useQuery(undefined, { enabled: !!user });
 
   const counts = [
     { label: "Stability analyses", value: stability.data?.length },
@@ -98,6 +117,7 @@ export default function Home() {
     { label: "Compliance checks", value: compliance.data?.length },
     { label: "Mapped structures", value: structures.data?.length },
     { label: "Kinematic analyses", value: kinematics.data?.length },
+    { label: "Monitoring walls", value: monitoring.data?.length },
   ];
 
   return (
@@ -163,7 +183,7 @@ export default function Home() {
           className="group bg-foreground text-background p-6 flex flex-col gap-4 hover:bg-primary transition-colors min-h-[210px]"
         >
           <div className="flex items-start justify-between">
-            <span className="swiss-number text-xs opacity-60">09</span>
+                <span className="swiss-number text-xs opacity-60">11</span>
             <ArrowUpRight className="h-4 w-4 opacity-60" />
           </div>
           <div className="mt-auto">

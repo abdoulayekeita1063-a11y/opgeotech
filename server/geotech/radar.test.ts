@@ -18,6 +18,37 @@ describe("Radar trend analysis", () => {
     expect(result.risk).toBe("Critical");
   });
 
+  it("returns an inverse-velocity forecast when the speed trend accelerates consistently", () => {
+    const result = analyzeRadarTrend([
+      { radarPointId: "P-INV", measuredAt: day, displacementMm: 0 },
+      { radarPointId: "P-INV", measuredAt: 2 * day, displacementMm: 1 },
+      { radarPointId: "P-INV", measuredAt: 3 * day, displacementMm: 3 },
+      { radarPointId: "P-INV", measuredAt: 4 * day, displacementMm: 6 },
+    ]);
+
+    expect(result.failureForecast.method).toBe("Inverse velocity");
+    expect(result.failureForecast.status).toBe("Forecast available");
+    expect(result.failureForecast.predictedFailureAt).not.toBeNull();
+    expect(result.failureForecast.rSquared).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it("respects configurable velocity thresholds", () => {
+    const result = analyzeRadarTrend([
+      { radarPointId: "P-CFG", measuredAt: day, displacementMm: 0 },
+      { radarPointId: "P-CFG", measuredAt: 2 * day, displacementMm: 2 },
+    ], {
+      moderateVelocityMmPerDay: 3,
+      highVelocityMmPerDay: 6,
+      criticalVelocityMmPerDay: 9,
+      moderateAccelerationMmPerDay2: 0.2,
+      highAccelerationMmPerDay2: 0.6,
+      criticalAccelerationMmPerDay2: 1.2,
+    });
+
+    expect(result.latestVelocityMmPerDay).toBe(2);
+    expect(result.risk).toBe("Low");
+  });
+
   it("uses supplied velocity and acceleration when available", () => {
     const result = analyzeRadarTrend([
       { radarPointId: "P-02", measuredAt: day, displacementMm: 10, velocityMmPerDay: 0.4, accelerationMmPerDay2: 0.02 },

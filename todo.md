@@ -94,5 +94,25 @@
 
 ## Monitoring Verification Follow-up
 - [x] Add a radar measurement table with timestamp, displacement, velocity, acceleration and source
-- [ ] Exercise radar CSV import end-to-end and verify readings populate the table and analysis
-- [ ] Save a new checkpoint after Monitoring and radar verification
+- [x] Exercise radar CSV import end-to-end and verify readings populate the table and analysis (CSV parser + authenticated tRPC contract test)
+- [x] Save a new checkpoint after Monitoring and radar verification
+
+## Radar Velocity-Based Failure Prediction (user request)
+- [x] Open the updated OPGeotech Monitoring module and verify the authentication gate; authenticated browser actions require the user's session
+- [x] Add a transparent velocity/acceleration trend prediction model with configurable thresholds
+- [x] Display prediction status, trend metrics, confidence/limitations and recommended action in English
+- [x] Test the radar import and prediction flow and save a new checkpoint (38 tests pass; browser import requires authenticated user session)
+
+## Monitoring Visibility Fix
+- [x] Add Monitoring to the Dashboard module cards and verify the direct /monitoring route is discoverable
+
+## Radar Prediction Final Verification
+- [x] Add user-facing velocity and acceleration threshold controls to Monitoring
+- [ ] Re-run authenticated browser import/prediction verification when the user session is available
+- [ ] Save a fresh checkpoint after threshold controls and final verification
+
+## Monitoring and Radar Report Reorganization (user request)
+- [x] Remove Q-system and Factor of Safety fields from the Monitoring UI and active form payload
+- [x] Create a separate Radar Failure Report section with radar trend, risk level and inverse-velocity failure-date estimate
+- [x] Add report export/print action and explicit engineering limitations in English
+- [x] Test the new report flow and save a checkpoint (39 automated tests pass; UI routes screenshot-verified)

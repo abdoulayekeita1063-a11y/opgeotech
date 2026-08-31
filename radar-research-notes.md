@@ -1,0 +1,5 @@
+# Radar prediction research notes
+
+The selected open technical literature describes inverse velocity as a widely used approach for forecasting slope failure time from displacement-rate trends, but it also emphasizes that forecasts require careful interpretation and can be sensitive to the chosen fitting window and data quality. OPGeotech therefore uses velocity/acceleration trend warnings and a clearly labeled engineering decision-support disclaimer rather than presenting a deterministic failure date. The public PMC source was protected by a CAPTCHA during browser access; the search results identified the relevant article and the Springer guideline by Carlà et al. as supporting references.
+
+Application verification: the published OPGeotech `/monitoring` route is present but requires authentication before the wall register and radar import controls can be tested in the browser. The dev preview shows Monitoring in the sidebar and Dashboard shortcut. Final UI import verification needs an authenticated operator session.

@@ -16,6 +16,7 @@ import Drillhole from "./pages/Drillhole";
 import StructuralMapping from "./pages/StructuralMapping";
 import KinematicAnalysis from "./pages/KinematicAnalysis";
 import Monitoring from "./pages/Monitoring";
+import RadarFailureReport from "./pages/RadarFailureReport";
 import Download from "./pages/Download";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
         <Route path={"/mapping"} component={StructuralMapping} />
         <Route path={"/kinematics"} component={KinematicAnalysis} />
         <Route path={"/monitoring"} component={Monitoring} />
+        <Route path={"/radar-report"} component={RadarFailureReport} />
         <Route path={"/archive"} component={Archive} />
         <Route path={"/download"} component={Download} />
         <Route path={"/404"} component={NotFound} />

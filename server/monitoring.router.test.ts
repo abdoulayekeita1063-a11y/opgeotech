@@ -1,0 +1,53 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const state = vi.hoisted(() => ({
+  readings: [] as any[],
+}));
+
+vi.mock("./db", () => ({
+  getMonitoringRecord: vi.fn(async (id: number) => id === 1 ? { id: 1, userId: 7 } : undefined),
+  insertMonitoringRadarReadings: vi.fn(async (rows: any[]) => { state.readings.push(...rows.map((row, index) => ({ ...row, id: index + 1, createdAt: new Date() }))); return rows.length; }),
+  listMonitoringRadarReadings: vi.fn(async () => state.readings),
+  insertMonitoringRecord: vi.fn(),
+  listMonitoringRecords: vi.fn(async () => []),
+  deleteMonitoringRecord: vi.fn(),
+  insertDxfPlan: vi.fn(), listDxfPlans: vi.fn(), getDxfPlan: vi.fn(), deleteDxfPlan: vi.fn(),
+  insertDrillhole: vi.fn(), listDrillholes: vi.fn(), deleteDrillhole: vi.fn(),
+  insertStructure: vi.fn(), insertStructuresBulk: vi.fn(), listStructures: vi.fn(), deleteStructure: vi.fn(),
+  insertKinematicAnalysis: vi.fn(), listKinematicAnalyses: vi.fn(), getKinematicAnalysis: vi.fn(),
+}));
+
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
+
+function context(): TrpcContext {
+  return {
+    user: { id: 7, openId: "monitoring-test", email: "monitoring@test.local", name: "Monitoring Test", loginMethod: "test", role: "user", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: {} as TrpcContext["res"],
+  };
+}
+
+describe("monitoring radar import contract", () => {
+  beforeEach(() => { state.readings.length = 0; });
+
+  it("imports readings, lists them and returns a trend warning", async () => {
+    const caller = appRouter.createCaller(context());
+    const imported = await caller.monitoring.importRadar({
+      monitoringRecordId: 1,
+      source: "radar-export.csv",
+      readings: [
+        { radarPointId: "P-01", measuredAt: 86_400_000, displacementMm: 0 },
+        { radarPointId: "P-01", measuredAt: 2 * 86_400_000, displacementMm: 2 },
+      ],
+    });
+    const listed = await caller.monitoring.radarReadings({ monitoringRecordId: 1 });
+    const analysis = await caller.monitoring.analyzeRadar({ monitoringRecordId: 1, radarPointId: "P-01" });
+
+    expect(imported).toEqual({ count: 2 });
+    expect(listed).toHaveLength(2);
+    expect(listed[0]?.source).toBe("radar-export.csv");
+    expect(analysis.latestVelocityMmPerDay).toBe(2);
+    expect(analysis.risk).toBe("Moderate");
+  });
+});

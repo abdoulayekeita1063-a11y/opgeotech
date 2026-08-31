@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { trpc } from "@/lib/trpc";
+import { parseRadarCsv } from "@/lib/radarCsv";
 
 const blankForm = {
   wallName: "",
@@ -22,7 +23,6 @@ const blankForm = {
   riskLevel: "Low",
   rmr: "",
   gsi: "",
-  qSystem: "",
   wallAssessmentScore: "",
   blastAssessmentScore: "",
   ucs: "",
@@ -30,7 +30,6 @@ const blankForm = {
   frictionAngle: "",
   density: "",
   dominantStructures: "",
-  currentFs: "",
   notes: "",
 };
 
@@ -40,56 +39,6 @@ function optionalNumber(value: string) {
   if (!value.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (char === '"') {
-      if (quoted && line[index + 1] === '"') { cell += '"'; index += 1; }
-      else quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      cells.push(cell.trim()); cell = "";
-    } else cell += char;
-  }
-  cells.push(cell.trim());
-  return cells;
-}
-
-function parseRadarCsv(text: string) {
-  const lines = text.split(/\\r?\\n/).filter(line => line.trim());
-  if (lines.length < 2) throw new Error("CSV must contain a header and at least one reading");
-  const headers = parseCsvLine(lines[0]).map(header => header.toLowerCase().replace(/[^a-z0-9]/g, ""));
-  const find = (...names: string[]) => names.map(name => headers.indexOf(name)).find(index => index >= 0) ?? -1;
-  const pointIndex = find("radarpointid", "pointid", "point", "id");
-  const timeIndex = find("measuredat", "timestamp", "datetime", "date", "time");
-  const displacementIndex = find("displacementmm", "displacement", "deformationmm", "deformation");
-  const velocityIndex = find("velocitymmperday", "velocity", "velocitymmd", "rate");
-  const accelerationIndex = find("accelerationmmperday2", "acceleration", "accelerationrate");
-  if (timeIndex < 0 || displacementIndex < 0) throw new Error("CSV needs measuredAt/timestamp and displacementMm columns");
-  const parseTime = (value: string) => {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
-    const parsed = Date.parse(value);
-    if (!Number.isFinite(parsed)) throw new Error(`Invalid radar timestamp: ${value}`);
-    return parsed;
-  };
-  return lines.slice(1).map((line, rowIndex) => {
-    const cells = parseCsvLine(line);
-    const displacementMm = Number(cells[displacementIndex]);
-    if (!Number.isFinite(displacementMm)) throw new Error(`Invalid displacement on CSV row ${rowIndex + 2}`);
-    const optional = (index: number) => index >= 0 && cells[index] ? Number(cells[index]) : undefined;
-    return {
-      radarPointId: pointIndex >= 0 && cells[pointIndex] ? cells[pointIndex] : "RADAR-POINT-01",
-      measuredAt: parseTime(cells[timeIndex]),
-      displacementMm,
-      velocityMmPerDay: optional(velocityIndex),
-      accelerationMmPerDay2: optional(accelerationIndex),
-    };
-  });
 }
 
 function riskClass(risk: string) {
@@ -110,13 +59,26 @@ export default function Monitoring() {
   const [form, setForm] = useState<MonitoringForm>(blankForm);
   const [selectedWallId, setSelectedWallId] = useState<number | null>(null);
   const [selectedPointId, setSelectedPointId] = useState("");
+  const [thresholds, setThresholds] = useState({
+    moderateVelocityMmPerDay: 1,
+    highVelocityMmPerDay: 5,
+    criticalVelocityMmPerDay: 10,
+    moderateAccelerationMmPerDay2: 0.1,
+    highAccelerationMmPerDay2: 0.5,
+    criticalAccelerationMmPerDay2: 1,
+  });
   const records = trpc.monitoring.list.useQuery();
   const radarReadings = trpc.monitoring.radarReadings.useQuery(
     { monitoringRecordId: selectedWallId ?? 0 },
     { enabled: selectedWallId !== null },
   );
+  const radarAnalysisInput = useMemo(() => ({
+    monitoringRecordId: selectedWallId ?? 0,
+    radarPointId: selectedPointId || undefined,
+    ...thresholds,
+  }), [selectedWallId, selectedPointId, thresholds]);
   const radarAnalysis = trpc.monitoring.analyzeRadar.useQuery(
-    { monitoringRecordId: selectedWallId ?? 0, radarPointId: selectedPointId || undefined },
+    radarAnalysisInput,
     { enabled: selectedWallId !== null && Boolean(selectedPointId) && (radarReadings.data?.length ?? 0) > 0 },
   );
   const utils = trpc.useUtils();
@@ -153,9 +115,7 @@ export default function Monitoring() {
     const rows = records.data ?? [];
     const active = rows.filter(row => row.status === "Active" || row.status === "Monitored").length;
     const alerts = rows.filter(row => row.riskLevel === "High" || row.riskLevel === "Critical").length;
-    const fsValues = rows.map(row => row.currentFs).filter((value): value is number => value !== null);
-    const averageFs = fsValues.length ? fsValues.reduce((sum, value) => sum + value, 0) / fsValues.length : null;
-    return { total: rows.length, active, alerts, averageFs };
+    return { total: rows.length, active, alerts };
   }, [records.data]);
 
   const setField = (field: keyof MonitoringForm, value: string) => {
@@ -185,7 +145,6 @@ export default function Monitoring() {
       riskLevel: form.riskLevel as "Low" | "Medium" | "High" | "Critical",
       rmr: optionalNumber(form.rmr),
       gsi: optionalNumber(form.gsi),
-      qSystem: optionalNumber(form.qSystem),
       wallAssessmentScore: optionalNumber(form.wallAssessmentScore),
       blastAssessmentScore: optionalNumber(form.blastAssessmentScore),
       ucs: optionalNumber(form.ucs),
@@ -193,7 +152,6 @@ export default function Monitoring() {
       frictionAngle: optionalNumber(form.frictionAngle),
       density: optionalNumber(form.density),
       dominantStructures: form.dominantStructures.trim() || undefined,
-      currentFs: optionalNumber(form.currentFs),
       notes: form.notes.trim() || undefined,
     });
   };
@@ -211,7 +169,6 @@ export default function Monitoring() {
           { label: "Registered walls", value: summary.total, icon: Activity },
           { label: "Active monitoring", value: summary.active, icon: Gauge },
           { label: "High / critical risk", value: summary.alerts, icon: ShieldAlert },
-          { label: "Average current FS", value: summary.averageFs === null ? "—" : summary.averageFs.toFixed(2), icon: Gauge },
         ].map(item => {
           const Icon = item.icon;
           return (
@@ -268,10 +225,8 @@ export default function Monitoring() {
               {([
                 ["rmr", "RMR", "0–100"],
                 ["gsi", "GSI", "0–100"],
-                ["qSystem", "Q-system", "index"],
                 ["wallAssessmentScore", "Wall assessment score", "0–100"],
                 ["blastAssessmentScore", "Blast assessment score", "0–100"],
-                ["currentFs", "Current FS", "factor"],
                 ["ucs", "UCS (MPa)", "MPa"],
                 ["cohesion", "Cohesion (kPa)", "kPa"],
                 ["frictionAngle", "Friction angle (°)", "degrees"],
@@ -316,7 +271,6 @@ export default function Monitoring() {
                   <th className="p-3 swiss-label text-[10px]">Wall / zone</th>
                   <th className="p-3 swiss-label text-[10px]">Risk</th>
                   <th className="p-3 swiss-label text-[10px]">Status</th>
-                  <th className="p-3 swiss-label text-[10px]">FS</th>
                   <th className="p-3 swiss-label text-[10px]">RMR / GSI</th>
                   <th className="p-3 swiss-label text-[10px]">Recorded</th>
                   <th className="p-3" />
@@ -331,7 +285,6 @@ export default function Monitoring() {
                     </td>
                     <td className="p-3"><span className={`inline-flex px-2 py-1 text-[10px] font-bold uppercase ${riskClass(record.riskLevel)}`}>{record.riskLevel}</span></td>
                     <td className="p-3"><span className={`inline-flex px-2 py-1 text-[10px] font-bold uppercase ${statusClass(record.status)}`}>{record.status}</span></td>
-                    <td className="p-3 font-mono">{record.currentFs === null ? "—" : record.currentFs.toFixed(2)}</td>
                     <td className="p-3 font-mono text-xs">{record.rmr ?? "—"} / {record.gsi ?? "—"}</td>
                     <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(record.createdAt).toLocaleDateString()}</td>
                     <td className="p-3 text-right">
@@ -342,7 +295,7 @@ export default function Monitoring() {
                   </tr>
                 ))}
                 {(records.data ?? []).length === 0 && (
-                  <tr><td colSpan={7} className="p-10 text-center text-sm text-muted-foreground">No wall records yet. Add the first exposed wall on the left.</td></tr>
+                  <tr><td colSpan={6} className="p-10 text-center text-sm text-muted-foreground">No wall records yet. Add the first exposed wall on the left.</td></tr>
                 )}
               </tbody>
             </table>
@@ -383,6 +336,16 @@ export default function Monitoring() {
               </div>
               <div className="text-xs text-muted-foreground pb-2">CSV: radarPointId, measuredAt, displacementMm, velocityMmPerDay, accelerationMmPerDay2</div>
             </div>
+            <div className="border border-foreground bg-muted/30 p-4 mt-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap"><div><div className="swiss-label text-[10px]">Radar trigger thresholds</div><p className="text-xs text-muted-foreground mt-1">Configure the site-specific warning levels used by the trend classification.</p></div><Button type="button" variant="outline" size="sm" className="rounded-none" onClick={() => setThresholds({ moderateVelocityMmPerDay: 1, highVelocityMmPerDay: 5, criticalVelocityMmPerDay: 10, moderateAccelerationMmPerDay2: 0.1, highAccelerationMmPerDay2: 0.5, criticalAccelerationMmPerDay2: 1 })}>Reset defaults</Button></div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+                {(["moderateVelocityMmPerDay", "highVelocityMmPerDay", "criticalVelocityMmPerDay", "moderateAccelerationMmPerDay2", "highAccelerationMmPerDay2", "criticalAccelerationMmPerDay2"] as const).map(field => {
+                  const isAcceleration = field.includes("Acceleration");
+                  const label = field.startsWith("moderate") ? "Moderate" : field.startsWith("high") ? "High" : "Critical";
+                  return <div key={field}><Label className="text-[10px] uppercase">{label} {isAcceleration ? "acceleration" : "velocity"}</Label><Input type="number" min="0.001" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds[field]} onChange={event => setThresholds(previous => ({ ...previous, [field]: Math.max(0.001, Number(event.target.value) || 0.001) }))} /><div className="text-[10px] text-muted-foreground mt-1">{isAcceleration ? "mm/day²" : "mm/day"}</div></div>;
+                })}
+              </div>
+            </div>
 
             {radarAnalysis.data && (
               <div className="mt-6">
@@ -396,6 +359,16 @@ export default function Monitoring() {
                   ].map(([label, value]) => <div key={String(label)} className="border border-foreground p-3"><div className="swiss-label text-[10px] mb-2">{label}</div><div className={`font-bold ${label === "Risk indication" ? riskClass(String(value)) + " inline-flex px-2 py-1" : ""}`}>{value}</div></div>)}
                 </div>
                 <div className="border-l-4 border-primary bg-muted/30 p-4 mt-4 text-sm"><strong>{radarAnalysis.data.alert}</strong><div className="text-xs text-muted-foreground mt-2">Trend warning only — verify radar quality, prisms, visual inspections and the site Trigger Action Response Plan before taking operational action.</div></div>
+                <div className="border border-foreground mt-5 p-4">
+                  <div className="swiss-label text-[10px] mb-3">Failure forecast — inverse velocity method</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div><div className="text-xs text-muted-foreground">Forecast status</div><div className={`font-bold mt-1 ${radarAnalysis.data.failureForecast.status === "Forecast available" ? "text-primary" : ""}`}>{radarAnalysis.data.failureForecast.status}</div></div>
+                    <div><div className="text-xs text-muted-foreground">Estimated failure window</div><div className="font-bold mt-1">{radarAnalysis.data.failureForecast.predictedFailureAt ? new Date(radarAnalysis.data.failureForecast.predictedFailureAt).toLocaleString() : "Not available"}</div></div>
+                    <div><div className="text-xs text-muted-foreground">Fit confidence / R²</div><div className="font-bold mt-1">{radarAnalysis.data.failureForecast.confidence} / {radarAnalysis.data.failureForecast.rSquared === null ? "—" : radarAnalysis.data.failureForecast.rSquared.toFixed(2)}</div></div>
+                  </div>
+                  <p className="text-sm mt-4">{radarAnalysis.data.failureForecast.message}</p>
+                  <p className="text-xs text-muted-foreground mt-2">This Fukuzono-style inverse-velocity extrapolation uses positive radar speed magnitudes and the supplied time window. It is not a probability of failure or a substitute for trigger-action procedures.</p>
+                </div>
                 <div className="border border-foreground mt-5 p-4">
                   <div className="swiss-label text-[10px] mb-3">Displacement trend — {radarAnalysis.data.pointId}</div>
                   <div className="h-[220px] w-full overflow-hidden">
