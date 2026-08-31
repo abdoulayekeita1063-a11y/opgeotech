@@ -9,6 +9,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { parseDxf } from "../geotech/dxf";
 import { runKinematicAnalysis } from "../geotech/kinematics";
+import { analyzeRadarTrend, DEFAULT_RADAR_THRESHOLDS } from "../geotech/radar";
 
 // ── Drillhole module ─────────────────────────────────────────────────
 
@@ -225,4 +226,140 @@ export const kinematicsRouter = router({
     if (!rec || rec.userId !== ctx.user.id) throw new Error("Analysis not found");
     return rec;
   }),
+});
+
+
+// ── Standalone Monitoring module ───────────────────────────────────────
+
+const monitoringStatuses = ["Active", "Monitored", "Remediated", "Closed"] as const;
+const monitoringRiskLevels = ["Low", "Medium", "High", "Critical"] as const;
+
+export const monitoringRouter = router({
+  create: protectedProcedure
+    .input(
+      z.object({
+        wallName: z.string().min(1).max(255),
+        zone: z.string().max(128).optional(),
+        status: z.enum(monitoringStatuses).default("Active"),
+        riskLevel: z.enum(monitoringRiskLevels).default("Low"),
+        rmr: z.number().min(0).max(100).optional(),
+        gsi: z.number().min(0).max(100).optional(),
+        qSystem: z.number().min(0).max(1000).optional(),
+        wallAssessmentScore: z.number().min(0).max(100).optional(),
+        blastAssessmentScore: z.number().min(0).max(100).optional(),
+        ucs: z.number().min(0).max(1000).optional(),
+        cohesion: z.number().min(0).max(1000).optional(),
+        frictionAngle: z.number().min(0).max(90).optional(),
+        density: z.number().min(0).max(10).optional(),
+        dominantStructures: z.string().max(4000).optional(),
+        currentFs: z.number().min(0).max(20).optional(),
+        notes: z.string().max(6000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const id = await db.insertMonitoringRecord({
+        userId: ctx.user.id,
+        wallName: input.wallName,
+        zone: input.zone ?? null,
+        status: input.status,
+        riskLevel: input.riskLevel,
+        rmr: input.rmr ?? null,
+        gsi: input.gsi ?? null,
+        qSystem: input.qSystem ?? null,
+        wallAssessmentScore: input.wallAssessmentScore ?? null,
+        blastAssessmentScore: input.blastAssessmentScore ?? null,
+        ucs: input.ucs ?? null,
+        cohesion: input.cohesion ?? null,
+        frictionAngle: input.frictionAngle ?? null,
+        density: input.density ?? null,
+        dominantStructures: input.dominantStructures ?? null,
+        currentFs: input.currentFs ?? null,
+        notes: input.notes ?? null,
+      });
+      return { id };
+    }),
+
+  list: protectedProcedure.query(({ ctx }) => db.listMonitoringRecords(ctx.user.id)),
+
+  get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+    const record = await db.getMonitoringRecord(input.id);
+    if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+    return record;
+  }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteMonitoringRecord(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
+
+  importRadar: protectedProcedure
+    .input(z.object({
+      monitoringRecordId: z.number(),
+      source: z.string().max(128).optional(),
+      readings: z.array(z.object({
+        radarPointId: z.string().min(1).max(128),
+        measuredAt: z.number().positive(),
+        displacementMm: z.number(),
+        velocityMmPerDay: z.number().nullable().optional(),
+        accelerationMmPerDay2: z.number().nullable().optional(),
+      })).min(1).max(10000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      const count = await db.insertMonitoringRadarReadings(input.readings.map(reading => ({
+        userId: ctx.user.id,
+        monitoringRecordId: input.monitoringRecordId,
+        radarPointId: reading.radarPointId,
+        measuredAt: reading.measuredAt,
+        displacementMm: reading.displacementMm,
+        velocityMmPerDay: reading.velocityMmPerDay ?? null,
+        accelerationMmPerDay2: reading.accelerationMmPerDay2 ?? null,
+        source: input.source ?? null,
+      })));
+      return { count };
+    }),
+
+  radarReadings: protectedProcedure
+    .input(z.object({ monitoringRecordId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      return db.listMonitoringRadarReadings(ctx.user.id, input.monitoringRecordId);
+    }),
+
+  analyzeRadar: protectedProcedure
+    .input(z.object({
+      monitoringRecordId: z.number(),
+      radarPointId: z.string().min(1).max(128).optional(),
+      moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
+      highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
+      criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
+      moderateAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateAccelerationMmPerDay2),
+      highAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highAccelerationMmPerDay2),
+      criticalAccelerationMmPerDay2: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalAccelerationMmPerDay2),
+    }))
+    .query(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      const stored = await db.listMonitoringRadarReadings(ctx.user.id, input.monitoringRecordId);
+      const selected = input.radarPointId ? stored.filter(reading => reading.radarPointId === input.radarPointId) : stored;
+      if (!selected.length) throw new Error("No radar readings found for this wall or point");
+      return analyzeRadarTrend(selected.map(reading => ({
+        radarPointId: reading.radarPointId,
+        measuredAt: reading.measuredAt,
+        displacementMm: reading.displacementMm,
+        velocityMmPerDay: reading.velocityMmPerDay,
+        accelerationMmPerDay2: reading.accelerationMmPerDay2,
+      })), {
+        moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
+        highVelocityMmPerDay: input.highVelocityMmPerDay,
+        criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
+        moderateAccelerationMmPerDay2: input.moderateAccelerationMmPerDay2,
+        highAccelerationMmPerDay2: input.highAccelerationMmPerDay2,
+        criticalAccelerationMmPerDay2: input.criticalAccelerationMmPerDay2,
+      });
+    }),
 });

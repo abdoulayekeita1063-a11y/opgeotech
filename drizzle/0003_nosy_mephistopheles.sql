@@ -1,0 +1,22 @@
+CREATE TABLE `monitoring_records` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`wallName` varchar(255) NOT NULL,
+	`zone` varchar(128),
+	`status` enum('Active','Monitored','Remediated','Closed') NOT NULL DEFAULT 'Active',
+	`riskLevel` enum('Low','Medium','High','Critical') NOT NULL DEFAULT 'Low',
+	`rmr` double,
+	`gsi` double,
+	`qSystem` double,
+	`wallAssessmentScore` double,
+	`blastAssessmentScore` double,
+	`ucs` double,
+	`cohesion` double,
+	`frictionAngle` double,
+	`density` double,
+	`dominantStructures` text,
+	`currentFs` double,
+	`notes` text,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `monitoring_records_id` PRIMARY KEY(`id`)
+);

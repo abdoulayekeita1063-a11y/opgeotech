@@ -8,6 +8,8 @@ import {
   inspectionReports,
   InsertUser,
   kinematicAnalyses,
+  monitoringRadarReadings,
+  monitoringRecords,
   rockClassifications,
   stabilityCalcs,
   structures,
@@ -336,4 +338,55 @@ export async function getKinematicAnalysis(id: number) {
     .where(eq(kinematicAnalyses.id, id))
     .limit(1);
   return rows[0];
+}
+
+
+// Standalone Monitoring module
+export async function insertMonitoringRecord(values: typeof monitoringRecords.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(monitoringRecords).values(values);
+  return res.insertId;
+}
+
+export async function listMonitoringRecords(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(monitoringRecords)
+    .where(eq(monitoringRecords.userId, userId))
+    .orderBy(desc(monitoringRecords.createdAt));
+}
+
+export async function getMonitoringRecord(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(monitoringRecords).where(eq(monitoringRecords.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function deleteMonitoringRecord(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(monitoringRecords).where(and(eq(monitoringRecords.id, id), eq(monitoringRecords.userId, userId)));
+}
+
+
+// Radar measurements for the standalone Monitoring module
+export async function insertMonitoringRadarReadings(values: (typeof monitoringRadarReadings.$inferInsert)[]) {
+  const db = await requireDb();
+  if (!values.length) return 0;
+  await db.insert(monitoringRadarReadings).values(values);
+  return values.length;
+}
+
+export async function listMonitoringRadarReadings(userId: number, monitoringRecordId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(monitoringRadarReadings)
+    .where(and(eq(monitoringRadarReadings.userId, userId), eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)))
+    .orderBy(monitoringRadarReadings.measuredAt);
+}
+
+export async function deleteMonitoringRadarReadings(userId: number, monitoringRecordId: number) {
+  const db = await requireDb();
+  await db.delete(monitoringRadarReadings).where(and(eq(monitoringRadarReadings.userId, userId), eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)));
 }

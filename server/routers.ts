@@ -9,7 +9,7 @@ import {
   inspectionRouter,
   stabilityRouter,
 } from "./routers/geotech";
-import { drillholeRouter, kinematicsRouter, mappingRouter } from "./routers/opgeotech";
+import { drillholeRouter, kinematicsRouter, mappingRouter, monitoringRouter } from "./routers/opgeotech";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -33,6 +33,7 @@ export const appRouter = router({
   drillhole: drillholeRouter,
   mapping: mappingRouter,
   kinematics: kinematicsRouter,
+  monitoring: monitoringRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -22,6 +22,20 @@
       "when": 1785251770941,
       "tag": "0002_sturdy_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1788192266427,
+      "tag": "0003_nosy_mephistopheles",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1788192449679,
+      "tag": "0004_windy_molten_man",
+      "breakpoints": true
     }
   ]
 }

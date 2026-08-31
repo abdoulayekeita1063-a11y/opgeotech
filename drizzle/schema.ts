@@ -210,3 +210,49 @@ export type DxfPlan = typeof dxfPlans.$inferSelect;
 export type Drillhole = typeof drillholes.$inferSelect;
 export type Structure = typeof structures.$inferSelect;
 export type KinematicAnalysis = typeof kinematicAnalyses.$inferSelect;
+
+
+/** Standalone monitoring register for exposed open-pit walls and slopes. */
+export const monitoringRecords = mysqlTable("monitoring_records", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  wallName: varchar("wallName", { length: 255 }).notNull(),
+  zone: varchar("zone", { length: 128 }),
+  status: mysqlEnum("status", ["Active", "Monitored", "Remediated", "Closed"]).default("Active").notNull(),
+  riskLevel: mysqlEnum("riskLevel", ["Low", "Medium", "High", "Critical"]).default("Low").notNull(),
+  rmr: double("rmr"),
+  gsi: double("gsi"),
+  qSystem: double("qSystem"),
+  wallAssessmentScore: double("wallAssessmentScore"),
+  blastAssessmentScore: double("blastAssessmentScore"),
+  ucs: double("ucs"),
+  cohesion: double("cohesion"),
+  frictionAngle: double("frictionAngle"),
+  density: double("density"),
+  dominantStructures: text("dominantStructures"),
+  currentFs: double("currentFs"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MonitoringRecord = typeof monitoringRecords.$inferSelect;
+export type InsertMonitoringRecord = typeof monitoringRecords.$inferInsert;
+
+
+/** Radar time-series measurements attached to a standalone Monitoring wall record. */
+export const monitoringRadarReadings = mysqlTable("monitoring_radar_readings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  monitoringRecordId: int("monitoringRecordId").notNull(),
+  radarPointId: varchar("radarPointId", { length: 128 }).notNull(),
+  /** UTC Unix timestamp in milliseconds. */
+  measuredAt: double("measuredAt").notNull(),
+  displacementMm: double("displacementMm").notNull(),
+  velocityMmPerDay: double("velocityMmPerDay"),
+  accelerationMmPerDay2: double("accelerationMmPerDay2"),
+  source: varchar("source", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MonitoringRadarReading = typeof monitoringRadarReadings.$inferSelect;
+export type InsertMonitoringRadarReading = typeof monitoringRadarReadings.$inferInsert;

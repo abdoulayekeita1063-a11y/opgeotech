@@ -22,6 +22,7 @@ import {
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
+  Activity,
   Archive,
   Bomb,
   ClipboardList,
@@ -51,6 +52,7 @@ const menuItems = [
   { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
+  { icon: Activity, label: "Monitoring", path: "/monitoring" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];

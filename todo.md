@@ -79,3 +79,20 @@
 - [x] Blast Assessment: Wall damage assessment (overbreak, backbreak, crest loss evaluation)
 - [x] Update UI: new Blast Assessment tabs/sections for design eval, BI, PF suggestion, wall damage
 - [x] Test and checkpoint (32 tests pass, screenshots verified)
+
+## Separate Monitoring Module (user request)
+- [x] Create a standalone Monitoring section, separate from Database, for exposed wall/talus surveillance
+- [x] Add monitoring records, status indicators and history for each wall/talus
+- [x] Test and checkpoint the standalone Monitoring module
+
+## Radar Monitoring and Failure-Risk Analysis (user request)
+- [x] Add radar measurement import and storage for wall monitoring
+- [x] Calculate displacement trend, velocity and acceleration from radar time series
+- [x] Provide a transparent alert classification and failure-risk indication with engineering disclaimer
+- [x] Add radar charts, measurement table and selected-wall analysis to the standalone Monitoring page
+- [x] Test radar calculations/import and save a checkpoint
+
+## Monitoring Verification Follow-up
+- [x] Add a radar measurement table with timestamp, displacement, velocity, acceleration and source
+- [ ] Exercise radar CSV import end-to-end and verify readings populate the table and analysis
+- [ ] Save a new checkpoint after Monitoring and radar verification
