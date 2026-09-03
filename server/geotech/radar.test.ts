@@ -62,6 +62,22 @@ describe("Radar trend analysis", () => {
     expect(riskAt(10)).toBe("Critical");
   });
 
+  it("uses maximum filtered velocity for risk instead of only the latest value", () => {
+    const result = analyzeRadarTrend([
+      { radarPointId: "PROJECT-MAX", measuredAt: day, displacementMm: 0, velocityMmPerDay: 0.2 },
+      { radarPointId: "PROJECT-MAX", measuredAt: 2 * day, displacementMm: 6.23, velocityMmPerDay: 6.23 },
+      { radarPointId: "PROJECT-MAX", measuredAt: 3 * day, displacementMm: 6.73, velocityMmPerDay: 0.5 },
+    ], {
+      moderateVelocityMmPerDay: 1,
+      highVelocityMmPerDay: 1.001,
+      criticalVelocityMmPerDay: 5.601,
+    });
+
+    expect(result.latestVelocityMmPerDay).toBe(0.5);
+    expect(result.peakVelocityMmPerDay).toBe(6.23);
+    expect(result.risk).toBe("Critical");
+  });
+
   it("uses supplied velocity when available", () => {
     const result = analyzeRadarTrend([
       { radarPointId: "P-02", measuredAt: day, displacementMm: 10, velocityMmPerDay: 0.4 },

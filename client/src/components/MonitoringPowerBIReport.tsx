@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SectionLabel } from "@/components/ModuleHeader";
+import { classifyMonitoringRisk, classifyMonitoringRiskFromVelocities, validateMonitoringThresholds } from "@/lib/monitoringRisk";
 import { trpc } from "@/lib/trpc";
 
 type SummaryRow = {
@@ -63,18 +64,12 @@ function standardDeviation(values: number[]) {
   return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
 }
 
-function riskFromVelocity(value: number, thresholds: { moderate: number; high: number; critical: number }) {
-  if (value >= thresholds.critical) return "Critical";
-  if (value >= thresholds.high) return "High";
-  if (value >= thresholds.moderate) return "Moderate";
-  return "Low";
-}
-
 function riskTone(risk: string) {
   if (risk === "Critical") return "bg-black text-white";
   if (risk === "High") return "bg-[#d71920] text-white";
   if (risk === "Moderate") return "bg-[#dcae1d] text-black";
-  return "bg-[#dcefdc] text-[#164b2a]";
+  if (risk === "Low") return "bg-[#dcefdc] text-[#164b2a]";
+  return "bg-muted text-muted-foreground";
 }
 
 function inverseVelocityModel(rows: SummaryRow[]) {
@@ -132,6 +127,7 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [thresholds, setThresholds] = useState({ moderate: 1, high: 5, critical: 10 });
+  const thresholdError = validateMonitoringThresholds(thresholds);
   const projects = trpc.monitoring.projects.useQuery();
   const rowsQuery = trpc.monitoring.projectSummaryRows.useQuery({ projectId: projectId ?? 0 }, { enabled: projectId !== null });
   const selectedProject = (projects.data ?? []).find(project => project.id === projectId);
@@ -153,9 +149,10 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
     const velocityValues = signedVelocityValues.map(Math.abs);
     const stableRows = ordered.filter(row => !row.observations || /^(NF|no fall|stable)$/i.test(row.observations.trim()));
     const maxDisplacement = displacementValues.length ? Math.max(...displacementValues.map(Math.abs)) : null;
-    const maxVelocity = velocityValues.length ? Math.max(...velocityValues) : null;
-    const currentVelocity = ordered.length ? Math.abs(ordered[ordered.length - 1].velocityAverageMmPerDay ?? ordered[ordered.length - 1].velocityMaxMmPerDay ?? 0) : 0;
-    const risk = riskFromVelocity(currentVelocity, thresholds);
+    const riskResult = classifyMonitoringRiskFromVelocities(velocityValues, thresholds);
+    const maxVelocity = velocityValues.length ? riskResult.maxVelocity : null;
+    const riskVelocity = riskResult.maxVelocity;
+    const risk = thresholdError ? "Invalid thresholds" : riskResult.risk;
     const monthlyMap = new Map<string, { label: string; displacementMax: number[]; displacementAverage: number[]; velocityMax: number[]; velocityAverage: number[] }>();
     const dailyMap = new Map<number, SummaryRow[]>();
     const windowMap = new Map<string, SummaryRow[]>();
@@ -190,7 +187,7 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
       const displacement = windowRows.map(row => row.displacementMaxMm ?? row.displacementAverageMm ?? 0).map(Math.abs);
       const velocity = windowRows.map(row => row.velocityMaxMmPerDay ?? row.velocityAverageMmPerDay ?? 0).map(Math.abs);
       const peakVelocity = velocity.length ? Math.max(...velocity) : 0;
-      return { name, displacement: displacement.length ? Math.max(...displacement) : 0, velocity: peakVelocity, risk: riskFromVelocity(peakVelocity, thresholds), records: windowRows.length };
+      return { name, displacement: displacement.length ? Math.max(...displacement) : 0, velocity: peakVelocity, risk: thresholdError ? "Invalid thresholds" : classifyMonitoringRisk(peakVelocity, thresholds), records: windowRows.length };
     }).sort((a, b) => b.velocity - a.velocity);
     const observationMap = new Map<string, number>();
     ordered.forEach(row => {
@@ -215,7 +212,7 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
       velocityStdDev: standardDeviation(velocityValues),
       minDisplacement: displacementValues.length ? Math.min(...displacementValues) : null,
       minVelocity: signedVelocityValues.length ? Math.min(...signedVelocityValues) : null,
-      currentVelocity,
+      riskVelocity,
       dataCompleteness: ordered.length ? completeRows / ordered.length * 100 : null,
       incidentCount: ordered.length - stableRows.length,
       peakDisplacementLocation: peakDisplacementRow ? `${peakDisplacementRow.pit} · ${peakDisplacementRow.window}` : "—",
@@ -230,7 +227,7 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
       peakWindow,
       peakMonth,
     };
-  }, [filteredRows, thresholds]);
+  }, [filteredRows, thresholds, thresholdError]);
 
   if (projectId === null) return <div className="border border-foreground p-10 text-sm text-muted-foreground">Select or add a project in the Data tab to build the Monitoring Report.</div>;
   if (!filteredRows.length) return <div className="border border-foreground p-10 text-sm text-muted-foreground">No radar monitoring rows match the current filters. Import an Excel workbook or adjust the report scope.</div>;
@@ -249,14 +246,16 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
       <div className="flex gap-2 print:hidden"><Button variant="outline" className="rounded-none" onClick={presentReport}><Expand className="h-4 w-4 mr-2" /> Present</Button><Button className="rounded-none" onClick={printReport}><FileDown className="h-4 w-4 mr-2" /> Print / Save PDF</Button></div>
     </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3 mt-6 print:hidden">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3 mt-6 print:hidden">
       <div><Label className="swiss-label text-[10px]">Pit</Label><Select value={pit} onValueChange={value => { setPit(value); setWindowName("all"); }}><SelectTrigger className="rounded-none border-foreground mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All pits</SelectItem>{pits.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
       <div><Label className="swiss-label text-[10px]">Window</Label><Select value={windowName} onValueChange={setWindowName}><SelectTrigger className="rounded-none border-foreground mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All windows</SelectItem>{windows.map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
       <div><Label className="swiss-label text-[10px]">From</Label><Input type="date" className="rounded-none border-foreground mt-1" value={fromDate} onChange={event => setFromDate(event.target.value)} /></div>
       <div><Label className="swiss-label text-[10px]">To</Label><Input type="date" className="rounded-none border-foreground mt-1" value={toDate} onChange={event => setToDate(event.target.value)} /></div>
-      <div><Label className="swiss-label text-[10px]">Moderate velocity</Label><Input type="number" min="0.001" step="0.1" className="rounded-none border-foreground mt-1" value={thresholds.moderate} onChange={event => setThresholds(previous => ({ ...previous, moderate: Math.max(0.001, Number(event.target.value) || 0.001) }))} /></div>
-      <div><Label className="swiss-label text-[10px]">High / critical</Label><div className="grid grid-cols-2 gap-1 mt-1"><Input aria-label="High velocity" type="number" min="0.001" step="0.1" className="rounded-none border-foreground" value={thresholds.high} onChange={event => setThresholds(previous => ({ ...previous, high: Math.max(0.001, Number(event.target.value) || 0.001) }))} /><Input aria-label="Critical velocity" type="number" min="0.001" step="0.1" className="rounded-none border-foreground" value={thresholds.critical} onChange={event => setThresholds(previous => ({ ...previous, critical: Math.max(0.001, Number(event.target.value) || 0.001) }))} /></div></div>
+      <div><Label className="swiss-label text-[10px]">Moderate velocity</Label><Input type="number" min="0" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds.moderate} onChange={event => setThresholds(previous => ({ ...previous, moderate: Math.max(0, Number(event.target.value) || 0) }))} /></div>
+      <div><Label className="swiss-label text-[10px]">High velocity</Label><Input type="number" min="0" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds.high} onChange={event => setThresholds(previous => ({ ...previous, high: Math.max(0, Number(event.target.value) || 0) }))} /></div>
+      <div><Label className="swiss-label text-[10px]">Critical velocity</Label><Input type="number" min="0" step="0.001" className="rounded-none border-foreground mt-1" value={thresholds.critical} onChange={event => setThresholds(previous => ({ ...previous, critical: Math.max(0, Number(event.target.value) || 0) }))} /></div>
     </div>
+    {thresholdError && <div role="alert" className="border border-[#d71920] bg-[#fff1f1] px-4 py-3 mt-3 text-sm font-bold text-[#9f1016] print:hidden">{thresholdError} Risk classification is paused until the values are corrected.</div>}
 
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-7">
       {[
@@ -264,15 +263,15 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
         ["Max velocity", report.maxVelocity === null ? "—" : `${report.maxVelocity.toFixed(3)} mm/day`],
         ["Stability rating", report.stablePercent === null ? "—" : `${report.stablePercent.toFixed(1)}%`],
         ["Records", report.ordered.length.toLocaleString()],
-        ["Current risk", report.risk],
+        ["Current risk", thresholdError ? "Paused" : report.risk],
       ].map(([label, value], index) => <div key={String(label)} className={`border border-foreground p-4 min-h-28 ${index === 4 ? riskTone(String(value)) : index < 3 ? "bg-black text-white" : ""}`}><div className={`swiss-label text-[10px] ${index < 3 ? "text-white/60" : ""}`}>{label}</div><div className={`text-2xl font-extrabold mt-5 ${index < 3 ? "text-[#f04b42]" : ""}`}>{value}</div></div>)}
     </div>
-    <div className="border border-foreground border-t-0 px-4 py-3 text-xs"><strong>Independent Monitoring Risk:</strong> latest project velocity {report.currentVelocity.toFixed(3)} mm/day compared with Moderate ≥ {thresholds.moderate}, High ≥ {thresholds.high}, and Critical ≥ {thresholds.critical} mm/day. Wall Risk Classification data is not used.</div>
+    <div className="border border-foreground border-t-0 px-4 py-3 text-xs">{thresholdError ? <><strong>Independent Monitoring Risk:</strong> classification paused until the threshold order is valid.</> : <><strong>Independent Monitoring Risk:</strong> maximum filtered velocity {report.riskVelocity.toFixed(3)} mm/day compared with Moderate ≥ {thresholds.moderate}, High ≥ {thresholds.high}, and Critical ≥ {thresholds.critical} mm/day. Wall Risk Classification data is not used.</>}</div>
 
     <div className="border border-foreground mt-5"><div className="bg-black text-white px-5 py-3"><div className="swiss-label text-[10px] text-white">Comprehensive monitoring metrics summary</div></div><div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border"><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Overall statistics</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Total records</dt><dd className="font-mono">{report.ordered.length}</dd><dt>Monitoring period</dt><dd className="text-right">{firstDate ? new Date(firstDate).toLocaleDateString() : "—"} – {lastDate ? new Date(lastDate).toLocaleDateString() : "—"}</dd><dt>Pit locations</dt><dd className="font-mono">{new Set(report.ordered.map(row => row.pit)).size}</dd><dt>Monitoring windows</dt><dd className="font-mono">{new Set(report.ordered.map(row => `${row.pit}-${row.window}`)).size}</dd><dt>Data completeness</dt><dd className="font-mono text-primary">{report.dataCompleteness === null ? "—" : `${report.dataCompleteness.toFixed(1)}%`}</dd><dt>Incident observations</dt><dd className="font-mono">{report.incidentCount}</dd></dl></div><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Displacement (mm)</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Maximum</dt><dd className="font-mono text-primary">{report.maxDisplacement?.toFixed(2) ?? "—"}</dd><dt>Minimum</dt><dd className="font-mono">{report.minDisplacement?.toFixed(2) ?? "—"}</dd><dt>Average</dt><dd className="font-mono">{report.averageDisplacement?.toFixed(2) ?? "—"}</dd><dt>Std deviation</dt><dd className="font-mono">{report.displacementStdDev?.toFixed(2) ?? "—"}</dd><dt>Peak location</dt><dd className="text-right">{report.peakDisplacementLocation}</dd></dl></div><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Velocity (mm/day)</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Maximum</dt><dd className="font-mono text-primary">{report.maxVelocity?.toFixed(3) ?? "—"}</dd><dt>Minimum</dt><dd className="font-mono">{report.minVelocity?.toFixed(3) ?? "—"}</dd><dt>Average</dt><dd className="font-mono">{report.averageVelocity?.toFixed(3) ?? "—"}</dd><dt>Std deviation</dt><dd className="font-mono">{report.velocityStdDev?.toFixed(3) ?? "—"}</dd><dt>Peak location</dt><dd className="text-right">{report.peakVelocityLocation}</dd></dl></div></div></div>
 
     <div className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] gap-5 mt-5">
-      <div className="border border-foreground bg-[#111] text-white p-6"><Gauge className="h-5 w-5 text-[#f04b42]" /><div className="swiss-label text-[10px] text-white/60 mt-5">Executive summary</div><p className="text-base leading-relaxed mt-4">From {firstDate ? new Date(firstDate).toLocaleDateString() : "—"} to {lastDate ? new Date(lastDate).toLocaleDateString() : "—"}, {report.ordered.length} radar summary records were assessed across {new Set(report.ordered.map(row => row.pit)).size} pit location(s) and {new Set(report.ordered.map(row => row.window)).size} monitoring window(s). The current velocity-based risk is <strong className="text-[#f04b42]">{report.risk}</strong>. {report.peakWindow ? `${report.peakWindow.name} is the leading hotspot with a peak velocity of ${report.peakWindow.velocity.toFixed(3)} mm/day.` : "No hotspot is available."}</p></div>
+      <div className="border border-foreground bg-[#111] text-white p-6"><Gauge className="h-5 w-5 text-[#f04b42]" /><div className="swiss-label text-[10px] text-white/60 mt-5">Executive summary</div><p className="text-base leading-relaxed mt-4">From {firstDate ? new Date(firstDate).toLocaleDateString() : "—"} to {lastDate ? new Date(lastDate).toLocaleDateString() : "—"}, {report.ordered.length} radar summary records were assessed across {new Set(report.ordered.map(row => row.pit)).size} pit location(s) and {new Set(report.ordered.map(row => row.window)).size} monitoring window(s). {thresholdError ? "Risk classification is paused until Moderate, High and Critical thresholds are in ascending order." : <>The maximum-velocity risk is <strong className="text-[#f04b42]">{report.risk}</strong>. </>} {report.peakWindow ? `${report.peakWindow.name} is the leading hotspot with a peak velocity of ${report.peakWindow.velocity.toFixed(3)} mm/day.` : "No hotspot is available."}</p></div>
       <div className="border border-foreground p-5"><SectionLabel>Observation distribution</SectionLabel><div className="h-64 mt-3"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={report.observations} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={54} outerRadius={88} paddingAngle={2}>{report.observations.map((entry, index) => <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />)}</Pie><Tooltip content={<PowerTooltip />} /><Legend verticalAlign="bottom" height={30} /></PieChart></ResponsiveContainer></div></div>
     </div>
 
@@ -283,7 +282,7 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
 
     <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5 mt-5">
       <div className="border border-foreground p-5"><SectionLabel>Pit / window comparison</SectionLabel><div className="h-80 mt-4"><ResponsiveContainer width="100%" height="100%"><BarChart data={report.windowComparison.slice(0, 10)} layout="vertical" margin={{ left: 40 }}><CartesianGrid strokeDasharray="3 3" stroke="#ddd" /><XAxis type="number" tick={{ fontSize: 10 }} /><YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} /><Tooltip content={<PowerTooltip />} /><Legend /><Bar dataKey="displacement" name="Peak displacement (mm)" fill="#111" /><Bar dataKey="velocity" name="Peak velocity (mm/day)" fill="#d71920" /></BarChart></ResponsiveContainer></div></div>
-      <div className="border border-foreground p-5"><SectionLabel>Window risk ranking</SectionLabel><div className="space-y-3 mt-4">{report.windowComparison.slice(0, 6).map((item, index) => <div key={item.name} className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 border-b border-border pb-3"><div className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div><div><div className="font-bold text-sm">{item.name}</div><div className="text-xs text-muted-foreground mt-1">{item.records} records · {item.displacement.toFixed(2)} mm peak displacement</div></div><div className={`px-2 py-1 text-[10px] font-bold uppercase ${riskTone(item.risk)}`}>{item.risk}</div></div>)}</div></div>
+      <div className="border border-foreground p-5"><SectionLabel>Window risk ranking</SectionLabel>{thresholdError ? <div className="bg-muted p-4 mt-4 text-sm text-muted-foreground">Thresholds invalid — window risk classification is paused.</div> : <div className="space-y-3 mt-4">{report.windowComparison.slice(0, 6).map((item, index) => <div key={item.name} className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 border-b border-border pb-3"><div className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</div><div><div className="font-bold text-sm">{item.name}</div><div className="text-xs text-muted-foreground mt-1">{item.records} records · {item.displacement.toFixed(2)} mm peak displacement</div></div><div className={`px-2 py-1 text-[10px] font-bold uppercase ${riskTone(item.risk)}`}>{item.risk}</div></div>)}</div>}</div>
     </div>
 
     <div className="border border-foreground p-5 mt-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><SectionLabel>Inverse Velocity analysis</SectionLabel><p className="text-xs text-muted-foreground mt-2">Observed 1 / |velocity| and fitted linear trend for the selected monitoring scope.</p></div><div className={`px-3 py-2 text-xs font-bold uppercase ${report.inverse.status === "Forecast available" ? "bg-[#d71920] text-white" : "bg-muted"}`}>{report.inverse.status}</div></div><div className="h-80 mt-4"><ResponsiveContainer width="100%" height="100%"><LineChart data={report.inverse.points}><CartesianGrid strokeDasharray="3 3" stroke="#ddd" /><XAxis dataKey="dateLabel" minTickGap={30} tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} label={{ value: "Inverse velocity (day/mm)", angle: -90, position: "insideLeft", fontSize: 10 }} /><Tooltip content={<PowerTooltip />} /><Line type="monotone" dataKey="inverseVelocity" name="Observed inverse velocity" stroke="#111" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} /><Line type="linear" dataKey="fittedInverseVelocity" name="Fitted trend" stroke="#d71920" strokeWidth={2} dot={false} connectNulls />{report.inverse.forecastAt && <ReferenceLine x={new Date(report.inverse.forecastAt).toLocaleDateString(undefined, { day: "2-digit", month: "short" })} stroke="#d71920" strokeDasharray="5 5" label={{ value: "Estimated failure", fill: "#d71920", fontSize: 10 }} />}</LineChart></ResponsiveContainer></div><div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4"><div className="bg-muted/40 p-4"><div className="swiss-label text-[10px]">Forecast date</div><div className="font-bold mt-2">{report.inverse.forecastAt ? new Date(report.inverse.forecastAt).toLocaleString() : "No reliable date"}</div></div><div className="bg-muted/40 p-4"><div className="swiss-label text-[10px]">R²</div><div className="font-mono mt-2">{report.inverse.rSquared === null ? "—" : report.inverse.rSquared.toFixed(2)}</div></div><div className="bg-muted/40 p-4"><div className="swiss-label text-[10px]">Engineering use</div><div className="text-xs mt-2">Trend warning only; verify against the site TARP.</div></div></div></div>

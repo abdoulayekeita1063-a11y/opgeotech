@@ -173,15 +173,16 @@ export function analyzeRadarTrend(
   const latest = points[points.length - 1];
   const velocities = points.map(point => point.calculatedVelocityMmPerDay).filter((value): value is number => value !== null);
   const latestVelocity = latest.calculatedVelocityMmPerDay;
-  const absoluteVelocity = latestVelocity === null ? 0 : Math.abs(latestVelocity);
+  const peakVelocity = velocities.length ? Math.max(...velocities.map(Math.abs)) : 0;
 
   let risk: RadarRisk = "Low";
-  if (absoluteVelocity >= thresholds.criticalVelocityMmPerDay) risk = "Critical";
-  else if (absoluteVelocity >= thresholds.highVelocityMmPerDay) risk = "High";
-  else if (absoluteVelocity >= thresholds.moderateVelocityMmPerDay) risk = "Moderate";
+  if (peakVelocity >= thresholds.criticalVelocityMmPerDay) risk = "Critical";
+  else if (peakVelocity >= thresholds.highVelocityMmPerDay) risk = "High";
+  else if (peakVelocity >= thresholds.moderateVelocityMmPerDay) risk = "Moderate";
 
   const failureForecast = inverseVelocityForecast(points, firstMeasuredAt, latest.measuredAt);
   const basis = [
+    `Maximum filtered velocity: ${velocities.length ? `${round(peakVelocity)} mm/day` : "not available"}.`,
     `Latest velocity: ${latestVelocity === null ? "not available" : `${latestVelocity} mm/day`}.`,
     `Thresholds: moderate ${thresholds.moderateVelocityMmPerDay}, high ${thresholds.highVelocityMmPerDay}, critical ${thresholds.criticalVelocityMmPerDay} mm/day.`,
     `Failure forecast: ${failureForecast.status} using ${failureForecast.method}.`,
@@ -202,7 +203,7 @@ export function analyzeRadarTrend(
     displacementChangeMm: round(latest.displacementMm - sorted[0].displacementMm) ?? 0,
     latestDisplacementMm: latest.displacementMm,
     latestVelocityMmPerDay: latestVelocity,
-    peakVelocityMmPerDay: velocities.length ? round(Math.max(...velocities.map(Math.abs))) : null,
+    peakVelocityMmPerDay: velocities.length ? round(peakVelocity) : null,
     risk,
     alert,
     basis,

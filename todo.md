@@ -149,11 +149,24 @@
 - [x] Associate imported radar summaries and Monitoring Reports with a selected project
 - [x] Replace Wall / Slope Register with Project in the Monitoring UI
 - [x] Add an Add Project dialog with project name, site and description
-- [ ] Test project creation, project-scoped radar data and report rendering; publish a checkpoint (43 tests pass; UI screenshot-verified; checkpoint pending)
+- [x] Test project creation, project-scoped radar data and report rendering; publish a checkpoint (43 tests pass; UI screenshot-verified; version 0d7b3f34)
 - [x] Update standalone Radar Report to use the selected Monitoring Project instead of Wall Risk Classification records
 
 ## Independent Monitoring Risk Classification (user request)
 - [x] Classify Monitoring risk as Low / Moderate / High / Critical using only project velocity thresholds
 - [x] Keep Monitoring risk independent from Wall Risk Classification records and labels
 - [x] Show threshold basis and independent risk status in Monitoring Report and standalone Radar Report
-- [ ] Test risk classification boundaries and publish a checkpoint (boundary tests pass; checkpoint pending)
+- [x] Test risk classification boundaries and publish a checkpoint (Low/Moderate/High/Critical boundaries pass; version 0d7b3f34)
+
+## Monitoring Maximum-Velocity Risk Fix (user report)
+- [x] Calculate Current Risk from the maximum absolute velocity in the active filtered dataset
+- [x] Apply threshold precedence Critical → High → Moderate → Low without ambiguity
+- [x] Add regression coverage for max velocity 6.230 with thresholds 1.000 / 1.001 / 5.601
+- [ ] Verify the Monitoring Report display and publish a corrective checkpoint (47 tests pass; UI screenshot-verified; checkpoint pending)
+
+## User-Defined Monitoring Thresholds (user request)
+- [x] Keep Moderate, High and Critical velocity thresholds freely editable in Monitoring Report
+- [x] Validate Moderate < High < Critical and show an immediate English validation message
+- [x] Disable risk output when the custom threshold order is invalid
+- [x] Apply the same custom-threshold behavior to standalone Radar Report
+- [ ] Test custom values and publish a checkpoint (47 tests pass; checkpoint pending)
