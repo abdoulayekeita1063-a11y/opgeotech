@@ -82,19 +82,27 @@ const modules = [
   },
   {
     index: "09",
-    title: "Monitoring",
+    title: "Wall Risk Classification",
     description:
-      "Exposed wall register with radar displacement trends, velocity, acceleration and risk warnings.",
-    path: "/monitoring",
+      "Register and classify exposed walls using geotechnical baseline, risk level and field assessment data.",
+    path: "/wall-risk-classification",
     icon: Activity,
   },
   {
     index: "10",
-    title: "Radar Failure Report",
+    title: "Monitoring",
     description:
-      "Structured report with radar risk level, inverse-velocity analysis and estimated failure date.",
-    path: "/radar-report",
+      "Import Excel-style daily radar summaries with displacement and velocity statistics by pit and window.",
+    path: "/monitoring",
     icon: FileText,
+  },
+  {
+    index: "11",
+    title: "Radar Report",
+    description:
+      "Generate an executive radar analysis with KPIs, window comparison, risk level and inverse-velocity estimate.",
+    path: "/radar-report",
+    icon: Activity,
   },
 ];
 
@@ -183,7 +191,7 @@ export default function Home() {
           className="group bg-foreground text-background p-6 flex flex-col gap-4 hover:bg-primary transition-colors min-h-[210px]"
         >
           <div className="flex items-start justify-between">
-                <span className="swiss-number text-xs opacity-60">11</span>
+                <span className="swiss-number text-xs opacity-60">12</span>
             <ArrowUpRight className="h-4 w-4 opacity-60" />
           </div>
           <div className="mt-auto">

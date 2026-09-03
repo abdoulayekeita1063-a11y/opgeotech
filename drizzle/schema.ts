@@ -256,3 +256,26 @@ export const monitoringRadarReadings = mysqlTable("monitoring_radar_readings", {
 
 export type MonitoringRadarReading = typeof monitoringRadarReadings.$inferSelect;
 export type InsertMonitoringRadarReading = typeof monitoringRadarReadings.$inferInsert;
+
+
+/** Daily/window radar summary rows imported from Excel-style monitoring workbooks. */
+export const radarMonitoringRows = mysqlTable("radar_monitoring_rows", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  monitoringRecordId: int("monitoringRecordId").notNull(),
+  measuredAt: double("measuredAt").notNull(),
+  pit: varchar("pit", { length: 128 }).notNull(),
+  window: varchar("window", { length: 128 }).notNull(),
+  displacementMaxMm: double("displacementMaxMm"),
+  displacementMinMm: double("displacementMinMm"),
+  displacementAverageMm: double("displacementAverageMm"),
+  velocityMaxMmPerDay: double("velocityMaxMmPerDay"),
+  velocityMinMmPerDay: double("velocityMinMmPerDay"),
+  velocityAverageMmPerDay: double("velocityAverageMmPerDay"),
+  observations: text("observations"),
+  source: varchar("source", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RadarMonitoringRow = typeof radarMonitoringRows.$inferSelect;
+export type InsertRadarMonitoringRow = typeof radarMonitoringRows.$inferInsert;

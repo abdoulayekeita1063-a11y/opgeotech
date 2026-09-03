@@ -109,7 +109,7 @@
 ## Radar Prediction Final Verification
 - [x] Add user-facing velocity and acceleration threshold controls to Monitoring
 - [ ] Re-run authenticated browser import/prediction verification when the user session is available
-- [ ] Save a fresh checkpoint after threshold controls and final verification
+- [x] Save a fresh checkpoint after threshold controls and final verification (version def70239)
 
 ## Monitoring and Radar Report Reorganization (user request)
 - [x] Remove Q-system and Factor of Safety fields from the Monitoring UI and active form payload
@@ -122,3 +122,16 @@
 - [x] Make radar risk classification depend only on velocity thresholds
 - [x] Keep Inverse Velocity failure-date prediction based only on displacement-derived or supplied velocity
 - [x] Update tests, verify the UI and save a fresh checkpoint
+
+## Radar Workflow Reorganization (user request)
+- [x] Rename the existing Monitoring section to Wall Risk Classification across navigation, dashboard and routes
+- [x] Create a new Monitoring section based on the supplied RadarReport Excel structure
+- [x] Create a separate Radar Report section based on the supplied PDF report structure
+- [x] Support Excel radar data entry/import, analysis, risk classification, inverse-velocity estimate and exportable report output
+- [x] Test the new workflow and save a checkpoint (workbook import validated against 1,147 populated rows; typecheck and 39 tests pass)
+
+## Interactive Inverse Velocity Chart (user request)
+- [x] Add an interactive Inverse Velocity chart to Radar Report using imported Excel radar rows
+- [x] Show velocity, inverse velocity, displacement and date tooltips with window filtering
+- [x] Overlay the fitted inverse-velocity trend and forecast marker when available
+- [x] Test the chart visually and save a checkpoint

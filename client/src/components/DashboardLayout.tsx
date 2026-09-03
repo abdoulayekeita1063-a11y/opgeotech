@@ -36,6 +36,7 @@ import {
   Mountain,
   PanelLeft,
   Ruler,
+  ShieldAlert,
   Triangle,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -53,8 +54,9 @@ const menuItems = [
   { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
+  { icon: ShieldAlert, label: "Wall Risk Classification", path: "/wall-risk-classification" },
   { icon: Activity, label: "Monitoring", path: "/monitoring" },
-  { icon: FileText, label: "Radar Failure Report", path: "/radar-report" },
+  { icon: FileText, label: "Radar Report", path: "/radar-report" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];

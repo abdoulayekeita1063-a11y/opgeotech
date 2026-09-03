@@ -36,6 +36,13 @@
       "when": 1788192449679,
       "tag": "0004_windy_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1788447717548,
+      "tag": "0005_stiff_lake",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ import {
   kinematicAnalyses,
   monitoringRadarReadings,
   monitoringRecords,
+  radarMonitoringRows,
   rockClassifications,
   stabilityCalcs,
   structures,
@@ -389,4 +390,26 @@ export async function listMonitoringRadarReadings(userId: number, monitoringReco
 export async function deleteMonitoringRadarReadings(userId: number, monitoringRecordId: number) {
   const db = await requireDb();
   await db.delete(monitoringRadarReadings).where(and(eq(monitoringRadarReadings.userId, userId), eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)));
+}
+
+// Excel-style daily/window radar summary rows
+export async function insertRadarMonitoringRows(values: (typeof radarMonitoringRows.$inferInsert)[]) {
+  const db = await requireDb();
+  if (!values.length) return 0;
+  await db.insert(radarMonitoringRows).values(values);
+  return values.length;
+}
+
+export async function listRadarMonitoringRows(userId: number, monitoringRecordId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(radarMonitoringRows)
+    .where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)))
+    .orderBy(radarMonitoringRows.measuredAt);
+}
+
+export async function deleteRadarMonitoringRows(userId: number, monitoringRecordId: number) {
+  const db = await requireDb();
+  await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)));
 }

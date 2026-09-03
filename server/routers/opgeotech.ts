@@ -328,6 +328,78 @@ export const monitoringRouter = router({
       return db.listMonitoringRadarReadings(ctx.user.id, input.monitoringRecordId);
     }),
 
+  importRadarSummary: protectedProcedure
+    .input(z.object({
+      monitoringRecordId: z.number(),
+      source: z.string().max(255).optional(),
+      rows: z.array(z.object({
+        measuredAt: z.number().positive(),
+        pit: z.string().min(1).max(128),
+        window: z.string().min(1).max(128),
+        displacementMaxMm: z.number().nullable().optional(),
+        displacementMinMm: z.number().nullable().optional(),
+        displacementAverageMm: z.number().nullable().optional(),
+        velocityMaxMmPerDay: z.number().nullable().optional(),
+        velocityMinMmPerDay: z.number().nullable().optional(),
+        velocityAverageMmPerDay: z.number().nullable().optional(),
+        observations: z.string().max(2000).nullable().optional(),
+      })).min(1).max(10000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      const count = await db.insertRadarMonitoringRows(input.rows.map(row => ({
+        userId: ctx.user.id,
+        monitoringRecordId: input.monitoringRecordId,
+        measuredAt: row.measuredAt,
+        pit: row.pit,
+        window: row.window,
+        displacementMaxMm: row.displacementMaxMm ?? null,
+        displacementMinMm: row.displacementMinMm ?? null,
+        displacementAverageMm: row.displacementAverageMm ?? null,
+        velocityMaxMmPerDay: row.velocityMaxMmPerDay ?? null,
+        velocityMinMmPerDay: row.velocityMinMmPerDay ?? null,
+        velocityAverageMmPerDay: row.velocityAverageMmPerDay ?? null,
+        observations: row.observations ?? null,
+        source: input.source ?? null,
+      })));
+      return { count };
+    }),
+
+  summaryRows: protectedProcedure
+    .input(z.object({ monitoringRecordId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      return db.listRadarMonitoringRows(ctx.user.id, input.monitoringRecordId);
+    }),
+
+  analyzeRadarSummary: protectedProcedure
+    .input(z.object({
+      monitoringRecordId: z.number(),
+      window: z.string().optional(),
+      moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
+      highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
+      criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
+    }))
+    .query(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      const stored = await db.listRadarMonitoringRows(ctx.user.id, input.monitoringRecordId);
+      const selected = input.window ? stored.filter(row => row.window === input.window) : stored;
+      if (!selected.length) throw new Error("No Excel radar monitoring rows found");
+      return analyzeRadarTrend(selected.map(row => ({
+        radarPointId: `${row.pit} / ${row.window}`,
+        measuredAt: row.measuredAt,
+        displacementMm: row.displacementAverageMm ?? row.displacementMaxMm ?? 0,
+        velocityMmPerDay: row.velocityAverageMmPerDay ?? row.velocityMaxMmPerDay,
+      })), {
+        moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
+        highVelocityMmPerDay: input.highVelocityMmPerDay,
+        criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
+      });
+    }),
+
   analyzeRadar: protectedProcedure
     .input(z.object({
       monitoringRecordId: z.number(),
