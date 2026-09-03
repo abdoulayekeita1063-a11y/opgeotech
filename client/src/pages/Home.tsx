@@ -115,7 +115,7 @@ export default function Home() {
   const compliance = trpc.compliance.list.useQuery(undefined, { enabled: !!user });
   const structures = trpc.mapping.list.useQuery(undefined, { enabled: !!user });
   const kinematics = trpc.kinematics.list.useQuery(undefined, { enabled: !!user });
-  const monitoring = trpc.monitoring.list.useQuery(undefined, { enabled: !!user });
+  const monitoringProjects = trpc.monitoring.projects.useQuery(undefined, { enabled: !!user });
 
   const counts = [
     { label: "Stability analyses", value: stability.data?.length },
@@ -125,7 +125,7 @@ export default function Home() {
     { label: "Compliance checks", value: compliance.data?.length },
     { label: "Mapped structures", value: structures.data?.length },
     { label: "Kinematic analyses", value: kinematics.data?.length },
-    { label: "Monitoring walls", value: monitoring.data?.length },
+    { label: "Monitoring projects", value: monitoringProjects.data?.length },
   ];
 
   return (

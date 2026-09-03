@@ -142,4 +142,18 @@
 - [x] Add interactive KPI cards and charts for displacement, velocity, observations and risk
 - [x] Add pit/window comparisons, trend interpretation and Inverse Velocity forecast summary
 - [x] Add print/PDF export and a Power BI-style presentation mode
-- [ ] Validate the report with the supplied radar workbook, run tests and publish a checkpoint (workbook parser validated; 41 tests pass; checkpoint pending)
+- [x] Validate the report with the supplied radar workbook, run tests and publish a checkpoint (1,147 populated rows validated; 41 tests pass; version aabd984d)
+
+## Monitoring Project Management (user request)
+- [x] Add a dedicated Project data model independent of Wall Risk Classification
+- [x] Associate imported radar summaries and Monitoring Reports with a selected project
+- [x] Replace Wall / Slope Register with Project in the Monitoring UI
+- [x] Add an Add Project dialog with project name, site and description
+- [ ] Test project creation, project-scoped radar data and report rendering; publish a checkpoint (43 tests pass; UI screenshot-verified; checkpoint pending)
+- [x] Update standalone Radar Report to use the selected Monitoring Project instead of Wall Risk Classification records
+
+## Independent Monitoring Risk Classification (user request)
+- [x] Classify Monitoring risk as Low / Moderate / High / Critical using only project velocity thresholds
+- [x] Keep Monitoring risk independent from Wall Risk Classification records and labels
+- [x] Show threshold basis and independent risk status in Monitoring Report and standalone Radar Report
+- [ ] Test risk classification boundaries and publish a checkpoint (boundary tests pass; checkpoint pending)

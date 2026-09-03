@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { FileSpreadsheet, Upload, Download, Table2 } from "lucide-react";
+import { FileSpreadsheet, Upload, Download, Table2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { MonitoringPowerBIReport } from "@/components/MonitoringPowerBIReport";
 import { trpc } from "@/lib/trpc";
@@ -28,14 +31,26 @@ function downloadTemplate() {
 }
 
 export default function Monitoring() {
-  const [wallId, setWallId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [projectForm, setProjectForm] = useState({ name: "", site: "", description: "" });
   const [activeTab, setActiveTab] = useState(() => window.location.hash === "#report" ? "report" : "data");
-  const records = trpc.monitoring.list.useQuery();
-  const rowsQuery = trpc.monitoring.summaryRows.useQuery({ monitoringRecordId: wallId ?? 0 }, { enabled: wallId !== null });
+  const projects = trpc.monitoring.projects.useQuery();
+  const rowsQuery = trpc.monitoring.projectSummaryRows.useQuery({ projectId: projectId ?? 0 }, { enabled: projectId !== null });
   const utils = trpc.useUtils();
-  const importSummary = trpc.monitoring.importRadarSummary.useMutation({
+  const createProject = trpc.monitoring.createProject.useMutation({
     onSuccess: async result => {
-      await utils.monitoring.summaryRows.invalidate();
+      await utils.monitoring.projects.invalidate();
+      setProjectId(result.id);
+      setProjectForm({ name: "", site: "", description: "" });
+      setProjectDialogOpen(false);
+      toast.success("Monitoring project created");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const importSummary = trpc.monitoring.importProjectRadarSummary.useMutation({
+    onSuccess: async result => {
+      await utils.monitoring.projectSummaryRows.invalidate();
       toast.success(`${result.count} Excel monitoring rows imported`);
     },
     onError: error => toast.error(error.message),
@@ -54,10 +69,10 @@ export default function Monitoring() {
   }, [rows]);
 
   const handleImport = async (file?: File) => {
-    if (!file || wallId === null) return;
+    if (!file || projectId === null) return;
     try {
       const imported = parseRadarWorkbook(await file.arrayBuffer());
-      importSummary.mutate({ monitoringRecordId: wallId, source: file.name, rows: imported });
+      importSummary.mutate({ projectId, source: file.name, rows: imported });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to read the Excel workbook");
     }
@@ -74,28 +89,39 @@ export default function Monitoring() {
         <TabsContent value="data" className="mt-0">
       <div className="flex flex-wrap gap-3 mt-7">
         <Button variant="outline" className="rounded-none" onClick={downloadTemplate}><Download className="h-4 w-4 mr-2" /> Download Excel template</Button>
-        <label className="inline-flex"><input className="sr-only" type="file" accept=".xlsx,.xls" disabled={wallId === null || importSummary.isPending} onChange={event => { void handleImport(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className={`inline-flex items-center justify-center rounded-none bg-primary px-4 py-2 text-sm font-bold text-primary-foreground cursor-pointer ${wallId === null ? "opacity-50 pointer-events-none" : ""}`}><Upload className="h-4 w-4 mr-2" /> {importSummary.isPending ? "Importing..." : "Import Excel workbook"}</span></label>
+        <label className="inline-flex"><input className="sr-only" type="file" accept=".xlsx,.xls" disabled={projectId === null || importSummary.isPending} onChange={event => { void handleImport(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className={`inline-flex items-center justify-center rounded-none bg-primary px-4 py-2 text-sm font-bold text-primary-foreground cursor-pointer ${projectId === null ? "opacity-50 pointer-events-none" : ""}`}><Upload className="h-4 w-4 mr-2" /> {importSummary.isPending ? "Importing..." : "Import Excel workbook"}</span></label>
       </div>
       <div className="border-t-2 border-foreground mt-8 pt-4 max-w-3xl">
         <SectionLabel>Monitoring dataset</SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          <div><Label className="swiss-label text-[11px]">Wall / slope register</Label><Select value={wallId ? String(wallId) : ""} onValueChange={value => setWallId(Number(value))}><SelectTrigger className="rounded-none border-foreground mt-1"><SelectValue placeholder="Choose a registered wall" /></SelectTrigger><SelectContent>{(records.data ?? []).map(record => <SelectItem key={record.id} value={String(record.id)}>{record.wallName}</SelectItem>)}</SelectContent></Select></div>
-          <div className="border border-foreground p-4 text-sm text-muted-foreground"><FileSpreadsheet className="h-4 w-4 text-primary mb-2" /><p>Use the two-row header layout from the template. Imported rows feed the embedded Report dashboard and the standalone Radar Report.</p></div>
+          <div><Label className="swiss-label text-[11px]">Project</Label><div className="flex gap-2 mt-1"><Select value={projectId ? String(projectId) : ""} onValueChange={value => setProjectId(Number(value))}><SelectTrigger className="rounded-none border-foreground"><SelectValue placeholder="Choose a project" /></SelectTrigger><SelectContent>{(projects.data ?? []).map(project => <SelectItem key={project.id} value={String(project.id)}>{project.name}{project.site ? ` · ${project.site}` : ""}</SelectItem>)}</SelectContent></Select><Button type="button" variant="outline" className="rounded-none shrink-0" onClick={() => setProjectDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> Add Project</Button></div></div>
+          <div className="border border-foreground p-4 text-sm text-muted-foreground"><FileSpreadsheet className="h-4 w-4 text-primary mb-2" /><p>Create or select a project, then import the two-row Excel template. Radar data and reports remain separated by project.</p></div>
         </div>
       </div>
-      {wallId !== null && (
+      {projectId !== null && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
             {[["Rows", summary.records], ["Windows", summary.windows], ["Max displacement", summary.maxDisplacement === null ? "—" : `${summary.maxDisplacement} mm`], ["Max velocity", summary.maxVelocity === null ? "—" : `${summary.maxVelocity} mm/day`]].map(([label, value]) => <div key={String(label)} className="border border-foreground p-4"><div className="swiss-label text-[10px] mb-2">{label}</div><div className="text-xl font-bold">{value}</div></div>)}
           </div>
-          <div className="border border-foreground mt-8 overflow-x-auto"><div className="p-4 border-b border-foreground flex items-center gap-2"><Table2 className="h-4 w-4 text-primary" /><div><div className="swiss-label text-[10px]">Imported radar summary rows</div><div className="text-xs text-muted-foreground mt-1">{rows.length} rows · displacement and velocity only</div></div></div><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-foreground bg-muted/40"><tr className="text-left">{["Date", "Pit", "Window", "Disp. max", "Disp. min", "Disp. avg", "Vel. max", "Vel. min", "Vel. avg", "Observations"].map(label => <th key={label} className="p-3 swiss-label text-[10px]">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{rows.map(row => <tr key={row.id}><td className="p-3 whitespace-nowrap">{formatDate(row.measuredAt)}</td><td className="p-3">{row.pit}</td><td className="p-3">{row.window}</td><td className="p-3 font-mono">{row.displacementMaxMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementMinMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementAverageMm ?? "—"}</td><td className="p-3 font-mono">{row.velocityMaxMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityMinMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityAverageMmPerDay ?? "—"}</td><td className="p-3 text-xs">{row.observations || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={10} className="p-12 text-center text-muted-foreground">No Excel radar rows imported for this wall yet.</td></tr>}</tbody></table></div>
+          <div className="border border-foreground mt-8 overflow-x-auto"><div className="p-4 border-b border-foreground flex items-center gap-2"><Table2 className="h-4 w-4 text-primary" /><div><div className="swiss-label text-[10px]">Imported radar summary rows</div><div className="text-xs text-muted-foreground mt-1">{rows.length} rows · displacement and velocity only</div></div></div><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-foreground bg-muted/40"><tr className="text-left">{["Date", "Pit", "Window", "Disp. max", "Disp. min", "Disp. avg", "Vel. max", "Vel. min", "Vel. avg", "Observations"].map(label => <th key={label} className="p-3 swiss-label text-[10px]">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{rows.map(row => <tr key={row.id}><td className="p-3 whitespace-nowrap">{formatDate(row.measuredAt)}</td><td className="p-3">{row.pit}</td><td className="p-3">{row.window}</td><td className="p-3 font-mono">{row.displacementMaxMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementMinMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementAverageMm ?? "—"}</td><td className="p-3 font-mono">{row.velocityMaxMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityMinMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityAverageMmPerDay ?? "—"}</td><td className="p-3 text-xs">{row.observations || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={10} className="p-12 text-center text-muted-foreground">No Excel radar rows imported for this project yet.</td></tr>}</tbody></table></div>
         </>
       )}
         </TabsContent>
         <TabsContent value="report" className="mt-7">
-          <MonitoringPowerBIReport wallId={wallId} />
+          <MonitoringPowerBIReport projectId={projectId} />
         </TabsContent>
       </Tabs>
+      <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+        <DialogContent className="rounded-none border-foreground sm:max-w-lg">
+          <DialogHeader><DialogTitle className="uppercase">Add Monitoring Project</DialogTitle><DialogDescription>Create a separate workspace for radar imports, dashboards and reports.</DialogDescription></DialogHeader>
+          <form className="space-y-4 mt-2" onSubmit={event => { event.preventDefault(); createProject.mutate({ name: projectForm.name.trim(), site: projectForm.site.trim() || undefined, description: projectForm.description.trim() || undefined }); }}>
+            <div><Label className="swiss-label text-[10px]">Project name *</Label><Input required className="rounded-none border-foreground mt-1" value={projectForm.name} onChange={event => setProjectForm(previous => ({ ...previous, name: event.target.value }))} placeholder="Fekola Radar Monitoring 2026" /></div>
+            <div><Label className="swiss-label text-[10px]">Site</Label><Input className="rounded-none border-foreground mt-1" value={projectForm.site} onChange={event => setProjectForm(previous => ({ ...previous, site: event.target.value }))} placeholder="Fekola Mine" /></div>
+            <div><Label className="swiss-label text-[10px]">Description</Label><Textarea className="rounded-none border-foreground mt-1" value={projectForm.description} onChange={event => setProjectForm(previous => ({ ...previous, description: event.target.value }))} placeholder="Monitoring period, radar coverage and project objective" /></div>
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="rounded-none" onClick={() => setProjectDialogOpen(false)}>Cancel</Button><Button type="submit" className="rounded-none" disabled={!projectForm.name.trim() || createProject.isPending}>{createProject.isPending ? "Creating..." : "Create Project"}</Button></div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

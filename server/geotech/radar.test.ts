@@ -45,6 +45,23 @@ describe("Radar trend analysis", () => {
     expect(result.risk).toBe("Low");
   });
 
+  it("classifies every Monitoring risk level from velocity thresholds only", () => {
+    const thresholds = {
+      moderateVelocityMmPerDay: 1,
+      highVelocityMmPerDay: 5,
+      criticalVelocityMmPerDay: 10,
+    };
+    const riskAt = (velocityMmPerDay: number) => analyzeRadarTrend([
+      { radarPointId: "PROJECT-RISK", measuredAt: day, displacementMm: 0, velocityMmPerDay: 0 },
+      { radarPointId: "PROJECT-RISK", measuredAt: 2 * day, displacementMm: velocityMmPerDay, velocityMmPerDay },
+    ], thresholds).risk;
+
+    expect(riskAt(0.99)).toBe("Low");
+    expect(riskAt(1)).toBe("Moderate");
+    expect(riskAt(5)).toBe("High");
+    expect(riskAt(10)).toBe("Critical");
+  });
+
   it("uses supplied velocity when available", () => {
     const result = analyzeRadarTrend([
       { radarPointId: "P-02", measuredAt: day, displacementMm: 10, velocityMmPerDay: 0.4 },

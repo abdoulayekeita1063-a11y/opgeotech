@@ -9,6 +9,7 @@ import {
   InsertUser,
   kinematicAnalyses,
   monitoringRadarReadings,
+  monitoringProjects,
   monitoringRecords,
   radarMonitoringRows,
   rockClassifications,
@@ -412,4 +413,37 @@ export async function listRadarMonitoringRows(userId: number, monitoringRecordId
 export async function deleteRadarMonitoringRows(userId: number, monitoringRecordId: number) {
   const db = await requireDb();
   await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)));
+}
+
+// Monitoring projects organize imported radar workbooks independently of wall-risk records.
+export async function createMonitoringProject(values: typeof monitoringProjects.$inferInsert) {
+  const db = await requireDb();
+  const result = await db.insert(monitoringProjects).values(values);
+  return Number(result[0].insertId);
+}
+
+export async function listMonitoringProjects(userId: number) {
+  const db = await requireDb();
+  return db.select().from(monitoringProjects).where(eq(monitoringProjects.userId, userId)).orderBy(monitoringProjects.createdAt);
+}
+
+export async function getMonitoringProject(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(monitoringProjects).where(eq(monitoringProjects.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function listProjectRadarMonitoringRows(userId: number, projectId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(radarMonitoringRows)
+    .where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, projectId)))
+    .orderBy(radarMonitoringRows.measuredAt);
+}
+
+export async function deleteMonitoringProject(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, id)));
+  await db.delete(monitoringProjects).where(and(eq(monitoringProjects.id, id), eq(monitoringProjects.userId, userId)));
 }

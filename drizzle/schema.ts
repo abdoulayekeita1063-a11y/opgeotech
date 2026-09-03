@@ -258,11 +258,26 @@ export type MonitoringRadarReading = typeof monitoringRadarReadings.$inferSelect
 export type InsertMonitoringRadarReading = typeof monitoringRadarReadings.$inferInsert;
 
 
+/** Projects used to organize Monitoring workbooks and reports independently of wall risk records. */
+export const monitoringProjects = mysqlTable("monitoring_projects", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  site: varchar("site", { length: 255 }),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MonitoringProject = typeof monitoringProjects.$inferSelect;
+export type InsertMonitoringProject = typeof monitoringProjects.$inferInsert;
+
+
 /** Daily/window radar summary rows imported from Excel-style monitoring workbooks. */
 export const radarMonitoringRows = mysqlTable("radar_monitoring_rows", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  monitoringRecordId: int("monitoringRecordId").notNull(),
+  monitoringRecordId: int("monitoringRecordId"),
+  projectId: int("projectId"),
   measuredAt: double("measuredAt").notNull(),
   pit: varchar("pit", { length: 128 }).notNull(),
   window: varchar("window", { length: 128 }).notNull(),

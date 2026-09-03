@@ -126,15 +126,15 @@ function PowerTooltip({ active, payload, label }: { active?: boolean; payload?: 
   return <div className="border border-foreground bg-background p-3 shadow-lg text-xs"><div className="font-bold uppercase mb-2">{label}</div>{payload.map((item, index) => <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-6 py-0.5"><span style={{ color: item.color }}>{item.name}</span><span className="font-mono">{typeof item.value === "number" ? item.value.toFixed(3) : "—"}</span></div>)}</div>;
 }
 
-export function MonitoringPowerBIReport({ wallId }: { wallId: number | null }) {
+export function MonitoringPowerBIReport({ projectId }: { projectId: number | null }) {
   const [pit, setPit] = useState("all");
   const [windowName, setWindowName] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [thresholds, setThresholds] = useState({ moderate: 1, high: 5, critical: 10 });
-  const records = trpc.monitoring.list.useQuery();
-  const rowsQuery = trpc.monitoring.summaryRows.useQuery({ monitoringRecordId: wallId ?? 0 }, { enabled: wallId !== null });
-  const selectedWall = (records.data ?? []).find(record => record.id === wallId);
+  const projects = trpc.monitoring.projects.useQuery();
+  const rowsQuery = trpc.monitoring.projectSummaryRows.useQuery({ projectId: projectId ?? 0 }, { enabled: projectId !== null });
+  const selectedProject = (projects.data ?? []).find(project => project.id === projectId);
   const allRows = (rowsQuery.data ?? []) as SummaryRow[];
   const pits = Array.from(new Set(allRows.map(row => row.pit))).sort();
   const windows = Array.from(new Set(allRows.filter(row => pit === "all" || row.pit === pit).map(row => row.window))).sort();
@@ -215,6 +215,7 @@ export function MonitoringPowerBIReport({ wallId }: { wallId: number | null }) {
       velocityStdDev: standardDeviation(velocityValues),
       minDisplacement: displacementValues.length ? Math.min(...displacementValues) : null,
       minVelocity: signedVelocityValues.length ? Math.min(...signedVelocityValues) : null,
+      currentVelocity,
       dataCompleteness: ordered.length ? completeRows / ordered.length * 100 : null,
       incidentCount: ordered.length - stableRows.length,
       peakDisplacementLocation: peakDisplacementRow ? `${peakDisplacementRow.pit} · ${peakDisplacementRow.window}` : "—",
@@ -231,7 +232,7 @@ export function MonitoringPowerBIReport({ wallId }: { wallId: number | null }) {
     };
   }, [filteredRows, thresholds]);
 
-  if (wallId === null) return <div className="border border-foreground p-10 text-sm text-muted-foreground">Select a registered wall in the Data tab to build the Monitoring Report.</div>;
+  if (projectId === null) return <div className="border border-foreground p-10 text-sm text-muted-foreground">Select or add a project in the Data tab to build the Monitoring Report.</div>;
   if (!filteredRows.length) return <div className="border border-foreground p-10 text-sm text-muted-foreground">No radar monitoring rows match the current filters. Import an Excel workbook or adjust the report scope.</div>;
 
   const firstDate = report.ordered[0]?.measuredAt;
@@ -244,7 +245,7 @@ export function MonitoringPowerBIReport({ wallId }: { wallId: number | null }) {
 
   return <section id="monitoring-powerbi-report" className="bg-background text-foreground p-1 print:p-0">
     <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-foreground pb-5">
-      <div><div className="swiss-label text-[10px] text-primary">Power BI-style presentation</div><h2 className="text-3xl md:text-4xl font-extrabold uppercase mt-2">Radar Monitoring Analysis</h2><p className="text-sm text-muted-foreground mt-2">{selectedWall?.wallName ?? "Selected wall"} · interactive operational summary</p></div>
+      <div><div className="swiss-label text-[10px] text-primary">Power BI-style presentation</div><h2 className="text-3xl md:text-4xl font-extrabold uppercase mt-2">Radar Monitoring Analysis</h2><p className="text-sm text-muted-foreground mt-2">{selectedProject?.name ?? "Selected project"}{selectedProject?.site ? ` · ${selectedProject.site}` : ""} · interactive operational summary</p></div>
       <div className="flex gap-2 print:hidden"><Button variant="outline" className="rounded-none" onClick={presentReport}><Expand className="h-4 w-4 mr-2" /> Present</Button><Button className="rounded-none" onClick={printReport}><FileDown className="h-4 w-4 mr-2" /> Print / Save PDF</Button></div>
     </div>
 
@@ -266,6 +267,7 @@ export function MonitoringPowerBIReport({ wallId }: { wallId: number | null }) {
         ["Current risk", report.risk],
       ].map(([label, value], index) => <div key={String(label)} className={`border border-foreground p-4 min-h-28 ${index === 4 ? riskTone(String(value)) : index < 3 ? "bg-black text-white" : ""}`}><div className={`swiss-label text-[10px] ${index < 3 ? "text-white/60" : ""}`}>{label}</div><div className={`text-2xl font-extrabold mt-5 ${index < 3 ? "text-[#f04b42]" : ""}`}>{value}</div></div>)}
     </div>
+    <div className="border border-foreground border-t-0 px-4 py-3 text-xs"><strong>Independent Monitoring Risk:</strong> latest project velocity {report.currentVelocity.toFixed(3)} mm/day compared with Moderate ≥ {thresholds.moderate}, High ≥ {thresholds.high}, and Critical ≥ {thresholds.critical} mm/day. Wall Risk Classification data is not used.</div>
 
     <div className="border border-foreground mt-5"><div className="bg-black text-white px-5 py-3"><div className="swiss-label text-[10px] text-white">Comprehensive monitoring metrics summary</div></div><div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border"><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Overall statistics</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Total records</dt><dd className="font-mono">{report.ordered.length}</dd><dt>Monitoring period</dt><dd className="text-right">{firstDate ? new Date(firstDate).toLocaleDateString() : "—"} – {lastDate ? new Date(lastDate).toLocaleDateString() : "—"}</dd><dt>Pit locations</dt><dd className="font-mono">{new Set(report.ordered.map(row => row.pit)).size}</dd><dt>Monitoring windows</dt><dd className="font-mono">{new Set(report.ordered.map(row => `${row.pit}-${row.window}`)).size}</dd><dt>Data completeness</dt><dd className="font-mono text-primary">{report.dataCompleteness === null ? "—" : `${report.dataCompleteness.toFixed(1)}%`}</dd><dt>Incident observations</dt><dd className="font-mono">{report.incidentCount}</dd></dl></div><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Displacement (mm)</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Maximum</dt><dd className="font-mono text-primary">{report.maxDisplacement?.toFixed(2) ?? "—"}</dd><dt>Minimum</dt><dd className="font-mono">{report.minDisplacement?.toFixed(2) ?? "—"}</dd><dt>Average</dt><dd className="font-mono">{report.averageDisplacement?.toFixed(2) ?? "—"}</dd><dt>Std deviation</dt><dd className="font-mono">{report.displacementStdDev?.toFixed(2) ?? "—"}</dd><dt>Peak location</dt><dd className="text-right">{report.peakDisplacementLocation}</dd></dl></div><div className="p-5"><div className="font-bold text-sm uppercase mb-4">Velocity (mm/day)</div><dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm"><dt>Maximum</dt><dd className="font-mono text-primary">{report.maxVelocity?.toFixed(3) ?? "—"}</dd><dt>Minimum</dt><dd className="font-mono">{report.minVelocity?.toFixed(3) ?? "—"}</dd><dt>Average</dt><dd className="font-mono">{report.averageVelocity?.toFixed(3) ?? "—"}</dd><dt>Std deviation</dt><dd className="font-mono">{report.velocityStdDev?.toFixed(3) ?? "—"}</dd><dt>Peak location</dt><dd className="text-right">{report.peakVelocityLocation}</dd></dl></div></div></div>
 
