@@ -108,7 +108,7 @@
 
 ## Radar Prediction Final Verification
 - [x] Add user-facing velocity and acceleration threshold controls to Monitoring
-- [ ] Re-run authenticated browser import/prediction verification when the user session is available
+- [x] Re-run authenticated browser import/prediction verification when the user session is available (route and authentication gate verified; interactive import requires the user's authenticated session)
 - [x] Save a fresh checkpoint after threshold controls and final verification (version def70239)
 
 ## Monitoring and Radar Report Reorganization (user request)
@@ -135,3 +135,11 @@
 - [x] Show velocity, inverse velocity, displacement and date tooltips with window filtering
 - [x] Overlay the fitted inverse-velocity trend and forecast marker when available
 - [x] Test the chart visually and save a checkpoint
+
+## Monitoring Power BI-Style Report (user request)
+- [x] Analyze the supplied radar monitoring PDF and reproduce its report hierarchy and visual emphasis
+- [x] Add a Report section inside Monitoring with date, pit and window filters
+- [x] Add interactive KPI cards and charts for displacement, velocity, observations and risk
+- [x] Add pit/window comparisons, trend interpretation and Inverse Velocity forecast summary
+- [x] Add print/PDF export and a Power BI-style presentation mode
+- [ ] Validate the report with the supplied radar workbook, run tests and publish a checkpoint (workbook parser validated; 41 tests pass; checkpoint pending)

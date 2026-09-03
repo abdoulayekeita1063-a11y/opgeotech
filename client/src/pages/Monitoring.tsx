@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
+import { MonitoringPowerBIReport } from "@/components/MonitoringPowerBIReport";
 import { trpc } from "@/lib/trpc";
 import { parseRadarWorkbook, RadarSummaryRow } from "@/lib/radarWorkbook";
 
@@ -27,6 +29,7 @@ function downloadTemplate() {
 
 export default function Monitoring() {
   const [wallId, setWallId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState(() => window.location.hash === "#report" ? "report" : "data");
   const records = trpc.monitoring.list.useQuery();
   const rowsQuery = trpc.monitoring.summaryRows.useQuery({ monitoringRecordId: wallId ?? 0 }, { enabled: wallId !== null });
   const utils = trpc.useUtils();
@@ -62,7 +65,13 @@ export default function Monitoring() {
 
   return (
     <div className="container py-10">
-      <ModuleHeader index="10" title="Monitoring" description="Import daily radar summaries using the OPGeotech Excel structure: Date, Pit, Window, displacement statistics, velocity statistics and observations." />
+      <ModuleHeader index="10" title="Monitoring" description="Import daily radar summaries, review the source table, and build an interactive Power BI-style analysis from displacement, velocity and observation data." />
+      <Tabs value={activeTab} onValueChange={value => { setActiveTab(value); window.history.replaceState(null, "", value === "report" ? "#report" : window.location.pathname); }} className="mt-7">
+        <TabsList className="rounded-none border border-foreground bg-background h-auto p-0 print:hidden">
+          <TabsTrigger value="data" className="rounded-none px-6 py-3 data-[state=active]:bg-black data-[state=active]:text-white">Data</TabsTrigger>
+          <TabsTrigger value="report" className="rounded-none px-6 py-3 data-[state=active]:bg-[#d71920] data-[state=active]:text-white">Report</TabsTrigger>
+        </TabsList>
+        <TabsContent value="data" className="mt-0">
       <div className="flex flex-wrap gap-3 mt-7">
         <Button variant="outline" className="rounded-none" onClick={downloadTemplate}><Download className="h-4 w-4 mr-2" /> Download Excel template</Button>
         <label className="inline-flex"><input className="sr-only" type="file" accept=".xlsx,.xls" disabled={wallId === null || importSummary.isPending} onChange={event => { void handleImport(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className={`inline-flex items-center justify-center rounded-none bg-primary px-4 py-2 text-sm font-bold text-primary-foreground cursor-pointer ${wallId === null ? "opacity-50 pointer-events-none" : ""}`}><Upload className="h-4 w-4 mr-2" /> {importSummary.isPending ? "Importing..." : "Import Excel workbook"}</span></label>
@@ -71,7 +80,7 @@ export default function Monitoring() {
         <SectionLabel>Monitoring dataset</SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div><Label className="swiss-label text-[11px]">Wall / slope register</Label><Select value={wallId ? String(wallId) : ""} onValueChange={value => setWallId(Number(value))}><SelectTrigger className="rounded-none border-foreground mt-1"><SelectValue placeholder="Choose a registered wall" /></SelectTrigger><SelectContent>{(records.data ?? []).map(record => <SelectItem key={record.id} value={String(record.id)}>{record.wallName}</SelectItem>)}</SelectContent></Select></div>
-          <div className="border border-foreground p-4 text-sm text-muted-foreground"><FileSpreadsheet className="h-4 w-4 text-primary mb-2" /><p>Use the two-row header layout from the template. The imported rows are stored against the selected wall and used by Radar Report.</p></div>
+          <div className="border border-foreground p-4 text-sm text-muted-foreground"><FileSpreadsheet className="h-4 w-4 text-primary mb-2" /><p>Use the two-row header layout from the template. Imported rows feed the embedded Report dashboard and the standalone Radar Report.</p></div>
         </div>
       </div>
       {wallId !== null && (
@@ -82,6 +91,11 @@ export default function Monitoring() {
           <div className="border border-foreground mt-8 overflow-x-auto"><div className="p-4 border-b border-foreground flex items-center gap-2"><Table2 className="h-4 w-4 text-primary" /><div><div className="swiss-label text-[10px]">Imported radar summary rows</div><div className="text-xs text-muted-foreground mt-1">{rows.length} rows · displacement and velocity only</div></div></div><table className="w-full min-w-[1100px] text-sm"><thead className="border-b border-foreground bg-muted/40"><tr className="text-left">{["Date", "Pit", "Window", "Disp. max", "Disp. min", "Disp. avg", "Vel. max", "Vel. min", "Vel. avg", "Observations"].map(label => <th key={label} className="p-3 swiss-label text-[10px]">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{rows.map(row => <tr key={row.id}><td className="p-3 whitespace-nowrap">{formatDate(row.measuredAt)}</td><td className="p-3">{row.pit}</td><td className="p-3">{row.window}</td><td className="p-3 font-mono">{row.displacementMaxMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementMinMm ?? "—"}</td><td className="p-3 font-mono">{row.displacementAverageMm ?? "—"}</td><td className="p-3 font-mono">{row.velocityMaxMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityMinMmPerDay ?? "—"}</td><td className="p-3 font-mono">{row.velocityAverageMmPerDay ?? "—"}</td><td className="p-3 text-xs">{row.observations || "—"}</td></tr>)}{rows.length === 0 && <tr><td colSpan={10} className="p-12 text-center text-muted-foreground">No Excel radar rows imported for this wall yet.</td></tr>}</tbody></table></div>
         </>
       )}
+        </TabsContent>
+        <TabsContent value="report" className="mt-7">
+          <MonitoringPowerBIReport wallId={wallId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
