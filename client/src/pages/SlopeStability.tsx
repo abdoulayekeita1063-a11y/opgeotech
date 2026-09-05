@@ -85,7 +85,7 @@ export default function SlopeStability() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <ModuleHeader
-        index="01"
+        index="02"
         title="Slope Stability"
         description="Limit-equilibrium factor of safety using the Fellenius (ordinary) and simplified Bishop methods of slices, with automatic critical circle search on a homogeneous slope."
       />

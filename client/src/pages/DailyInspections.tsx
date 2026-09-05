@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { exportRecordAsPdf, markdownToHtml } from "@/lib/exportPdf";
 
-export default function DailyInspections() {
+export default function DailyInspections({ embedded = false }: { embedded?: boolean }) {
   const [form, setForm] = useState({
     title: "",
     inspectionDate: new Date().toISOString().slice(0, 10),
@@ -56,12 +56,12 @@ export default function DailyInspections() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <ModuleHeader
+    <div className={embedded ? "" : "max-w-6xl mx-auto px-4 py-8"}>
+      {!embedded && <ModuleHeader
         index="03"
         title="Daily Inspections"
         description="Enter field data — observations, anomalies, weather, inspected zones — and the AI writes a structured, professionally worded daily geotechnical inspection report."
-      />
+      />}
       <div className="grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-5 space-y-4">
           <SectionLabel>Field Data</SectionLabel>

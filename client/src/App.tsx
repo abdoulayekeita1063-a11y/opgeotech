@@ -2,13 +2,14 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DashboardLayout from "./components/DashboardLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import SlopeStability from "./pages/SlopeStability";
 import RockClassification from "./pages/RockClassification";
-import DailyInspections from "./pages/DailyInspections";
+import Reporting from "./pages/Reporting";
 import PostBlast from "./pages/PostBlast";
 import DesignCompliance from "./pages/DesignCompliance";
 import Archive from "./pages/Archive";
@@ -17,17 +18,22 @@ import StructuralMapping from "./pages/StructuralMapping";
 import KinematicAnalysis from "./pages/KinematicAnalysis";
 import Monitoring from "./pages/Monitoring";
 import WallRiskClassification from "./pages/WallRiskClassification";
-import RadarReport from "./pages/RadarReport";
 import Download from "./pages/Download";
+
+function LegacyRedirect({ to }: { to: string }) {
+  useEffect(() => { window.location.replace(to); }, [to]);
+  return null;
+}
 
 function Router() {
   return (
     <DashboardLayout>
       <Switch>
         <Route path={"/"} component={Home} />
+        <Route path={"/reporting"} component={Reporting} />
         <Route path={"/stability"} component={SlopeStability} />
         <Route path={"/classification"} component={RockClassification} />
-        <Route path={"/inspections"} component={DailyInspections} />
+        <Route path={"/inspections"} component={() => <LegacyRedirect to="/reporting#inspections" />} />
         <Route path={"/blast"} component={PostBlast} />
         <Route path={"/compliance"} component={DesignCompliance} />
         <Route path={"/drillhole"} component={Drillhole} />
@@ -35,8 +41,8 @@ function Router() {
         <Route path={"/kinematics"} component={KinematicAnalysis} />
         <Route path={"/wall-risk-classification"} component={WallRiskClassification} />
         <Route path={"/monitoring"} component={Monitoring} />
-        <Route path={"/radar-report"} component={RadarReport} />
-        <Route path={"/radar-failure-report"} component={RadarReport} />
+        <Route path={"/radar-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
+        <Route path={"/radar-failure-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
         <Route path={"/archive"} component={Archive} />
         <Route path={"/download"} component={Download} />
         <Route path={"/404"} component={NotFound} />

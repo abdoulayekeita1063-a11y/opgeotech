@@ -294,3 +294,26 @@ export const radarMonitoringRows = mysqlTable("radar_monitoring_rows", {
 
 export type RadarMonitoringRow = typeof radarMonitoringRows.$inferSelect;
 export type InsertRadarMonitoringRow = typeof radarMonitoringRows.$inferInsert;
+
+/** Fall-of-ground / slope failure incidents imported or entered through Reporting. */
+export const failureRecords = mysqlTable("failure_records", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  /** UTC Unix timestamp in milliseconds. */
+  incidentDate: double("incidentDate").notNull(),
+  pit: varchar("pit", { length: 128 }).notNull(),
+  phase: varchar("phase", { length: 128 }),
+  wall: varchar("wall", { length: 128 }),
+  bench: varchar("bench", { length: 128 }),
+  lithology: varchar("lithology", { length: 255 }),
+  failureType: varchar("failureType", { length: 255 }),
+  actionTaken: text("actionTaken"),
+  comments: text("comments"),
+  pictureReference: text("pictureReference"),
+  sourceSheet: varchar("sourceSheet", { length: 128 }),
+  sourceFile: varchar("sourceFile", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FailureRecord = typeof failureRecords.$inferSelect;
+export type InsertFailureRecord = typeof failureRecords.$inferInsert;

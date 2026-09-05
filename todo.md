@@ -189,4 +189,14 @@
 - [x] Increase KPI label size and weight for Max Displacement, Max Velocity, Stability Rating and Current Risk
 - [x] Increase label contrast on black and risk-colored KPI cards
 - [x] Preserve KPI values, calculations, responsive layout and print output
-- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; checkpoint pending)
+- [x] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; version 7bc269a6)
+
+## Reporting Hub and Failure Records (user request)
+- [x] Analyze GeneralreportfailureFekola.xlsx and Fekola Fall of Ground Incidents Distribution.pdf
+- [x] Add a top-level Reporting module above Slope Stability
+- [x] Move Daily Inspections into Reporting while preserving the existing inspection workflow
+- [x] Add Failure Records entry and Excel import matching the supplied workbook
+- [x] Add an interactive Fall of Ground report matching the supplied PDF hierarchy and visuals
+- [x] Add report print/PDF export and filters for date, location and failure attributes
+- [x] Remove Radar Report from navigation/dashboard and preserve an appropriate legacy route
+- [ ] Test with the supplied files, visually verify and publish a checkpoint (41 workbook rows validated; 49 tests pass; UI screenshot-verified; checkpoint pending)

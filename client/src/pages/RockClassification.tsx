@@ -53,7 +53,7 @@ export default function RockClassification() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <ModuleHeader
-        index="02"
+        index="03"
         title="Rock Classification"
         description="Rock mass characterization using three classification systems: RMR (Bieniawski 1989), Q-system (Barton) and GSI (Hoek). Each index is computed automatically with its engineering interpretation."
       />

@@ -5,6 +5,7 @@ import {
   complianceChecks,
   drillholes,
   dxfPlans,
+  failureRecords,
   inspectionReports,
   InsertUser,
   kinematicAnalyses,
@@ -446,4 +447,37 @@ export async function deleteMonitoringProject(id: number, userId: number) {
   const db = await requireDb();
   await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, id)));
   await db.delete(monitoringProjects).where(and(eq(monitoringProjects.id, id), eq(monitoringProjects.userId, userId)));
+}
+
+// Reporting: fall-of-ground / slope failure records
+export async function insertFailureRecord(values: typeof failureRecords.$inferInsert) {
+  const db = await requireDb();
+  const result = await db.insert(failureRecords).values(values);
+  return Number(result[0].insertId);
+}
+
+export async function insertFailureRecords(values: (typeof failureRecords.$inferInsert)[]) {
+  const db = await requireDb();
+  if (!values.length) return 0;
+  await db.insert(failureRecords).values(values);
+  return values.length;
+}
+
+export async function listFailureRecords(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(failureRecords)
+    .where(eq(failureRecords.userId, userId))
+    .orderBy(desc(failureRecords.incidentDate));
+}
+
+export async function deleteFailureRecord(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(failureRecords).where(and(eq(failureRecords.id, id), eq(failureRecords.userId, userId)));
+}
+
+export async function clearFailureRecords(userId: number) {
+  const db = await requireDb();
+  await db.delete(failureRecords).where(eq(failureRecords.userId, userId));
 }

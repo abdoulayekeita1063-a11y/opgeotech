@@ -26,7 +26,6 @@ import {
   Archive,
   FileText,
   Bomb,
-  ClipboardList,
   Compass,
   Download,
   Drill,
@@ -46,9 +45,9 @@ import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: FileText, label: "Reporting", path: "/reporting" },
   { icon: Mountain, label: "Slope Stability", path: "/stability" },
   { icon: Layers, label: "Rock Classification", path: "/classification" },
-  { icon: ClipboardList, label: "Daily Inspections", path: "/inspections" },
   { icon: Bomb, label: "Blast Assessment", path: "/blast" },
   { icon: Ruler, label: "Design Compliance", path: "/compliance" },
   { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
@@ -56,7 +55,6 @@ const menuItems = [
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: ShieldAlert, label: "Wall Risk Classification", path: "/wall-risk-classification" },
   { icon: Activity, label: "Monitoring", path: "/monitoring" },
-  { icon: FileText, label: "Radar Report", path: "/radar-report" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];

@@ -5,7 +5,6 @@ import {
   Activity,
   ArrowUpRight,
   Bomb,
-  ClipboardList,
   Compass,
   Drill,
   FileText,
@@ -18,6 +17,14 @@ import {
 const modules = [
   {
     index: "01",
+    title: "Reporting",
+    description:
+      "Daily inspection reporting, fall-of-ground records and interactive incident trend analysis in one workspace.",
+    path: "/reporting",
+    icon: FileText,
+  },
+  {
+    index: "02",
     title: "Slope Stability",
     description:
       "Factor of safety computation using Bishop and Fellenius limit-equilibrium methods with critical circle search.",
@@ -25,20 +32,12 @@ const modules = [
     icon: Mountain,
   },
   {
-    index: "02",
+    index: "03",
     title: "Rock Classification",
     description:
       "Rock mass characterization through RMR, Q-system and GSI with automatic index calculation and interpretation.",
     path: "/classification",
     icon: Layers,
-  },
-  {
-    index: "03",
-    title: "Daily Inspections",
-    description:
-      "Field data entry with AI-generated structured professional inspection reports.",
-    path: "/inspections",
-    icon: ClipboardList,
   },
   {
     index: "04",
@@ -96,14 +95,6 @@ const modules = [
     path: "/monitoring",
     icon: FileText,
   },
-  {
-    index: "11",
-    title: "Radar Report",
-    description:
-      "Generate an executive radar analysis with KPIs, window comparison, risk level and inverse-velocity estimate.",
-    path: "/radar-report",
-    icon: Activity,
-  },
 ];
 
 export default function Home() {
@@ -116,6 +107,7 @@ export default function Home() {
   const structures = trpc.mapping.list.useQuery(undefined, { enabled: !!user });
   const kinematics = trpc.kinematics.list.useQuery(undefined, { enabled: !!user });
   const monitoringProjects = trpc.monitoring.projects.useQuery(undefined, { enabled: !!user });
+  const failures = trpc.reporting.failures.list.useQuery(undefined, { enabled: !!user });
 
   const counts = [
     { label: "Stability analyses", value: stability.data?.length },
@@ -126,6 +118,7 @@ export default function Home() {
     { label: "Mapped structures", value: structures.data?.length },
     { label: "Kinematic analyses", value: kinematics.data?.length },
     { label: "Monitoring projects", value: monitoringProjects.data?.length },
+    { label: "Failure records", value: failures.data?.length },
   ];
 
   return (
@@ -191,7 +184,7 @@ export default function Home() {
           className="group bg-foreground text-background p-6 flex flex-col gap-4 hover:bg-primary transition-colors min-h-[210px]"
         >
           <div className="flex items-start justify-between">
-                <span className="swiss-number text-xs opacity-60">12</span>
+                <span className="swiss-number text-xs opacity-60">11</span>
             <ArrowUpRight className="h-4 w-4 opacity-60" />
           </div>
           <div className="mt-auto">

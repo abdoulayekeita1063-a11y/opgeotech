@@ -256,7 +256,7 @@ export default function WallRiskClassification() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="border border-foreground p-4">
               <div className="swiss-label text-[10px] mb-3">Classification scope</div>
-              <p className="text-sm text-muted-foreground">Use this register to classify exposed walls and slopes. Radar time-series entry and reporting are handled in the separate Monitoring and Radar Report modules.</p>
+              <p className="text-sm text-muted-foreground">Use this register to classify exposed walls and slopes. Radar data entry and analysis are handled independently in Monitoring and its embedded Report workspace.</p>
             </div>
             <div className="border border-foreground p-4">
               <div className="swiss-label text-[10px] mb-3">Risk convention</div>
