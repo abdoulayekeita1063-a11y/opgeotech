@@ -162,11 +162,17 @@
 - [x] Calculate Current Risk from the maximum absolute velocity in the active filtered dataset
 - [x] Apply threshold precedence Critical → High → Moderate → Low without ambiguity
 - [x] Add regression coverage for max velocity 6.230 with thresholds 1.000 / 1.001 / 5.601
-- [ ] Verify the Monitoring Report display and publish a corrective checkpoint (47 tests pass; UI screenshot-verified; checkpoint pending)
+- [x] Verify the Monitoring Report display and publish a corrective checkpoint (47 tests pass; UI screenshot-verified; version be17bf1e)
 
 ## User-Defined Monitoring Thresholds (user request)
 - [x] Keep Moderate, High and Critical velocity thresholds freely editable in Monitoring Report
 - [x] Validate Moderate < High < Critical and show an immediate English validation message
 - [x] Disable risk output when the custom threshold order is invalid
 - [x] Apply the same custom-threshold behavior to standalone Radar Report
-- [ ] Test custom values and publish a checkpoint (47 tests pass; checkpoint pending)
+- [x] Test custom values and publish a checkpoint (47 tests pass; version be17bf1e)
+
+## Monitoring Report Typography Readability (user request)
+- [x] Increase filter, label and helper text sizes in the embedded Monitoring Report
+- [x] Increase KPI, summary, table and chart text sizes while preserving responsive layout
+- [x] Preserve readable print/PDF typography with scoped print rules
+- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; checkpoint pending)

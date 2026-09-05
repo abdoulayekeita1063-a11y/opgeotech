@@ -205,3 +205,43 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Scoped readability boost for the data-dense Monitoring report. */
+.monitoring-report-readable {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.monitoring-report-readable .swiss-label {
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.monitoring-report-readable input,
+.monitoring-report-readable [role="combobox"] {
+  font-size: 0.9375rem;
+}
+
+.monitoring-report-readable table {
+  font-size: 0.9375rem;
+}
+
+.monitoring-report-readable .recharts-text,
+.monitoring-report-readable .recharts-legend-item-text {
+  font-size: 12px !important;
+}
+
+@media print {
+  .monitoring-report-readable {
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  .monitoring-report-readable .swiss-label {
+    font-size: 8pt;
+  }
+
+  .monitoring-report-readable table {
+    font-size: 9pt;
+  }
+}
