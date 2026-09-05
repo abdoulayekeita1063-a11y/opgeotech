@@ -175,4 +175,10 @@
 - [x] Increase filter, label and helper text sizes in the embedded Monitoring Report
 - [x] Increase KPI, summary, table and chart text sizes while preserving responsive layout
 - [x] Preserve readable print/PDF typography with scoped print rules
-- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; checkpoint pending)
+- [x] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; version 2c6432d1)
+
+## Comprehensive Metrics Table Typography (user request)
+- [x] Increase the black header title size in Comprehensive Monitoring Metrics Summary
+- [x] Increase section headings, row labels and numeric values in all three summary columns
+- [x] Increase row spacing while preserving responsive and print/PDF layout
+- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; route screenshot-verified; checkpoint pending)

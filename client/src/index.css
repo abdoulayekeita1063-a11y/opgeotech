@@ -231,6 +231,27 @@
   font-size: 12px !important;
 }
 
+.monitoring-report-readable .monitoring-metrics-summary > div:first-child .swiss-label {
+  font-size: 0.875rem;
+  letter-spacing: 0.14em;
+}
+
+.monitoring-report-readable .monitoring-metrics-summary .font-bold.uppercase {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+
+.monitoring-report-readable .monitoring-metrics-summary dl {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.monitoring-report-readable .monitoring-metrics-summary dt,
+.monitoring-report-readable .monitoring-metrics-summary dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 @media print {
   .monitoring-report-readable {
     font-size: 10.5pt;
@@ -243,5 +264,18 @@
 
   .monitoring-report-readable table {
     font-size: 9pt;
+  }
+
+  .monitoring-report-readable .monitoring-metrics-summary > div:first-child .swiss-label {
+    font-size: 9pt;
+  }
+
+  .monitoring-report-readable .monitoring-metrics-summary .font-bold.uppercase {
+    font-size: 10.5pt;
+  }
+
+  .monitoring-report-readable .monitoring-metrics-summary dl {
+    font-size: 10pt;
+    line-height: 1.5;
   }
 }
