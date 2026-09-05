@@ -252,6 +252,21 @@
   overflow-wrap: anywhere;
 }
 
+.monitoring-report-readable .monitoring-kpi-label {
+  font-size: 0.875rem;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: 0.14em;
+}
+
+.monitoring-report-readable .monitoring-kpi-label-dark {
+  color: rgb(255 255 255 / 92%);
+}
+
+.monitoring-report-readable .monitoring-kpi-label-light {
+  color: rgb(0 0 0 / 78%);
+}
+
 @media print {
   .monitoring-report-readable {
     font-size: 10.5pt;
@@ -277,5 +292,9 @@
   .monitoring-report-readable .monitoring-metrics-summary dl {
     font-size: 10pt;
     line-height: 1.5;
+  }
+
+  .monitoring-report-readable .monitoring-kpi-label {
+    font-size: 9.5pt;
   }
 }

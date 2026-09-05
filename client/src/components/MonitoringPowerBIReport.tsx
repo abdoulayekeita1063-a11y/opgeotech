@@ -264,7 +264,10 @@ export function MonitoringPowerBIReport({ projectId }: { projectId: number | nul
         ["Stability rating", report.stablePercent === null ? "—" : `${report.stablePercent.toFixed(1)}%`],
         ["Records", report.ordered.length.toLocaleString()],
         ["Current risk", thresholdError ? "Paused" : report.risk],
-      ].map(([label, value], index) => <div key={String(label)} className={`border border-foreground p-5 min-h-32 ${index === 4 ? riskTone(String(value)) : index < 3 ? "bg-black text-white" : ""}`}><div className={`swiss-label ${index < 3 ? "text-white/60" : ""}`}>{label}</div><div className={`text-3xl font-extrabold mt-5 ${index < 3 ? "text-[#f04b42]" : ""}`}>{value}</div></div>)}
+      ].map(([label, value], index) => {
+        const darkCard = index < 3 || (index === 4 && (value === "High" || value === "Critical"));
+        return <div key={String(label)} className={`border border-foreground p-5 min-h-32 ${index === 4 ? riskTone(String(value)) : index < 3 ? "bg-black text-white" : ""}`}><div className={`swiss-label monitoring-kpi-label ${darkCard ? "monitoring-kpi-label-dark" : "monitoring-kpi-label-light"}`}>{label}</div><div className={`text-3xl font-extrabold mt-5 ${index < 3 ? "text-[#f04b42]" : ""}`}>{value}</div></div>;
+      })}
     </div>
     <div className="border border-foreground border-t-0 px-5 py-4 text-sm leading-relaxed">{thresholdError ? <><strong>Independent Monitoring Risk:</strong> classification paused until the threshold order is valid.</> : <><strong>Independent Monitoring Risk:</strong> maximum filtered velocity {report.riskVelocity.toFixed(3)} mm/day compared with Moderate ≥ {thresholds.moderate}, High ≥ {thresholds.high}, and Critical ≥ {thresholds.critical} mm/day. Wall Risk Classification data is not used.</>}</div>
 

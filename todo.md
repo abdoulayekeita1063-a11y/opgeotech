@@ -181,4 +181,12 @@
 - [x] Increase the black header title size in Comprehensive Monitoring Metrics Summary
 - [x] Increase section headings, row labels and numeric values in all three summary columns
 - [x] Increase row spacing while preserving responsive and print/PDF layout
-- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; route screenshot-verified; checkpoint pending)
+- [x] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; version 124da632)
+- [x] Verify the enlarged metrics table in an authenticated, populated Monitoring Report (confirmed from user-provided populated screenshot)
+- [ ] Verify Print / Save PDF readability for the populated metrics table
+
+## Monitoring KPI Label Visibility (user request)
+- [x] Increase KPI label size and weight for Max Displacement, Max Velocity, Stability Rating and Current Risk
+- [x] Increase label contrast on black and risk-colored KPI cards
+- [x] Preserve KPI values, calculations, responsive layout and print output
+- [ ] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; checkpoint pending)
