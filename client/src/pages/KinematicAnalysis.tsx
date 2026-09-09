@@ -49,8 +49,14 @@ interface KinResult {
   toppling: TopplingRes[];
   summary: {
     planarCount: number;
+    planarTotal: number;
+    planarPercentage: number;
     wedgeCount: number;
+    wedgeTotal: number;
+    wedgePercentage: number;
     topplingCount: number;
+    topplingTotal: number;
+    topplingPercentage: number;
     criticalFs: number | null;
     overallAssessment: string;
   };
@@ -226,27 +232,33 @@ export default function KinematicAnalysis() {
             <div className="space-y-6">
               {/* summary */}
               <div className="border-2 border-foreground p-4">
-                <div className="grid grid-cols-4 gap-3 text-center mb-3">
-                  <div>
-                    <div className="text-2xl font-extrabold">{result.summary.planarCount}</div>
-                    <div className="swiss-label text-[10px]">Planar</div>
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 text-center mb-4">
+                  <div className="border border-foreground p-3">
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.planarPercentage.toFixed(1)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Planar feasible</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.planarCount} / {result.summary.planarTotal} structures</div>
                   </div>
-                  <div>
-                    <div className="text-2xl font-extrabold">{result.summary.wedgeCount}</div>
-                    <div className="swiss-label text-[10px]">Wedge</div>
+                  <div className="border border-foreground p-3">
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.wedgePercentage.toFixed(1)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Wedge feasible</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.wedgeCount} / {result.summary.wedgeTotal} pairs</div>
                   </div>
-                  <div>
-                    <div className="text-2xl font-extrabold">{result.summary.topplingCount}</div>
-                    <div className="swiss-label text-[10px]">Toppling</div>
+                  <div className="border border-foreground p-3">
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.topplingPercentage.toFixed(1)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Toppling feasible</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.topplingCount} / {result.summary.topplingTotal} structures</div>
                   </div>
-                  <div>
+                  <div className="border border-foreground p-3">
                     <div className={`text-2xl font-extrabold ${result.summary.criticalFs != null && result.summary.criticalFs < 1.3 ? "text-destructive" : ""}`}>
                       {result.summary.criticalFs != null ? result.summary.criticalFs.toFixed(2) : "—"}
                     </div>
-                    <div className="swiss-label text-[10px]">Critical FS</div>
+                    <div className="swiss-label text-[11px] mt-1">Critical FS</div>
                   </div>
                 </div>
                 <p className="text-sm">{result.summary.overallAssessment}</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Planar and toppling percentages use the selected structures as their denominator; wedge percentage uses all unique structure pairs. The three percentages are independent and are not expected to sum to 100%.
+                </p>
               </div>
 
               {/* planar table */}

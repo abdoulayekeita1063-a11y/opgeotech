@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { parseFailureWorkbook } from "@/lib/failureWorkbook";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +30,6 @@ export default function FailureRecords() {
   const utils = trpc.useUtils();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [replaceExisting, setReplaceExisting] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [search, setSearch] = useState("");
   const [year, setYear] = useState("all");
@@ -71,7 +69,7 @@ export default function FailureRecords() {
     try {
       const parsed = parseFailureWorkbook(await file.arrayBuffer());
       if (!parsed.rows.length) throw new Error("No valid failure records were found in this workbook.");
-      importWorkbook.mutate({ sourceFile: file.name, replaceExisting, rows: parsed.rows });
+      importWorkbook.mutate({ sourceFile: file.name, rows: parsed.rows });
       if (parsed.warnings.length) toast.warning(`${parsed.warnings.length} workbook rows were skipped`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to read the workbook");
@@ -113,7 +111,7 @@ export default function FailureRecords() {
       <div className="w-36"><Label className="swiss-label mb-1.5 block">Year</Label><Select value={year} onValueChange={setYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All years</SelectItem>{options.years.map(item => <SelectItem key={item} value={String(item)}>{item}</SelectItem>)}</SelectContent></Select></div>
       <div className="w-44"><Label className="swiss-label mb-1.5 block">Wall</Label><Select value={wall} onValueChange={setWall}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All walls</SelectItem>{options.walls.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
       <div className="w-48"><Label className="swiss-label mb-1.5 block">Failure type</Label><Select value={failureType} onValueChange={setFailureType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem>{options.types.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select></div>
-      <label className="flex items-center gap-2 text-sm pt-5"><Checkbox checked={replaceExisting} onCheckedChange={checked => setReplaceExisting(checked === true)} /> Replace existing records on import</label>
+      <div className="md:col-span-4 border-l-4 border-primary bg-primary/5 px-4 py-3 text-sm"><strong>Replacement import:</strong> importing a workbook permanently replaces the previous Failure Records dataset. Records from two workbooks are never mixed.</div>
     </div>
 
     <div className="border border-foreground overflow-auto"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Pit</TableHead><TableHead>Phase</TableHead><TableHead>Wall</TableHead><TableHead>Bench</TableHead><TableHead>Lithology</TableHead><TableHead>Failure type</TableHead><TableHead>Action / comment</TableHead><TableHead className="w-12" /></TableRow></TableHeader><TableBody>

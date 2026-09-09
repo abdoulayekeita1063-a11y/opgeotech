@@ -78,8 +78,14 @@ export interface KinematicResult {
   toppling: TopplingResult[];
   summary: {
     planarCount: number;
+    planarTotal: number;
+    planarPercentage: number;
     wedgeCount: number;
+    wedgeTotal: number;
+    wedgePercentage: number;
     topplingCount: number;
+    topplingTotal: number;
+    topplingPercentage: number;
     criticalFs: number | null;
     overallAssessment: string;
   };
@@ -345,17 +351,15 @@ export function runKinematicAnalysis(input: KinematicInput): KinematicResult {
   const pc = planar.filter(p => p.feasible).length;
   const wc = wedge.filter(w => w.feasible).length;
   const tc = toppling.filter(t => t.feasible).length;
+  const percentage = (feasible: number, total: number) => total ? Math.round((feasible / total) * 1000) / 10 : 0;
+  const pp = percentage(pc, planar.length);
+  const wp = percentage(wc, wedge.length);
+  const tp = percentage(tc, toppling.length);
 
-  let overall: string;
+  let overall = `Kinematic feasibility: Planar ${pp.toFixed(1)}% (${pc}/${planar.length} structures), Wedge ${wp.toFixed(1)}% (${wc}/${wedge.length} pairs), Toppling ${tp.toFixed(1)}% (${tc}/${toppling.length} structures).`;
   if (criticalFs == null && tc === 0) {
-    overall =
-      "No kinematically feasible failure mode identified for the given slope orientation and structural data.";
+    overall += " No kinematically feasible failure mode identified for the given slope orientation and structural data.";
   } else {
-    const parts: string[] = [];
-    if (pc) parts.push(`${pc} planar mechanism${pc > 1 ? "s" : ""}`);
-    if (wc) parts.push(`${wc} wedge mechanism${wc > 1 ? "s" : ""}`);
-    if (tc) parts.push(`${tc} toppling mechanism${tc > 1 ? "s" : ""}`);
-    overall = `Kinematically feasible: ${parts.join(", ")}.`;
     if (criticalFs != null) {
       overall += ` Critical factor of safety = ${criticalFs.toFixed(2)} (${
         criticalFs >= 1.3 ? "acceptable" : criticalFs >= 1.0 ? "marginal — reinforcement or redesign advised" : "unacceptable — failure likely, immediate action required"
@@ -369,8 +373,14 @@ export function runKinematicAnalysis(input: KinematicInput): KinematicResult {
     toppling,
     summary: {
       planarCount: pc,
+      planarTotal: planar.length,
+      planarPercentage: pp,
       wedgeCount: wc,
+      wedgeTotal: wedge.length,
+      wedgePercentage: wp,
       topplingCount: tc,
+      topplingTotal: toppling.length,
+      topplingPercentage: tp,
       criticalFs,
       overallAssessment: overall,
     },

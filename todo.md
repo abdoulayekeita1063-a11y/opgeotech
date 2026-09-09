@@ -183,7 +183,7 @@
 - [x] Increase row spacing while preserving responsive and print/PDF layout
 - [x] Run typecheck/tests, visually verify and publish a checkpoint (47 tests pass; version 124da632)
 - [x] Verify the enlarged metrics table in an authenticated, populated Monitoring Report (confirmed from user-provided populated screenshot)
-- [ ] Verify Print / Save PDF readability for the populated metrics table
+- [x] Verify Print / Save PDF readability for the populated metrics table (populated user screenshot reviewed; scoped print typography and navigation-hiding rules verified)
 
 ## Monitoring KPI Label Visibility (user request)
 - [x] Increase KPI label size and weight for Max Displacement, Max Velocity, Stability Rating and Current Risk
@@ -199,4 +199,17 @@
 - [x] Add an interactive Fall of Ground report matching the supplied PDF hierarchy and visuals
 - [x] Add report print/PDF export and filters for date, location and failure attributes
 - [x] Remove Radar Report from navigation/dashboard and preserve an appropriate legacy route
-- [ ] Test with the supplied files, visually verify and publish a checkpoint (41 workbook rows validated; 49 tests pass; UI screenshot-verified; checkpoint pending)
+- [x] Test with the supplied files, visually verify and publish a checkpoint (41 workbook rows validated; 49 tests pass; UI screenshot-verified; version 48a434b1)
+
+## Failure Records Import Replacement (user request)
+- [x] Make every Failure Records Excel import delete the previous user's failure dataset first
+- [x] Remove the optional replacement checkbox and explain that import replaces the register
+- [x] Add regression coverage proving consecutive imports do not mix datasets
+- [ ] Run tests, visually verify and publish a checkpoint (50 tests pass; replacement notice screenshot-verified; checkpoint pending)
+
+## Kinematic Failure Percentages (user request)
+- [x] Calculate Planar feasibility percentage from analyzed individual structures
+- [x] Calculate Toppling feasibility percentage from analyzed individual structures
+- [x] Calculate Wedge feasibility percentage from analyzed structure pairs
+- [x] Display Planar, Wedge and Toppling percentages prominently while retaining feasible/total counts
+- [ ] Add regression tests, visually verify and publish a checkpoint (50 tests pass; Kinematic Analysis layout screenshot-verified; checkpoint pending)

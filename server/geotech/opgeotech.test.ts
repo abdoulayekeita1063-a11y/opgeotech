@@ -44,6 +44,8 @@ describe("runKinematicAnalysis", () => {
     expect(r.planar[0].factorOfSafety).toBeGreaterThan(0);
     expect(r.planar[0].blockWeightKn).toBeGreaterThan(0);
     expect(r.summary.planarCount).toBe(1);
+    expect(r.summary.planarTotal).toBe(1);
+    expect(r.summary.planarPercentage).toBe(100);
   });
 
   it("rejects planar sliding when the plane dips into the face", () => {
@@ -52,6 +54,7 @@ describe("runKinematicAnalysis", () => {
       structures: [{ id: "J2", dip: 45, dipDirection: 270, jrc: 8 }],
     });
     expect(r.planar[0].feasible).toBe(false);
+    expect(r.summary.planarPercentage).toBe(0);
   });
 
   it("rejects planar sliding when dip is below the friction angle", () => {
@@ -74,6 +77,9 @@ describe("runKinematicAnalysis", () => {
     expect(r.wedge[0].feasible).toBe(true);
     expect(r.wedge[0].lineOfIntersection.plunge).toBeGreaterThan(30);
     expect(r.wedge[0].factorOfSafety).toBeGreaterThan(0);
+    expect(r.summary.wedgeCount).toBe(1);
+    expect(r.summary.wedgeTotal).toBe(1);
+    expect(r.summary.wedgePercentage).toBe(100);
   });
 
   it("flags flexural toppling for steep planes dipping into the face", () => {
@@ -83,6 +89,7 @@ describe("runKinematicAnalysis", () => {
     });
     expect(r.toppling[0].feasible).toBe(true);
     expect(r.toppling[0].mode).toBe("flexural");
+    expect(r.summary.topplingPercentage).toBe(100);
   });
 
   it("returns a coherent summary with critical FS", () => {
@@ -94,7 +101,8 @@ describe("runKinematicAnalysis", () => {
       ],
     });
     expect(r.summary.criticalFs).not.toBeNull();
-    expect(r.summary.overallAssessment).toContain("Kinematically feasible");
+    expect(r.summary.overallAssessment).toContain("Kinematic feasibility:");
+    expect(r.summary.overallAssessment).toContain("Planar 50.0% (1/2 structures)");
   });
 });
 

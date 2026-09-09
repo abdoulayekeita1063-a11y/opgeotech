@@ -481,3 +481,12 @@ export async function clearFailureRecords(userId: number) {
   const db = await requireDb();
   await db.delete(failureRecords).where(eq(failureRecords.userId, userId));
 }
+
+export async function replaceFailureRecords(userId: number, values: (typeof failureRecords.$inferInsert)[]) {
+  const db = await requireDb();
+  return db.transaction(async transaction => {
+    await transaction.delete(failureRecords).where(eq(failureRecords.userId, userId));
+    if (values.length) await transaction.insert(failureRecords).values(values);
+    return values.length;
+  });
+}

@@ -28,12 +28,10 @@ export const reportingRouter = router({
     importWorkbook: protectedProcedure
       .input(z.object({
         sourceFile: z.string().trim().min(1).max(255),
-        replaceExisting: z.boolean().default(false),
         rows: z.array(failureRecordInput).min(1).max(5_000),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (input.replaceExisting) await db.clearFailureRecords(ctx.user.id);
-        const imported = await db.insertFailureRecords(input.rows.map(row => ({
+        const imported = await db.replaceFailureRecords(ctx.user.id, input.rows.map(row => ({
           userId: ctx.user.id,
           sourceFile: input.sourceFile,
           ...row,
@@ -52,4 +50,3 @@ export const reportingRouter = router({
     }),
   }),
 });
-

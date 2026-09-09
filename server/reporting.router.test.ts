@@ -20,6 +20,11 @@ vi.mock("./db", () => ({
   clearFailureRecords: vi.fn(async (userId: number) => {
     state.failures.splice(0, state.failures.length, ...state.failures.filter(row => row.userId !== userId));
   }),
+  replaceFailureRecords: vi.fn(async (userId: number, rows: any[]) => {
+    state.failures.splice(0, state.failures.length, ...state.failures.filter(row => row.userId !== userId));
+    state.failures.push(...rows.map((row, index) => ({ ...row, id: index + 1, createdAt: new Date() })));
+    return rows.length;
+  }),
 }));
 
 import { appRouter } from "./routers";
@@ -40,7 +45,6 @@ describe("Failure Records reporting API", () => {
     const caller = appRouter.createCaller(context());
     const imported = await caller.reporting.failures.importWorkbook({
       sourceFile: "GeneralreportfailureFekola.xlsx",
-      replaceExisting: false,
       rows: [
         { incidentDate: Date.UTC(2026, 5, 12), pit: "Fekola", phase: "8", wall: "West", lithology: "MBX", failureType: "Wedge" },
         { incidentDate: Date.UTC(2026, 6, 4), pit: "Fekola", phase: "North Dump", lithology: "Swell Material", failureType: "Sliding" },
@@ -52,5 +56,23 @@ describe("Failure Records reporting API", () => {
     expect(listed).toHaveLength(2);
     expect(listed.every(row => row.userId === 11)).toBe(true);
   });
-});
 
+  it("replaces the previous workbook dataset instead of mixing consecutive imports", async () => {
+    const caller = appRouter.createCaller(context());
+    await caller.reporting.failures.importWorkbook({
+      sourceFile: "old.xlsx",
+      rows: [{ incidentDate: Date.UTC(2025, 0, 1), pit: "Old Pit", failureType: "Wedge" }],
+    });
+    await caller.reporting.failures.importWorkbook({
+      sourceFile: "new.xlsx",
+      rows: [
+        { incidentDate: Date.UTC(2026, 0, 1), pit: "New Pit", failureType: "Planar" },
+        { incidentDate: Date.UTC(2026, 0, 2), pit: "New Pit", failureType: "Toppling" },
+      ],
+    });
+
+    const listed = await caller.reporting.failures.list();
+    expect(listed).toHaveLength(2);
+    expect(listed.every(row => row.pit === "New Pit" && row.sourceFile === "new.xlsx")).toBe(true);
+  });
+});
