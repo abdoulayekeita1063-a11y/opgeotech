@@ -205,11 +205,16 @@
 - [x] Make every Failure Records Excel import delete the previous user's failure dataset first
 - [x] Remove the optional replacement checkbox and explain that import replaces the register
 - [x] Add regression coverage proving consecutive imports do not mix datasets
-- [ ] Run tests, visually verify and publish a checkpoint (50 tests pass; replacement notice screenshot-verified; checkpoint pending)
+- [x] Run tests, visually verify and publish a checkpoint (covered by the current release; replacement notice screenshot-verified)
 
-## Kinematic Failure Percentages (user request)
-- [x] Calculate Planar feasibility percentage from analyzed individual structures
-- [x] Calculate Toppling feasibility percentage from analyzed individual structures
-- [x] Calculate Wedge feasibility percentage from analyzed structure pairs
-- [x] Display Planar, Wedge and Toppling percentages prominently while retaining feasible/total counts
-- [ ] Add regression tests, visually verify and publish a checkpoint (50 tests pass; Kinematic Analysis layout screenshot-verified; checkpoint pending)
+## Kinematics tRPC HTML Response Error (user report)
+- [x] Reproduce the /kinematics API query returning HTML instead of JSON
+- [x] Identify and fix the retryable 502 SESSION_DNS_FAILED proxy response with a resilient tRPC fetch wrapper
+- [x] Add regression coverage for retryable HTML 502 responses and readable failure handling
+- [x] Run tests, visually verify and publish a checkpoint (56 tests pass; authenticated protected-procedure contract verified; layout screenshot-verified; covered by the current release)
+
+## Kinematics Feasible-Only Tables (user request)
+- [x] Show only Feasible = YES rows in Planar, Wedge and Toppling result tables
+- [x] Keep all analyzed cases in percentage denominators and summary counts
+- [x] Show an explicit no-feasible-cases row when a filtered table has no results
+- [x] Add regression coverage, visually verify and publish a checkpoint (56 tests pass; layout screenshot-verified; covered by the current release)

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Play } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { feasibleCases } from "@/lib/kinematicResults";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 
 interface Strength {
@@ -119,6 +120,10 @@ export default function KinematicAnalysis() {
       structureIds: selected,
     });
   };
+
+  const feasiblePlanar = feasibleCases(result?.planar ?? []);
+  const feasibleWedge = feasibleCases(result?.wedge ?? []);
+  const feasibleToppling = feasibleCases(result?.toppling ?? []);
 
   return (
     <div>
@@ -256,21 +261,18 @@ export default function KinematicAnalysis() {
                   </div>
                 </div>
                 <p className="text-sm">{result.summary.overallAssessment}</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Planar and toppling percentages use the selected structures as their denominator; wedge percentage uses all unique structure pairs. The three percentages are independent and are not expected to sum to 100%.
-                </p>
+                <p className="text-xs text-muted-foreground mt-2">Only feasible cases are listed below. Percentage denominators still include every analyzed structure or unique pair.</p>
               </div>
 
               {/* planar table */}
               <div>
-                <SectionLabel>Planar sliding</SectionLabel>
+                <SectionLabel>Planar sliding — {feasiblePlanar.length} feasible</SectionLabel>
                 <div className="border border-foreground overflow-x-auto">
                   <table className="w-full text-xs font-mono">
                     <thead className="bg-secondary">
                       <tr className="text-left border-b border-foreground">
                         <th className="px-2 py-1.5">Structure</th>
                         <th className="px-2 py-1.5">Dip/DipDir</th>
-                        <th className="px-2 py-1.5">Feasible</th>
                         <th className="px-2 py-1.5">W (kN/m)</th>
                         <th className="px-2 py-1.5">σn (kPa)</th>
                         <th className="px-2 py-1.5">c_i (kPa)</th>
@@ -280,17 +282,10 @@ export default function KinematicAnalysis() {
                       </tr>
                     </thead>
                     <tbody>
-                      {result.planar.map((p, i) => (
+                      {feasiblePlanar.map((p, i) => (
                         <tr key={i} className="border-b border-border align-top">
                           <td className="px-2 py-1 font-bold">{p.structureId}</td>
                           <td className="px-2 py-1">{p.dip}°/{p.dipDirection}°</td>
-                          <td className="px-2 py-1">
-                            {p.feasible ? (
-                              <span className="text-destructive font-bold">YES</span>
-                            ) : (
-                              <span title={p.reasons.join("; ")}>no</span>
-                            )}
-                          </td>
                           <td className="px-2 py-1">{p.blockWeightKn ?? "—"}</td>
                           <td className="px-2 py-1">{p.strength?.normalStressKpa ?? "—"}</td>
                           <td className="px-2 py-1">{p.strength?.instantaneousCohesionKpa ?? "—"}</td>
@@ -299,6 +294,7 @@ export default function KinematicAnalysis() {
                           <td className={`px-2 py-1 ${statusColor(p.status)}`}>{p.status ?? "—"}</td>
                         </tr>
                       ))}
+                      {!feasiblePlanar.length && <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No feasible planar cases.</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -306,14 +302,13 @@ export default function KinematicAnalysis() {
 
               {/* wedge table */}
               <div>
-                <SectionLabel>Wedge sliding (structure pairs)</SectionLabel>
+                <SectionLabel>Wedge sliding — {feasibleWedge.length} feasible pairs</SectionLabel>
                 <div className="border border-foreground overflow-x-auto">
                   <table className="w-full text-xs font-mono">
                     <thead className="bg-secondary">
                       <tr className="text-left border-b border-foreground">
                         <th className="px-2 py-1.5">Pair</th>
                         <th className="px-2 py-1.5">Intersection T/P</th>
-                        <th className="px-2 py-1.5">Feasible</th>
                         <th className="px-2 py-1.5">W (kN)</th>
                         <th className="px-2 py-1.5">c_i (kPa)</th>
                         <th className="px-2 py-1.5">φ_i (°)</th>
@@ -322,17 +317,10 @@ export default function KinematicAnalysis() {
                       </tr>
                     </thead>
                     <tbody>
-                      {result.wedge.map((w, i) => (
+                      {feasibleWedge.map((w, i) => (
                         <tr key={i} className="border-b border-border">
                           <td className="px-2 py-1 font-bold">{w.pair.join(" × ")}</td>
                           <td className="px-2 py-1">{w.lineOfIntersection.trend}°/{w.lineOfIntersection.plunge}°</td>
-                          <td className="px-2 py-1">
-                            {w.feasible ? (
-                              <span className="text-destructive font-bold">YES</span>
-                            ) : (
-                              <span title={w.reasons.join("; ")}>no</span>
-                            )}
-                          </td>
                           <td className="px-2 py-1">{w.blockWeightKn ?? "—"}</td>
                           <td className="px-2 py-1">{w.strength?.instantaneousCohesionKpa ?? "—"}</td>
                           <td className="px-2 py-1">{w.strength?.instantaneousFrictionAngle ?? "—"}</td>
@@ -340,6 +328,7 @@ export default function KinematicAnalysis() {
                           <td className={`px-2 py-1 ${statusColor(w.status)}`}>{w.status ?? "—"}</td>
                         </tr>
                       ))}
+                      {!feasibleWedge.length && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No feasible wedge pairs.</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -347,30 +336,27 @@ export default function KinematicAnalysis() {
 
               {/* toppling table */}
               <div>
-                <SectionLabel>Toppling</SectionLabel>
+                <SectionLabel>Toppling — {feasibleToppling.length} feasible</SectionLabel>
                 <div className="border border-foreground overflow-x-auto">
                   <table className="w-full text-xs font-mono">
                     <thead className="bg-secondary">
                       <tr className="text-left border-b border-foreground">
                         <th className="px-2 py-1.5">Structure</th>
                         <th className="px-2 py-1.5">Dip/DipDir</th>
-                        <th className="px-2 py-1.5">Feasible</th>
                         <th className="px-2 py-1.5">Mode</th>
                         <th className="px-2 py-1.5">Assessment</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {result.toppling.map((t, i) => (
+                      {feasibleToppling.map((t, i) => (
                         <tr key={i} className="border-b border-border">
                           <td className="px-2 py-1 font-bold">{t.structureId}</td>
                           <td className="px-2 py-1">{t.dip}°/{t.dipDirection}°</td>
-                          <td className="px-2 py-1">
-                            {t.feasible ? <span className="text-destructive font-bold">YES</span> : "no"}
-                          </td>
                           <td className="px-2 py-1">{t.mode}</td>
                           <td className="px-2 py-1 text-muted-foreground">{t.reasons[0]}</td>
                         </tr>
                       ))}
+                      {!feasibleToppling.length && <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No feasible toppling cases.</td></tr>}
                     </tbody>
                   </table>
                 </div>
