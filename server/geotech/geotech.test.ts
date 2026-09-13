@@ -5,6 +5,7 @@ import {
   computeGSI,
   computeQ,
   computeRMR,
+  computeSMR,
   ratingRQD,
   ratingSpacing,
   ratingUCS,
@@ -124,6 +125,42 @@ describe("RMR classification", () => {
     });
     expect(r.score).toBeLessThanOrEqual(20);
     expect(r.rockClass).toContain("Class V");
+  });
+});
+
+describe("SMR classification", () => {
+  it("computes the Romana correction factors and classifies a stable slope", () => {
+    const result = computeSMR({
+      rmrBasic: 69,
+      jointDip: 65,
+      jointDipDirection: 120,
+      slopeDip: 70,
+      slopeDipDirection: 120,
+      excavationMethod: "production-blasting",
+    });
+
+    expect(result.breakdown.f1).toBeCloseTo(0.15, 2);
+    expect(result.breakdown.f2).toBe(1);
+    expect(result.breakdown.f3).toBe(-6);
+    expect(result.breakdown.f4).toBe(-8);
+    expect(result.score).toBeCloseTo(60.1, 1);
+    expect(result.rockClass).toContain("Class II");
+  });
+
+  it("reduces SMR for unfavorable joint and slope orientation", () => {
+    const result = computeSMR({
+      rmrBasic: 55,
+      jointDip: 75,
+      jointDipDirection: 100,
+      slopeDip: 65,
+      slopeDipDirection: 280,
+      excavationMethod: "poor-blasting",
+    });
+
+    expect(result.breakdown.f1).toBe(1);
+    expect(result.breakdown.f3).toBe(-25);
+    expect(result.score).toBeLessThan(35);
+    expect(result.rockClass).toMatch(/Class IV|Class V/);
   });
 });
 

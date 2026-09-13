@@ -55,7 +55,7 @@ export default function RockClassification() {
       <ModuleHeader
         index="03"
         title="Rock Classification"
-        description="Rock mass characterization using three classification systems: RMR (Bieniawski 1989), Q-system (Barton) and GSI (Hoek). Each index is computed automatically with its engineering interpretation."
+        description="Rock mass characterization using four classification systems: RMR (Bieniawski 1989), SMR (Romana), Q-system (Barton) and GSI (Hoek). Each index is computed automatically with its engineering interpretation."
       />
       <Tabs defaultValue="rmr">
         <TabsList className="w-full justify-start rounded-none border border-foreground bg-background h-auto p-0">
@@ -63,6 +63,7 @@ export default function RockClassification() {
             { v: "rmr", l: "RMR" },
             { v: "q", l: "Q-System" },
             { v: "gsi", l: "GSI" },
+            { v: "smr", l: "SMR" },
           ].map(t => (
             <TabsTrigger
               key={t.v}
@@ -81,6 +82,9 @@ export default function RockClassification() {
         </TabsContent>
         <TabsContent value="gsi" className="mt-8">
           <GSIForm />
+        </TabsContent>
+        <TabsContent value="smr" className="mt-8">
+          <SMRForm />
         </TabsContent>
       </Tabs>
     </div>
@@ -205,6 +209,96 @@ function RMRForm() {
         </>
       }
       results={<ResultBlock result={result} label="RMR" />}
+    />
+  );
+}
+
+function SMRForm() {
+  const [title, setTitle] = useState("");
+  const [zone, setZone] = useState("");
+  const [rmrBasic, setRmrBasic] = useState("69");
+  const [jointDip, setJointDip] = useState("65");
+  const [jointDipDirection, setJointDipDirection] = useState("120");
+  const [slopeDip, setSlopeDip] = useState("70");
+  const [slopeDipDirection, setSlopeDipDirection] = useState("120");
+  const [excavationMethod, setExcavationMethod] = useState("production-blasting");
+  const [result, setResult] = useState<ClassResult | null>(null);
+
+  const compute = trpc.classification.computeSMR.useMutation({
+    onSuccess: d => {
+      setResult(d);
+      toast.success("SMR computed");
+    },
+    onError: e => toast.error(e.message),
+  });
+
+  return (
+    <TwoCol
+      form={
+        <>
+          <SectionLabel>SMR Parameters (Romana)</SectionLabel>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            SMR = RMRbasic + (F1 × F2 × F3) + F4. Use the basic RMR before slope-orientation adjustment and the discontinuity/slope geometry for a planar assessment.
+          </p>
+          <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
+          <div>
+            <Label className="swiss-label mb-1.5 block">Basic RMR (0–100)</Label>
+            <Input type="number" value={rmrBasic} onChange={e => setRmrBasic(e.target.value)} />
+          </div>
+          <FieldGrid>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
+              <Input type="number" value={jointDip} onChange={e => setJointDip(e.target.value)} />
+            </div>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
+              <Input type="number" value={jointDipDirection} onChange={e => setJointDipDirection(e.target.value)} />
+            </div>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Slope dip (°)</Label>
+              <Input type="number" value={slopeDip} onChange={e => setSlopeDip(e.target.value)} />
+            </div>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Slope dip direction (°)</Label>
+              <Input type="number" value={slopeDipDirection} onChange={e => setSlopeDipDirection(e.target.value)} />
+            </div>
+          </FieldGrid>
+          <div>
+            <Label className="swiss-label mb-1.5 block">Excavation method (F4)</Label>
+            <Select value={excavationMethod} onValueChange={setExcavationMethod}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="natural">Natural slope (+15)</SelectItem>
+                <SelectItem value="pre-splitting">Pre-splitting (+10)</SelectItem>
+                <SelectItem value="smooth-blasting">Smooth blasting (+8)</SelectItem>
+                <SelectItem value="mechanical">Mechanical excavation (0)</SelectItem>
+                <SelectItem value="production-blasting">Production blasting (−8)</SelectItem>
+                <SelectItem value="poor-blasting">Poor blasting (−12)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            className="w-full font-bold uppercase tracking-wider"
+            disabled={compute.isPending}
+            onClick={() => {
+              if (!title.trim()) return toast.error("Please provide a title");
+              compute.mutate({
+                title: title.trim(),
+                zone: zone.trim() || undefined,
+                rmrBasic: Number(rmrBasic),
+                jointDip: Number(jointDip),
+                jointDipDirection: Number(jointDipDirection),
+                slopeDip: Number(slopeDip),
+                slopeDipDirection: Number(slopeDipDirection),
+                excavationMethod: excavationMethod as "natural" | "pre-splitting" | "smooth-blasting" | "mechanical" | "production-blasting" | "poor-blasting",
+              });
+            }}
+          >
+            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute SMR"}
+          </Button>
+        </>
+      }
+      results={<ResultBlock result={result} label="SMR" />}
     />
   );
 }

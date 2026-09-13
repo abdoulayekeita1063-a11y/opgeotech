@@ -218,3 +218,14 @@
 - [x] Keep all analyzed cases in percentage denominators and summary counts
 - [x] Show an explicit no-feasible-cases row when a filtered table has no results
 - [x] Add regression coverage, visually verify and publish a checkpoint (56 tests pass; layout screenshot-verified; covered by the current release)
+
+## Source Code Export (user request)
+- [ ] Prepare a clean source tree without dependencies, logs, secrets or build artifacts
+- [ ] Include setup/export documentation and database migrations
+- [ ] Create and verify a downloadable ZIP archive
+
+## SMR in Rock Classification (user request)
+- [x] Define the SMR calculation inputs, correction factors and class interpretation
+- [x] Add SMR calculation to the Rock Classification backend/schema flow
+- [x] Add English SMR fields, result card and classification display in Rock Classification
+- [x] Add regression tests, visually verify the page and publish a checkpoint (58 tests pass; migration applied; page screenshot-verified)

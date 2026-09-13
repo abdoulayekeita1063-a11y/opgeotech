@@ -1,6 +1,6 @@
 /**
  * Rock mass classification systems:
- * RMR (Bieniawski 1989), Q-system (Barton et al.) and GSI (Hoek).
+ * RMR (Bieniawski 1989), SMR (Romana), Q-system (Barton et al.) and GSI (Hoek).
  */
 
 // ---------- RMR ----------
@@ -90,6 +90,107 @@ export function computeRMR(input: RMRInput): RMRResult {
     rockClass,
     interpretation: `RMR = ${score}. The rock mass is of ${quality} quality (${rockClass}). ${advice}`,
     breakdown: { ucs: r1, rqd: r2, spacing: r3, condition: r4, groundwater: r5, orientation: adj },
+  };
+}
+
+// ---------- SMR (Romana) ----------
+export type SMRExcavationMethod =
+  | "natural"
+  | "pre-splitting"
+  | "smooth-blasting"
+  | "mechanical"
+  | "production-blasting"
+  | "poor-blasting";
+
+export interface SMRInput {
+  rmrBasic: number; // basic RMR before orientation adjustment (0-100)
+  jointDip: number; // discontinuity dip (degrees)
+  jointDipDirection: number; // discontinuity dip direction (degrees)
+  slopeDip: number; // slope dip (degrees)
+  slopeDipDirection: number; // slope dip direction (degrees)
+  excavationMethod: SMRExcavationMethod;
+}
+
+export interface SMRResult {
+  score: number;
+  rockClass: string;
+  interpretation: string;
+  breakdown: Record<string, number>;
+  excavationMethod: string;
+}
+
+function angularDifference(a: number, b: number): number {
+  const raw = Math.abs(((a - b + 540) % 360) - 180);
+  return raw > 180 ? 360 - raw : raw;
+}
+
+function smrF1(angle: number): number {
+  if (angle <= 5) return 0.15;
+  if (angle <= 10) return 0.4;
+  if (angle <= 20) return 0.7;
+  return 1;
+}
+
+function smrF2(jointDip: number): number {
+  if (jointDip <= 20) return 0.4;
+  if (jointDip <= 30) return 0.7;
+  if (jointDip <= 35) return 0.85;
+  return 1;
+}
+
+function smrF3(jointDip: number, slopeDip: number): number {
+  const difference = jointDip - slopeDip;
+  if (difference < -10) return 0;
+  if (difference <= 0) return -6;
+  if (difference <= 10) return -25;
+  if (difference <= 20) return -50;
+  return -60;
+}
+
+const SMR_METHODS: Record<SMRExcavationMethod, { label: string; f4: number }> = {
+  natural: { label: "Natural slope", f4: 15 },
+  "pre-splitting": { label: "Pre-splitting", f4: 10 },
+  "smooth-blasting": { label: "Smooth blasting", f4: 8 },
+  mechanical: { label: "Mechanical excavation", f4: 0 },
+  "production-blasting": { label: "Production blasting", f4: -8 },
+  "poor-blasting": { label: "Poor blasting", f4: -12 },
+};
+
+export function computeSMR(input: SMRInput): SMRResult {
+  const rmrBasic = Math.max(0, Math.min(100, input.rmrBasic));
+  const jointDip = Math.max(0, Math.min(90, input.jointDip));
+  const slopeDip = Math.max(0, Math.min(90, input.slopeDip));
+  const f1 = smrF1(angularDifference(input.jointDipDirection, input.slopeDipDirection));
+  const f2 = smrF2(jointDip);
+  const f3 = smrF3(jointDip, slopeDip);
+  const method = SMR_METHODS[input.excavationMethod];
+  const score = Math.max(0, Math.min(100, Math.round((rmrBasic + f1 * f2 * f3 + method.f4) * 10) / 10));
+
+  let rockClass: string;
+  let advice: string;
+  if (score >= 81) {
+    rockClass = "Class I — Very stable";
+    advice = "Very stable slope conditions; little support is normally required, subject to site verification.";
+  } else if (score >= 61) {
+    rockClass = "Class II — Stable";
+    advice = "Stable conditions are expected; local support and routine monitoring may be appropriate.";
+  } else if (score >= 41) {
+    rockClass = "Class III — Partially stable";
+    advice = "Partially stable conditions; systematic assessment, drainage and local or systematic support should be considered.";
+  } else if (score >= 21) {
+    rockClass = "Class IV — Unstable";
+    advice = "Unstable conditions are possible; redesign, reinforcement, drainage and close monitoring are recommended.";
+  } else {
+    rockClass = "Class V — Very unstable";
+    advice = "Very unstable conditions; stabilization, conservative geometry and continuous monitoring are required.";
+  }
+
+  return {
+    score,
+    rockClass,
+    excavationMethod: method.label,
+    breakdown: { rmrBasic, f1, f2, f3, f4: method.f4 },
+    interpretation: `SMR = ${score}. ${rockClass}. ${advice} The calculation uses the Romana correction factors F1, F2, F3 and excavation-method factor F4 for a planar discontinuity assessment.`,
   };
 }
 

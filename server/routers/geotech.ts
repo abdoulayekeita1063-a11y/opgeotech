@@ -4,7 +4,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { computeStability } from "../geotech/stability";
 import { computeCompliance } from "../geotech/compliance";
-import { computeGSI, computeQ, computeRMR } from "../geotech/classification";
+import { computeGSI, computeQ, computeRMR, computeSMR } from "../geotech/classification";
 import {
   analyzeBlastPhotos,
   generateBlastReport,
@@ -118,6 +118,41 @@ export const classificationRouter = router({
         title,
         zone,
         system: "Q",
+        inputs: params,
+        score: result.score,
+        rockClass: result.rockClass,
+        interpretation: result.interpretation,
+      });
+      return { id, ...result };
+    }),
+  computeSMR: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1).max(255),
+        zone: z.string().max(255).optional(),
+        rmrBasic: z.number().min(0).max(100),
+        jointDip: z.number().min(0).max(90),
+        jointDipDirection: z.number().min(0).max(360),
+        slopeDip: z.number().min(0).max(90),
+        slopeDipDirection: z.number().min(0).max(360),
+        excavationMethod: z.enum([
+          "natural",
+          "pre-splitting",
+          "smooth-blasting",
+          "mechanical",
+          "production-blasting",
+          "poor-blasting",
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { title, zone, ...params } = input;
+      const result = computeSMR(params);
+      const id = await db.insertRockClassification({
+        userId: ctx.user.id,
+        title,
+        zone,
+        system: "SMR",
         inputs: params,
         score: result.score,
         rockClass: result.rockClass,

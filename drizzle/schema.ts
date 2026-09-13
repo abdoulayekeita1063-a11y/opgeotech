@@ -49,14 +49,14 @@ export const stabilityCalcs = mysqlTable("stability_calcs", {
 });
 
 /**
- * Classifications de massif rocheux (RMR, Q, GSI)
+ * Classifications de massif rocheux (RMR, Q, GSI, SMR)
  */
 export const rockClassifications = mysqlTable("rock_classifications", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   zone: varchar("zone", { length: 255 }),
-  system: mysqlEnum("system", ["RMR", "Q", "GSI"]).notNull(),
+  system: mysqlEnum("system", ["RMR", "Q", "GSI", "SMR"]).notNull(),
   inputs: json("inputs").notNull(), // paramètres saisis
   score: double("score").notNull(), // valeur calculée
   rockClass: varchar("rockClass", { length: 64 }), // ex: "Classe II — Bon rocher"
