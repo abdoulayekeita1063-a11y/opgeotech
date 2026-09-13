@@ -220,9 +220,9 @@
 - [x] Add regression coverage, visually verify and publish a checkpoint (56 tests pass; layout screenshot-verified; covered by the current release)
 
 ## Source Code Export (user request)
-- [ ] Prepare a clean source tree without dependencies, logs, secrets or build artifacts
-- [ ] Include setup/export documentation and database migrations
-- [ ] Create and verify a downloadable ZIP archive
+- [x] Prepare a clean source tree without dependencies, logs, secrets or build artifacts
+- [x] Include setup/export documentation and database migrations
+- [x] Create and verify a downloadable ZIP archive (198 source files; forbidden entries absent; archive verified)
 
 ## SMR in Rock Classification (user request)
 - [x] Define the SMR calculation inputs, correction factors and class interpretation
