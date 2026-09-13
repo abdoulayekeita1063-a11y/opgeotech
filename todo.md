@@ -229,3 +229,9 @@
 - [x] Add SMR calculation to the Rock Classification backend/schema flow
 - [x] Add English SMR fields, result card and classification display in Rock Classification
 - [x] Add regression tests, visually verify the page and publish a checkpoint (58 tests pass; migration applied; page screenshot-verified)
+
+## Visual GSI Selection (user request)
+- [x] Add the supplied GSI chart as a persistent project asset
+- [x] Add visual structure and surface-quality selectors linked to GSI values
+- [x] Preserve manual numeric GSI inputs and existing save/calculation flow
+- [x] Add tests, verify visually and publish a checkpoint (58 tests pass; GSI image and marker screenshot-verified)

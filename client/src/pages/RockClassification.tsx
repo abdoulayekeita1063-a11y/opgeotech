@@ -450,12 +450,58 @@ function QForm() {
   );
 }
 
+function GSIChartPreview({ structure, surface }: { structure: number; surface: number }) {
+  const markerLeft = Math.max(56, Math.min(96, 56 + (100 - surface) * 0.4));
+  const markerTop = Math.max(46, Math.min(90, 46 + (100 - structure) * 0.44));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <SectionLabel>GSI Selection Chart</SectionLabel>
+        <span className="text-xs font-mono text-muted-foreground">Selected: {Math.round((structure + surface) / 2)}</span>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Use the chart as a visual guide. Choose the closest structure and surface-condition categories, then refine the numeric ratings if required.
+      </p>
+      <div className="relative overflow-hidden border border-foreground bg-white">
+        <img
+          src="/manus-storage/gsi-chart_dfa797aa.png"
+          alt="Geological Strength Index chart showing structure and surface-condition ratings"
+          className="block w-full h-auto"
+        />
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow-[0_0_0_2px_rgba(0,0,0,0.7)]"
+          style={{ left: `${markerLeft}%`, top: `${markerTop}%`, width: 14, height: 14 }}
+          aria-label={`Selected GSI position: structure ${structure}, surface ${surface}`}
+        />
+      </div>
+    </div>
+  );
+}
+
 function GSIForm() {
   const [title, setTitle] = useState("");
   const [zone, setZone] = useState("");
   const [structure, setStructure] = useState("70");
   const [surface, setSurface] = useState("60");
   const [result, setResult] = useState<ClassResult | null>(null);
+
+  const structureOptions = [
+    { value: "90", label: "Intact / massive — 90" },
+    { value: "80", label: "Blocky — 80" },
+    { value: "65", label: "Very blocky — 65" },
+    { value: "50", label: "Blocky / disturbed — 50" },
+    { value: "30", label: "Disintegrated — 30" },
+    { value: "15", label: "Laminated / sheared — 15" },
+  ];
+  const surfaceOptions = [
+    { value: "90", label: "Very good / fresh — 90" },
+    { value: "80", label: "Good — 80" },
+    { value: "65", label: "Fair — 65" },
+    { value: "50", label: "Poor — 50" },
+    { value: "30", label: "Very poor — 30" },
+    { value: "15", label: "Extremely poor — 15" },
+  ];
 
   const compute = trpc.classification.computeGSI.useMutation({
     onSuccess: d => {
@@ -470,19 +516,38 @@ function GSIForm() {
       form={
         <>
           <SectionLabel>GSI Parameters (Hoek)</SectionLabel>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Select the closest structure and surface-condition description from the supplied GSI chart. The numeric values remain editable for engineering judgement.
+          </p>
           <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
           <div>
-            <Label className="swiss-label mb-1.5 block">
-              Structure rating (0–100) — 100 = intact/massive, 0 = disintegrated
-            </Label>
-            <Input type="number" value={structure} onChange={e => setStructure(e.target.value)} />
+            <Label className="swiss-label mb-1.5 block">Rock-mass structure</Label>
+            <Select value={structure} onValueChange={setStructure}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {structureOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">
-              Surface condition rating (0–100) — 100 = very good/fresh, 0 = very poor
-            </Label>
-            <Input type="number" value={surface} onChange={e => setSurface(e.target.value)} />
+            <Label className="swiss-label mb-1.5 block">Surface condition</Label>
+            <Select value={surface} onValueChange={setSurface}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {surfaceOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
+          <FieldGrid>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Structure rating (0–100)</Label>
+              <Input type="number" min="0" max="100" value={structure} onChange={e => setStructure(e.target.value)} />
+            </div>
+            <div>
+              <Label className="swiss-label mb-1.5 block">Surface rating (0–100)</Label>
+              <Input type="number" min="0" max="100" value={surface} onChange={e => setSurface(e.target.value)} />
+            </div>
+          </FieldGrid>
           <Button
             className="w-full font-bold uppercase tracking-wider"
             disabled={compute.isPending}
@@ -500,7 +565,12 @@ function GSIForm() {
           </Button>
         </>
       }
-      results={<ResultBlock result={result} label="GSI" />}
+      results={
+        <div className="space-y-8">
+          <GSIChartPreview structure={Number(structure)} surface={Number(surface)} />
+          <ResultBlock result={result} label="GSI" />
+        </div>
+      }
     />
   );
 }
