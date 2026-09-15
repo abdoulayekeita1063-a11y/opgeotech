@@ -12,6 +12,7 @@ import {
 } from "../geotech/ai";
 import {
   computeBlastabilityIndex,
+  evaluateBlastControl,
   evaluateWallControl,
 } from "../geotech/blastability";
 import { TRPCError } from "@trpc/server";
@@ -329,9 +330,21 @@ export const blastRouter = router({
         measuredCrestLoss: z.number().min(0).max(10).default(0),
         designBermWidth: z.number().min(0).max(30).default(8),
         actualBermWidth: z.number().min(0).max(30).default(7),
+        blastAzimuth: z.number().min(0).max(360).default(90),
+        wallFaceAzimuth: z.number().min(0).max(360).default(90),
+        structureDipDirection: z.number().min(0).max(360).default(90),
+        structureDip: z.number().min(0).max(90).default(45),
+        initiationDirection: z.enum(["away-from-wall", "parallel-to-wall", "toward-wall"]).default("away-from-wall"),
+        tieUpPattern: z.enum(["echelon", "diagonal", "row-by-row", "v-cut", "unknown"]).default("echelon"),
+        holeDelayMs: z.number().min(1).max(1000).default(17),
+        rowDelayMs: z.number().min(1).max(2000).default(65),
+        controlledWallBlast: z.boolean().default(true),
       }),
     )
-    .mutation(({ input }) => evaluateWallControl(input)),
+    .mutation(({ input }) => ({
+      ...evaluateWallControl(input),
+      blastControl: evaluateBlastControl(input),
+    })),
 });
 
 export const complianceRouter = router({

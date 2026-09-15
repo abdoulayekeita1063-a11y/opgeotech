@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeBlastabilityIndex, evaluateWallControl } from "./blastability";
+import { computeBlastabilityIndex, evaluateBlastControl, evaluateWallControl } from "./blastability";
 
 describe("Blastability Index (Lilly 1986) — SME reference", () => {
   it("matches the SME spreadsheet example: BI=50, PF=0.52", () => {
@@ -62,6 +62,49 @@ describe("Blastability Index (Lilly 1986) — SME reference", () => {
     });
     expect(result.wallProximityPF.min).toBeCloseTo(0.52 * 0.5, 2);
     expect(result.wallProximityPF.max).toBeCloseTo(0.52 * 0.65, 2);
+  });
+});
+
+describe("Blast Orientation and Tie-up Control", () => {
+  it("flags toward-wall initiation and recommends away-from-wall echelon relief", () => {
+    const result = evaluateBlastControl({
+      blastAzimuth: 90,
+      wallFaceAzimuth: 90,
+      structureDipDirection: 90,
+      structureDip: 65,
+      initiationDirection: "toward-wall",
+      tieUpPattern: "row-by-row",
+      holeDelayMs: 5,
+      rowDelayMs: 3,
+      bufferRows: 0,
+      controlledWallBlast: false,
+    });
+
+    expect(result.wallAlignmentAngle).toBe(0);
+    expect(result.structureWallAngle).toBe(0);
+    expect(result.orientationRisk).toBe("Critical");
+    expect(result.tieUpRecommendation).toMatch(/away-from-wall/i);
+    expect(result.recommendations.join(" ")).toMatch(/simultaneous|relief|controlled/i);
+  });
+
+  it("returns a low-risk screen for away-from-wall controlled firing", () => {
+    const result = evaluateBlastControl({
+      blastAzimuth: 0,
+      wallFaceAzimuth: 90,
+      structureDipDirection: 225,
+      structureDip: 25,
+      initiationDirection: "away-from-wall",
+      tieUpPattern: "echelon",
+      holeDelayMs: 17,
+      rowDelayMs: 65,
+      bufferRows: 2,
+      controlledWallBlast: true,
+    });
+
+    expect(result.wallAlignmentAngle).toBe(90);
+    expect(result.structureWallAngle).toBe(135);
+    expect(result.orientationRisk).toBe("Low");
+    expect(result.checks.every(check => check.status !== "Fail")).toBe(true);
   });
 });
 

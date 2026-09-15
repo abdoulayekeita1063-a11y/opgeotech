@@ -272,6 +272,15 @@ function WallControlTab() {
   const [measuredCrestLoss, setMeasuredCrestLoss] = useState("0.3");
   const [designBermWidth, setDesignBermWidth] = useState("8");
   const [actualBermWidth, setActualBermWidth] = useState("7.5");
+  const [blastAzimuth, setBlastAzimuth] = useState("90");
+  const [wallFaceAzimuth, setWallFaceAzimuth] = useState("90");
+  const [structureDipDirection, setStructureDipDirection] = useState("90");
+  const [structureDip, setStructureDip] = useState("45");
+  const [initiationDirection, setInitiationDirection] = useState("away-from-wall");
+  const [tieUpPattern, setTieUpPattern] = useState("echelon");
+  const [holeDelayMs, setHoleDelayMs] = useState("17");
+  const [rowDelayMs, setRowDelayMs] = useState("65");
+  const [controlledWallBlast, setControlledWallBlast] = useState(true);
   const [result, setResult] = useState<any>(null);
 
   const evaluate = trpc.blast.wallControl.useMutation({
@@ -292,6 +301,15 @@ function WallControlTab() {
       measuredCrestLoss: Number(measuredCrestLoss),
       designBermWidth: Number(designBermWidth),
       actualBermWidth: Number(actualBermWidth),
+      blastAzimuth: Number(blastAzimuth),
+      wallFaceAzimuth: Number(wallFaceAzimuth),
+      structureDipDirection: Number(structureDipDirection),
+      structureDip: Number(structureDip),
+      initiationDirection: initiationDirection as "away-from-wall" | "parallel-to-wall" | "toward-wall",
+      tieUpPattern: tieUpPattern as "echelon" | "diagonal" | "row-by-row" | "v-cut" | "unknown",
+      holeDelayMs: Number(holeDelayMs),
+      rowDelayMs: Number(rowDelayMs),
+      controlledWallBlast,
     });
   };
 
@@ -347,6 +365,66 @@ function WallControlTab() {
             <Input type="number" step="0.5" value={standoffDistance} onChange={e => setStandoffDistance(e.target.value)} />
           </div>
         </div>
+        <SectionLabel>Blast Orientation & Tie-up</SectionLabel>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Screen the blast direction against the final wall and dominant discontinuities. The output is an engineering aid; confirm the final timing with the responsible blast engineer.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="swiss-label text-[11px]">Blast azimuth (°)</Label>
+            <Input type="number" min="0" max="360" value={blastAzimuth} onChange={e => setBlastAzimuth(e.target.value)} />
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Final wall azimuth (°)</Label>
+            <Input type="number" min="0" max="360" value={wallFaceAzimuth} onChange={e => setWallFaceAzimuth(e.target.value)} />
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Structure dip direction (°)</Label>
+            <Input type="number" min="0" max="360" value={structureDipDirection} onChange={e => setStructureDipDirection(e.target.value)} />
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Structure dip (°)</Label>
+            <Input type="number" min="0" max="90" value={structureDip} onChange={e => setStructureDip(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="swiss-label text-[11px]">Initiation direction</Label>
+            <Select value={initiationDirection} onValueChange={setInitiationDirection}>
+              <SelectTrigger className="rounded-none border-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="away-from-wall">Away from final wall</SelectItem>
+                <SelectItem value="parallel-to-wall">Parallel to final wall</SelectItem>
+                <SelectItem value="toward-wall">Toward final wall</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Tie-up pattern</Label>
+            <Select value={tieUpPattern} onValueChange={setTieUpPattern}>
+              <SelectTrigger className="rounded-none border-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="echelon">Echelon</SelectItem>
+                <SelectItem value="diagonal">Diagonal</SelectItem>
+                <SelectItem value="row-by-row">Row-by-row</SelectItem>
+                <SelectItem value="v-cut">V-cut</SelectItem>
+                <SelectItem value="unknown">Not recorded</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Hole delay (ms)</Label>
+            <Input type="number" min="1" max="1000" value={holeDelayMs} onChange={e => setHoleDelayMs(e.target.value)} />
+          </div>
+          <div>
+            <Label className="swiss-label text-[11px]">Row delay (ms)</Label>
+            <Input type="number" min="1" max="2000" value={rowDelayMs} onChange={e => setRowDelayMs(e.target.value)} />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={controlledWallBlast} onChange={e => setControlledWallBlast(e.target.checked)} className="h-4 w-4" />
+          Controlled perimeter blast used (trim / cushion / pre-split)
+        </label>
         <SectionLabel>Measured Wall Damage</SectionLabel>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -409,6 +487,22 @@ function WallControlTab() {
                 </div>
               ))}
             </div>
+            {result.blastControl && (
+              <div className="border border-primary bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="swiss-label text-xs">Orientation & Tie-up Recommendation</div>
+                  <div className="font-bold text-sm">{result.blastControl.orientationRisk} risk</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-muted-foreground text-xs">Blast / wall angle</span><div className="font-bold">{result.blastControl.wallAlignmentAngle}°</div></div>
+                  <div><span className="text-muted-foreground text-xs">Structure / wall angle</span><div className="font-bold">{result.blastControl.structureWallAngle}°</div></div>
+                </div>
+                <p className="text-sm leading-relaxed">{result.blastControl.tieUpRecommendation}</p>
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {result.blastControl.recommendations.map((r: string, i: number) => <li key={i}>• {r}</li>)}
+                </ul>
+              </div>
+            )}
             {/* Wall Damage Assessment */}
             <div className="border border-foreground p-4">
               <div className="swiss-label text-xs mb-3">Wall Damage Assessment</div>
@@ -501,7 +595,7 @@ export default function PostBlast() {
       <ModuleHeader
         index="04"
         title="Blast Assessment"
-        description="Comprehensive blast evaluation: AI photo analysis (fragmentation & wall damage), Blastability Index with powder factor recommendation, and wall control compliance verification."
+        description="Comprehensive blast evaluation: AI photo analysis, Blastability Index, wall-control compliance, blast orientation screening and tie-up recommendations to help reduce backbreak and wall damage."
       />
 
       <Tabs defaultValue="photo" className="mt-6">

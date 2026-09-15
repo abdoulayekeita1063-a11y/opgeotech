@@ -303,6 +303,127 @@ export function evaluateWallControl(input: WallControlInput): WallControlResult 
   return { overallCompliance, score, checks, wallDamageAssessment };
 }
 
+// ─── Blast orientation and tie-up control ─────────────────────────────────────
+
+export type TieUpPattern = "echelon" | "diagonal" | "row-by-row" | "v-cut" | "unknown";
+export type InitiationDirection = "away-from-wall" | "parallel-to-wall" | "toward-wall";
+
+export interface BlastControlInput {
+  /** Blast advance / burden-relief azimuth, degrees clockwise from north. */
+  blastAzimuth: number;
+  /** Final wall face azimuth, degrees clockwise from north. */
+  wallFaceAzimuth: number;
+  /** Dominant joint dip direction, degrees clockwise from north. */
+  structureDipDirection: number;
+  /** Dominant joint dip, degrees from horizontal. */
+  structureDip: number;
+  /** Existing initiation direction relative to the final wall. */
+  initiationDirection: InitiationDirection;
+  /** Current tie-up arrangement, if known. */
+  tieUpPattern: TieUpPattern;
+  /** Delay between holes in milliseconds. */
+  holeDelayMs: number;
+  /** Delay between rows in milliseconds. */
+  rowDelayMs: number;
+  /** Whether a buffer row separates production holes from the wall. */
+  bufferRows: number;
+  /** Whether a trim/cushion or pre-split wall-control method is used. */
+  controlledWallBlast: boolean;
+}
+
+export interface BlastControlResult {
+  wallAlignmentAngle: number;
+  structureWallAngle: number;
+  orientationRisk: "Low" | "Moderate" | "High" | "Critical";
+  tieUpRecommendation: string;
+  recommendations: string[];
+  checks: WallControlCheck[];
+}
+
+function angularDifference(a: number, b: number): number {
+  const raw = Math.abs(((a - b) % 360 + 360) % 360);
+  return raw > 180 ? 360 - raw : raw;
+}
+
+export function evaluateBlastControl(input: BlastControlInput): BlastControlResult {
+  const wallAlignmentAngle = round3(angularDifference(input.blastAzimuth, input.wallFaceAzimuth));
+  const structureWallAngle = round3(angularDifference(input.structureDipDirection, input.wallFaceAzimuth));
+  const checks: WallControlCheck[] = [];
+  const recommendations: string[] = [];
+  let risk: BlastControlResult["orientationRisk"] = "Low";
+
+  if (input.initiationDirection === "toward-wall") {
+    risk = "Critical";
+    checks.push({ parameter: "Initiation direction", status: "Fail", detail: "Relief is directed toward the final wall; this can increase wall damage and backbreak risk." });
+    recommendations.push("Change the initiation sequence so burden relief progresses away from the final wall before firing production holes adjacent to the wall.");
+  } else if (input.initiationDirection === "parallel-to-wall") {
+    risk = "Moderate";
+    checks.push({ parameter: "Initiation direction", status: "Warning", detail: "Relief is parallel to the final wall; confirm adequate free-face relief and row separation." });
+  } else {
+    checks.push({ parameter: "Initiation direction", status: "Pass", detail: "Relief is directed away from the final wall." });
+  }
+
+  if (wallAlignmentAngle <= 20) {
+    risk = risk === "Critical" ? risk : "High";
+    checks.push({ parameter: "Blast / wall orientation", status: "Warning", detail: `${wallAlignmentAngle}° relationship — review burden relief and vibration concentration along the wall.` });
+    recommendations.push("Avoid a straight, simultaneous front parallel to the final wall; use staggered relief and controlled perimeter firing.");
+  } else if (wallAlignmentAngle <= 45) {
+    risk = risk === "Critical" ? risk : "Moderate";
+    checks.push({ parameter: "Blast / wall orientation", status: "Warning", detail: `${wallAlignmentAngle}° relationship — acceptable only with verified free-face relief and wall-control measures.` });
+  } else {
+    checks.push({ parameter: "Blast / wall orientation", status: "Pass", detail: `${wallAlignmentAngle}° relationship — blast direction is not closely aligned with the final wall.` });
+  }
+
+  if (input.structureDip >= 45 && structureWallAngle <= 45) {
+    risk = risk === "Critical" ? risk : "High";
+    checks.push({ parameter: "Structure orientation", status: "Warning", detail: `${input.structureDip}° dip with ${structureWallAngle}° to the wall face — unfavourable discontinuity geometry requires review.` });
+    recommendations.push("Map the dominant structures at the perimeter and reduce energy or increase control-hole protection where discontinuities daylight toward the wall.");
+  } else {
+    checks.push({ parameter: "Structure orientation", status: "Pass", detail: `${structureWallAngle}° relationship to wall face — no high-angle unfavourable geometry flagged by this screen.` });
+  }
+
+  if (input.tieUpPattern === "unknown") {
+    risk = risk === "Critical" ? risk : "Moderate";
+    checks.push({ parameter: "Tie-up pattern", status: "Warning", detail: "Tie-up pattern not recorded; verify the firing sequence before approval." });
+  } else if (input.tieUpPattern === "row-by-row" && wallAlignmentAngle <= 45) {
+    risk = risk === "Critical" ? risk : "High";
+    checks.push({ parameter: "Tie-up pattern", status: "Warning", detail: "Row-by-row firing may create a continuous wall-parallel impulse when the blast is closely aligned with the wall." });
+  } else {
+    checks.push({ parameter: "Tie-up pattern", status: "Pass", detail: `${input.tieUpPattern} tie-up recorded for review.` });
+  }
+
+  if (input.holeDelayMs < 8) {
+    risk = risk === "Critical" ? risk : "High";
+    recommendations.push("Review very short hole delays; confirm the timing provides usable burden relief and does not create excessive simultaneous charge concentration.");
+  }
+  if (input.rowDelayMs < input.holeDelayMs) {
+    risk = risk === "Critical" ? risk : "Moderate";
+    recommendations.push("Verify row delay sequencing: the row delay should not be shorter than the hole delay without a documented timing rationale.");
+  }
+  if (input.bufferRows < 1 || !input.controlledWallBlast) {
+    risk = risk === "Critical" ? risk : "High";
+    recommendations.push("Use a dedicated buffer/trim or pre-split control line between production energy and the final wall where site conditions require it.");
+  }
+
+  let tieUpRecommendation = "Use an away-from-wall echelon or diagonal tie-up with sequential burden relief and a dedicated controlled perimeter line. Confirm the final timing with the blast engineer and site vibration limits.";
+  if (risk === "High" || risk === "Critical") {
+    tieUpRecommendation = "Prefer an away-from-wall echelon or diagonal tie-up, with the perimeter/trim line fired as a controlled sequence after adequate relief is established. Avoid simultaneous wall-parallel firing and confirm timing with the blast engineer before execution.";
+  }
+  if (input.initiationDirection === "toward-wall") {
+    tieUpRecommendation = "Do not approve the current direction without engineering review. Re-orient the tie-up away-from-wall to establish relief away from the final wall, then use staggered perimeter control and verify the timing sequence before firing.";
+  }
+
+  recommendations.push(tieUpRecommendation);
+  return {
+    wallAlignmentAngle,
+    structureWallAngle,
+    orientationRisk: risk,
+    tieUpRecommendation,
+    recommendations: Array.from(new Set(recommendations)),
+    checks,
+  };
+}
+
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }

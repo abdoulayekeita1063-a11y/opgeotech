@@ -235,3 +235,14 @@
 - [x] Add visual structure and surface-quality selectors linked to GSI values
 - [x] Preserve manual numeric GSI inputs and existing save/calculation flow
 - [x] Add tests, verify visually and publish a checkpoint (58 tests pass; GSI image and marker screenshot-verified)
+
+## GSI Chart Crop (user request)
+- [ ] Replace the GSI asset with a chart-only version without photograph sections or photo markers
+- [ ] Adjust the GSI preview and marker positioning for the chart-only asset
+- [ ] Test, visually verify and publish a checkpoint
+
+## Blast Control and Tie-up Recommendations (user request)
+- [x] Add blast and structure orientation inputs with angular relationship analysis
+- [x] Add tie-up recommendation for reducing backbreak and wall damage
+- [x] Add additional wall-control parameters, validation and engineering limitations
+- [x] Add regression tests, visually verify and publish a checkpoint (60 tests pass; Wall Control screenshot-verified)
