@@ -290,7 +290,6 @@ export default function KinematicAnalysis() {
                   </table>
                 </div>
                 <p className="text-sm">{result.summary.overallAssessment}</p>
-                <p className="text-xs text-muted-foreground mt-2">Critical is the DIPS-style kinematically feasible count. Percentages are calculated as Critical ÷ Total × 100; denominators include every analyzed structure or unique pair.</p>
               </div>
 
               {/* planar table */}
