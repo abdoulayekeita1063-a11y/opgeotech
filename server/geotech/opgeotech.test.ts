@@ -97,6 +97,23 @@ describe("runKinematicAnalysis", () => {
     expect(r.summary.overallAssessment).toContain("Kinematic feasibility:");
     expect(r.summary.overallAssessment).toContain("Planar 50.0% (1/2 structures)");
   });
+
+  it("processes an analysis with 100 structures", () => {
+    const structures = Array.from({ length: 100 }, (_, i) => ({
+      id: `J${i + 1}`,
+      dip: 45,
+      dipDirection: 95,
+      jrc: 8,
+    }));
+    const r = runKinematicAnalysis({ ...slope, structures });
+
+    expect(r.planar).toHaveLength(100);
+    expect(r.toppling).toHaveLength(100);
+    expect(r.wedge).toHaveLength(4950);
+    expect(r.summary.planarTotal).toBe(100);
+    expect(r.summary.wedgeTotal).toBe(4950);
+    expect(r.summary.topplingTotal).toBe(100);
+  });
 });
 
 describe("parseDxf", () => {

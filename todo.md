@@ -241,6 +241,12 @@
 - [ ] Adjust the GSI preview and marker positioning for the chart-only asset
 - [ ] Test, visually verify and publish a checkpoint
 
+## Wall Risk Classification from Pit Inspection Template (user request)
+- [ ] Reproduce the supplied pit inspection categories and operational identifiers in Wall Risk Classification
+- [ ] Add transparent weighted risk scoring with Low / Moderate / High / Critical outputs
+- [ ] Add category scores, action priority, engineering recommendations and comments/report output
+- [ ] Add regression tests, verify visually and publish a checkpoint
+
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis
 - [x] Add tie-up recommendation for reducing backbreak and wall damage

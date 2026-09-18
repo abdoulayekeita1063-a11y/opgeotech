@@ -177,7 +177,7 @@ export const kinematicsRouter = router({
         basicFrictionAngle: z.number().min(5).max(60),
         jcs: z.number().positive().max(500),
         lateralLimit: z.number().min(5).max(45).default(20),
-        structureIds: z.array(z.number()).min(1).max(50),
+        structureIds: z.array(z.number()).min(1).max(100),
       })
     )
     .mutation(async ({ ctx, input }) => {

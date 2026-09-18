@@ -9,6 +9,8 @@ import { trpc } from "@/lib/trpc";
 import { feasibleCases } from "@/lib/kinematicResults";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 
+const MAX_KINEMATIC_STRUCTURES = 100;
+
 interface Strength {
   normalStressKpa: number;
   peakFrictionAngle: number;
@@ -96,11 +98,16 @@ export default function KinematicAnalysis() {
     onError: e => toast.error(e.message),
   });
 
-  const toggle = (id: number) =>
+  const toggle = (id: number) => {
+    if (!selected.includes(id) && selected.length >= MAX_KINEMATIC_STRUCTURES) {
+      toast.error(`Kinematic Analysis supports up to ${MAX_KINEMATIC_STRUCTURES} structures per run`);
+      return;
+    }
     setSelected(prev => (prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]));
+  };
 
   const selectAll = () => {
-    const all = (structures.data ?? []).map(s => s.id);
+    const all = (structures.data ?? []).slice(0, MAX_KINEMATIC_STRUCTURES).map(s => s.id);
     setSelected(prev => (prev.length === all.length ? [] : all));
   };
 
@@ -187,7 +194,7 @@ export default function KinematicAnalysis() {
 
           <div className="mt-6">
             <div className="flex items-center justify-between">
-              <SectionLabel>Structures ({selected.length} selected)</SectionLabel>
+              <SectionLabel>Structures ({selected.length}/{MAX_KINEMATIC_STRUCTURES} selected)</SectionLabel>
               <button className="text-xs underline font-mono" onClick={selectAll}>
                 {selected.length === (structures.data ?? []).length ? "Clear all" : "Select all"}
               </button>
@@ -209,6 +216,9 @@ export default function KinematicAnalysis() {
                 </label>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Select up to {MAX_KINEMATIC_STRUCTURES} structures per analysis. Select all uses the first {MAX_KINEMATIC_STRUCTURES}.
+            </p>
           </div>
 
           <Button
