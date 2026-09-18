@@ -255,7 +255,7 @@
 - [x] Calculate Toppling block weight, Barton–Bandis strength, factor of safety and stability status
 - [x] Include feasible Toppling FS values in the overall critical FS and result table
 - [x] Add CSV export for summary and detailed kinematic results
-- [x] Add print / Save PDF export with print-specific layout rules
+- [x] Add Export PDF with a dedicated PDF report generator
 
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis

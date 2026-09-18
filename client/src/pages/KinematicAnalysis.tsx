@@ -8,6 +8,7 @@ import { Download, FileDown, Loader2, Play } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { feasibleCases } from "@/lib/kinematicResults";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
+import { escapeHtml, exportRecordAsPdf } from "@/lib/exportPdf";
 
 const MAX_KINEMATIC_STRUCTURES = 100;
 
@@ -110,6 +111,22 @@ function downloadKinematicCsv(result: KinResult, analysisTitle: string) {
   anchor.click();
   URL.revokeObjectURL(url);
   toast.success("Kinematic results exported to CSV");
+}
+
+function exportKinematicPdf(result: KinResult, analysisTitle: string) {
+  const summaryRows = [
+    ["Planar Sliding", result.summary.planarCritical, result.summary.planarTotal, `${result.summary.planarPercentage.toFixed(2)}%`],
+    ["Wedge Sliding", result.summary.wedgeCritical, result.summary.wedgeTotal, `${result.summary.wedgePercentage.toFixed(2)}%`],
+    ["Flexural Toppling (All)", result.summary.topplingCritical, result.summary.topplingTotal, `${result.summary.topplingPercentage.toFixed(2)}%`],
+  ];
+  const detailRows = [
+    ...result.planar.map(item => ["Planar", item.structureId, item.feasible ? "Yes" : "No", item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+    ...result.wedge.map(item => ["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+    ...result.toppling.map(item => ["Toppling", item.structureId, item.feasible ? "Yes" : "No", item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+  ];
+  const table = (headers: string[], rows: unknown[][]) => `<table><thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(String(value ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  const body = `<h1>Kinematic Analysis</h1><p><strong>Analysis:</strong> ${escapeHtml(analysisTitle || "Untitled")}</p><h2>Mechanism Summary</h2>${table(["Mechanism", "Critical", "Total", "%"], summaryRows)}<p><strong>Critical FS:</strong> ${result.summary.criticalFs == null ? "—" : result.summary.criticalFs.toFixed(2)}</p><h2>Detailed Results</h2>${table(["Mode", "Identifier", "Feasible", "FS", "Status", "Assessment"], detailRows)}`;
+  exportRecordAsPdf(analysisTitle || "Kinematic Analysis", body);
 }
 
 export default function KinematicAnalysis() {
@@ -288,8 +305,8 @@ export default function KinematicAnalysis() {
                 <Button variant="outline" className="rounded-none" onClick={() => downloadKinematicCsv(result, title)}>
                   <Download className="h-4 w-4 mr-2" /> Export CSV
                 </Button>
-                <Button className="rounded-none" onClick={() => window.print()}>
-                  <FileDown className="h-4 w-4 mr-2" /> Print / Save PDF
+                <Button className="rounded-none" onClick={() => exportKinematicPdf(result, title)}>
+                  <FileDown className="h-4 w-4 mr-2" /> Export PDF
                 </Button>
               </div>
               {/* summary */}
