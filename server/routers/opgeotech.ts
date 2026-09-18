@@ -10,6 +10,7 @@ import { storagePut } from "../storage";
 import { parseDxf } from "../geotech/dxf";
 import { runKinematicAnalysis } from "../geotech/kinematics";
 import { analyzeRadarTrend, DEFAULT_RADAR_THRESHOLDS } from "../geotech/radar";
+import { scoreWallRisk, serializeWallRisk } from "../geotech/wallRisk";
 
 // ── Drillhole module ─────────────────────────────────────────────────
 
@@ -232,7 +233,55 @@ export const kinematicsRouter = router({
 // ── Standalone Monitoring module ───────────────────────────────────────
 
 const monitoringStatuses = ["Active", "Monitored", "Remediated", "Closed"] as const;
-const monitoringRiskLevels = ["Low", "Medium", "High", "Critical"] as const;
+const monitoringRiskLevels = ["Low", "Moderate", "High", "Critical"] as const;
+
+const wallRiskInspectionShape = {
+  pitPhase: z.string().max(128).optional(),
+  area: z.string().max(128).optional(),
+  operation: z.string().max(128).optional(),
+  inspectorName: z.string().max(255).optional(),
+  startBench: z.string().max(64).optional(),
+  endBench: z.string().max(64).optional(),
+  inspectionDate: z.string().max(32).optional(),
+  bermWidth: z.number().min(0).max(500).optional(),
+  slopeHeight: z.number().min(0).max(1000).optional(),
+  slopeAngle: z.number().min(0).max(90).optional(),
+  monthToDateRainfall: z.number().min(0).max(5000).optional(),
+  faceMoistureCondition: z.string().max(128).optional(),
+  ponding: z.string().max(128).optional(),
+  drainage: z.string().max(128).optional(),
+  rockMassRating: z.number().min(0).max(100).optional(),
+  jointSets: z.number().min(0).max(50).optional(),
+  jointContinuity: z.string().max(128).optional(),
+  rockType: z.string().max(128).optional(),
+  structuralType: z.string().max(128).optional(),
+  infilling: z.string().max(128).optional(),
+  rockMassCharacterization: z.string().max(2000).optional(),
+  mappingDensity: z.string().max(128).optional(),
+  irsData: z.string().max(128).optional(),
+  geotechDrillingProgram: z.string().max(128).optional(),
+  geotechnicalAnalysis: z.string().max(2000).optional(),
+  potentialFailureMechanism: z.string().max(128).optional(),
+  factorOfSafety: z.number().min(0).max(20).optional(),
+  failureHistory: z.string().max(128).optional(),
+  probabilityOfFailure: z.number().min(0).max(100).optional(),
+  orientation: z.string().max(128).optional(),
+  faceCleaningMethod: z.string().max(128).optional(),
+  bermCondition: z.string().max(128).optional(),
+  rockFaceDescription: z.string().max(128).optional(),
+  looseMaterials: z.string().max(128).optional(),
+  limitBlastingMethod: z.string().max(128).optional(),
+  wallDamage: z.string().max(128).optional(),
+  presplitBarrelsVisible: z.string().max(128).optional(),
+  crestBackbreak: z.string().max(128).optional(),
+  hardToe: z.string().max(128).optional(),
+  structuralPlanesVisible: z.string().max(128).optional(),
+  monitoringMethod: z.string().max(128).optional(),
+  monitoringFrequency: z.string().max(128).optional(),
+  cumulativeDisplacement: z.number().min(0).max(100000).optional(),
+  analysis: z.string().max(128).optional(),
+  velocity: z.number().min(0).max(100000).optional(),
+};
 
 export const monitoringRouter = router({
   create: protectedProcedure
@@ -241,7 +290,7 @@ export const monitoringRouter = router({
         wallName: z.string().min(1).max(255),
         zone: z.string().max(128).optional(),
         status: z.enum(monitoringStatuses).default("Active"),
-        riskLevel: z.enum(monitoringRiskLevels).default("Low"),
+        ...wallRiskInspectionShape,
         rmr: z.number().min(0).max(100).optional(),
         gsi: z.number().min(0).max(100).optional(),
         qSystem: z.number().min(0).max(1000).optional(),
@@ -257,12 +306,26 @@ export const monitoringRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const wallRisk = scoreWallRisk(input);
+      const persistedRisk = serializeWallRisk(wallRisk);
       const id = await db.insertMonitoringRecord({
         userId: ctx.user.id,
         wallName: input.wallName,
         zone: input.zone ?? null,
+        pitPhase: input.pitPhase ?? null,
+        area: input.area ?? null,
+        operation: input.operation ?? null,
+        inspectorName: input.inspectorName ?? null,
+        startBench: input.startBench ?? null,
+        endBench: input.endBench ?? null,
+        inspectionDate: input.inspectionDate ?? null,
         status: input.status,
-        riskLevel: input.riskLevel,
+        riskLevel: persistedRisk.riskLevel,
+        riskScore: persistedRisk.riskScore,
+        actionPriority: persistedRisk.actionPriority,
+        categoryScoresJson: persistedRisk.categoryScoresJson,
+        recommendations: persistedRisk.recommendations,
+        inspectionDataJson: JSON.stringify(input),
         rmr: input.rmr ?? null,
         gsi: input.gsi ?? null,
         qSystem: input.qSystem ?? null,
@@ -276,7 +339,7 @@ export const monitoringRouter = router({
         currentFs: input.currentFs ?? null,
         notes: input.notes ?? null,
       });
-      return { id };
+      return { id, risk: wallRisk };
     }),
 
   list: protectedProcedure.query(({ ctx }) => db.listMonitoringRecords(ctx.user.id)),

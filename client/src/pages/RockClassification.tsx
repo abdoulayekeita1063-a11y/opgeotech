@@ -451,8 +451,10 @@ function QForm() {
 }
 
 function GSIChartPreview({ structure, surface }: { structure: number; surface: number }) {
-  const markerLeft = Math.max(56, Math.min(96, 56 + (100 - surface) * 0.4));
-  const markerTop = Math.max(46, Math.min(90, 46 + (100 - structure) * 0.44));
+  // The chart-only asset has its plotting grid in the right/lower portion of the image.
+  // Surface quality moves left → right; decreasing interlocking moves top → bottom.
+  const markerLeft = Math.max(52, Math.min(96, 52 + (100 - surface) * 0.46));
+  const markerTop = Math.max(43, Math.min(94, 43 + (100 - structure) * 0.56));
 
   return (
     <div className="space-y-3">
@@ -465,8 +467,8 @@ function GSIChartPreview({ structure, surface }: { structure: number; surface: n
       </p>
       <div className="relative overflow-hidden border border-foreground bg-white">
         <img
-          src="/manus-storage/gsi-chart_dfa797aa.png"
-          alt="Geological Strength Index chart showing structure and surface-condition ratings"
+          src="/manus-storage/gsi-chart-only-clean_514a5417.png"
+          alt="Chart-only Geological Strength Index diagram showing structure and surface-condition ratings"
           className="block w-full h-auto"
         />
         <div

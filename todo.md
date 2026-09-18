@@ -237,15 +237,20 @@
 - [x] Add tests, verify visually and publish a checkpoint (58 tests pass; GSI image and marker screenshot-verified)
 
 ## GSI Chart Crop (user request)
-- [ ] Replace the GSI asset with a chart-only version without photograph sections or photo markers
-- [ ] Adjust the GSI preview and marker positioning for the chart-only asset
-- [ ] Test, visually verify and publish a checkpoint
+- [x] Replace the GSI asset with a chart-only version without photograph sections or photo markers
+- [x] Adjust the GSI preview and marker positioning for the chart-only asset
+- [x] Test, visually verify and publish a checkpoint
 
 ## Wall Risk Classification from Pit Inspection Template (user request)
-- [ ] Reproduce the supplied pit inspection categories and operational identifiers in Wall Risk Classification
-- [ ] Add transparent weighted risk scoring with Low / Moderate / High / Critical outputs
-- [ ] Add category scores, action priority, engineering recommendations and comments/report output
-- [ ] Add regression tests, verify visually and publish a checkpoint
+- [x] Reproduce the supplied pit inspection categories and operational identifiers in Wall Risk Classification
+- [x] Add transparent weighted risk scoring with Low / Moderate / High / Critical outputs
+- [x] Add category scores, action priority, engineering recommendations and comments/report output
+- [x] Add regression tests, verify visually and publish a checkpoint
+
+## Kinematic Structure Capacity (user request)
+- [x] Increase Kinematic Analysis selection and API validation from 50 to 100 structures
+- [x] Add frontend cap guidance and regression coverage for 100 structures / 4,950 wedge pairs
+- [x] Typecheck, test and save a checkpoint
 
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis
