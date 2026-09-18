@@ -45,6 +45,10 @@ interface TopplingRes {
   feasible: boolean;
   mode: string;
   reasons: string[];
+  blockWeightKn?: number;
+  strength?: Strength;
+  factorOfSafety?: number;
+  status?: string;
 }
 interface KinResult {
   planar: PlanarRes[];
@@ -369,6 +373,11 @@ export default function KinematicAnalysis() {
                         <th className="px-2 py-1.5">Structure</th>
                         <th className="px-2 py-1.5">Dip/DipDir</th>
                         <th className="px-2 py-1.5">Mode</th>
+                        <th className="px-2 py-1.5">W (kN)</th>
+                        <th className="px-2 py-1.5">c_i (kPa)</th>
+                        <th className="px-2 py-1.5">φ_i (°)</th>
+                        <th className="px-2 py-1.5">FS</th>
+                        <th className="px-2 py-1.5">Status</th>
                         <th className="px-2 py-1.5">Assessment</th>
                       </tr>
                     </thead>
@@ -378,10 +387,15 @@ export default function KinematicAnalysis() {
                           <td className="px-2 py-1 font-bold">{t.structureId}</td>
                           <td className="px-2 py-1">{t.dip}°/{t.dipDirection}°</td>
                           <td className="px-2 py-1">{t.mode}</td>
+                          <td className="px-2 py-1">{t.blockWeightKn ?? "—"}</td>
+                          <td className="px-2 py-1">{t.strength?.instantaneousCohesionKpa ?? "—"}</td>
+                          <td className="px-2 py-1">{t.strength?.instantaneousFrictionAngle ?? "—"}</td>
+                          <td className="px-2 py-1 font-bold">{t.factorOfSafety ?? "—"}</td>
+                          <td className={`px-2 py-1 ${statusColor(t.status)}`}>{t.status ?? "—"}</td>
                           <td className="px-2 py-1 text-muted-foreground">{t.reasons[0]}</td>
                         </tr>
                       ))}
-                      {!feasibleToppling.length && <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No feasible toppling cases.</td></tr>}
+                      {!feasibleToppling.length && <tr><td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">No feasible toppling cases.</td></tr>}
                     </tbody>
                   </table>
                 </div>

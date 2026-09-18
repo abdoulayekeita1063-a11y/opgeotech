@@ -86,6 +86,10 @@ describe("runKinematicAnalysis", () => {
     });
     expect(r.toppling[0].feasible).toBe(true);
     expect(r.toppling[0].mode).toBe("flexural");
+    expect(r.toppling[0].blockWeightKn).toBeGreaterThan(0);
+    expect(r.toppling[0].strength?.instantaneousCohesionKpa).toBeGreaterThanOrEqual(0);
+    expect(r.toppling[0].factorOfSafety).toBeGreaterThan(0);
+    expect(["Stable", "Marginal", "Unstable"]).toContain(r.toppling[0].status);
     expect(r.summary.topplingCritical).toBe(1);
     expect(r.summary.topplingTotal).toBe(1);
     expect(r.summary.topplingPercentage).toBe(100);

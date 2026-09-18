@@ -70,6 +70,10 @@ export interface TopplingResult {
   feasible: boolean;
   mode: "flexural" | "none";
   reasons: string[];
+  blockWeightKn?: number;
+  strength?: BartonStrength;
+  factorOfSafety?: number;
+  status?: "Stable" | "Marginal" | "Unstable";
 }
 
 export interface KinematicResult {
@@ -308,7 +312,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
   if (!steep) reasons.push(`Plane dip (${s.dip}°) too shallow for toppling columns (< 60°)`);
 
   const feasible = dirOk && slipCondition && steep;
-  return {
+  const result: TopplingResult = {
     structureId: s.id,
     dip: s.dip,
     dipDirection: s.dipDirection,
@@ -318,6 +322,28 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
       ? ["Steep plane dipping into the face satisfying the Goodman-Bray slip condition"]
       : reasons,
   };
+  if (!feasible) return result;
+
+  // Screening-level Goodman–Bray toppling check. Treat each column as a
+  // unit-thickness block and compare resisting friction/cohesion moment with
+  // the gravity overturning moment about the toe of the column.
+  const H = inp.slopeHeight;
+  const blockInclination = Math.max(90 - s.dip, 2) * DEG;
+  const blockWidth = Math.max(H * Math.tan(blockInclination), 0.5);
+  const W = 0.5 * H * blockWidth * inp.unitWeight;
+  const contactLength = Math.max(H / Math.cos(blockInclination), 1);
+  const sigmaN = (W * Math.cos(blockInclination)) / contactLength;
+  const strength = bartonBandis(sigmaN, s.jrc ?? 8, inp.jcs, inp.basicFrictionAngle);
+  const resistingMoment =
+    strength.instantaneousCohesionKpa * contactLength * (blockWidth / 2) +
+    W * Math.cos(blockInclination) * Math.tan(strength.instantaneousFrictionAngle * DEG) * (blockWidth / 2);
+  const overturningMoment = W * Math.sin(blockInclination) * (H / 2);
+  const fs = overturningMoment > 0 ? resistingMoment / overturningMoment : 99;
+  result.blockWeightKn = r2(W);
+  result.strength = strength;
+  result.factorOfSafety = r2(Math.min(fs, 99));
+  result.status = fs >= 1.3 ? "Stable" : fs >= 1.0 ? "Marginal" : "Unstable";
+  return result;
 }
 
 // ── main entry ───────────────────────────────────────────────────────
@@ -348,6 +374,7 @@ export function runKinematicAnalysis(input: KinematicInput): KinematicResult {
   const feasibleFs = [
     ...planar.filter(p => p.feasible && p.factorOfSafety != null).map(p => p.factorOfSafety!),
     ...wedge.filter(w => w.feasible && w.factorOfSafety != null).map(w => w.factorOfSafety!),
+    ...toppling.filter(t => t.feasible && t.factorOfSafety != null).map(t => t.factorOfSafety!),
   ];
   const criticalFs = feasibleFs.length ? Math.min(...feasibleFs) : null;
 

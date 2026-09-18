@@ -252,6 +252,8 @@
 - [x] Add frontend cap guidance and regression coverage for 100 structures / 4,950 wedge pairs
 - [x] Typecheck, test and save a checkpoint
 - [x] Calculate and display Wedge and Toppling percentages using DIPS-style Critical ÷ Total × 100
+- [x] Calculate Toppling block weight, Barton–Bandis strength, factor of safety and stability status
+- [x] Include feasible Toppling FS values in the overall critical FS and result table
 
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis
