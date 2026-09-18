@@ -254,6 +254,8 @@
 - [x] Calculate and display Wedge and Toppling percentages using DIPS-style Critical ÷ Total × 100
 - [x] Calculate Toppling block weight, Barton–Bandis strength, factor of safety and stability status
 - [x] Include feasible Toppling FS values in the overall critical FS and result table
+- [x] Add CSV export for summary and detailed kinematic results
+- [x] Add print / Save PDF export with print-specific layout rules
 
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis

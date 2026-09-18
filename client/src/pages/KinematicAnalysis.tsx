@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Play } from "lucide-react";
+import { Download, FileDown, Loader2, Play } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { feasibleCases } from "@/lib/kinematicResults";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
@@ -80,6 +80,38 @@ function statusColor(s?: string) {
       : "text-emerald-700 font-bold";
 }
 
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadKinematicCsv(result: KinResult, analysisTitle: string) {
+  const rows: unknown[][] = [
+    ["Kinematic Analysis", analysisTitle || "Untitled"],
+    ["Mechanism", "Critical", "Total", "Percentage"],
+    ["Planar Sliding", result.summary.planarCritical, result.summary.planarTotal, `${result.summary.planarPercentage.toFixed(2)}%`],
+    ["Wedge Sliding", result.summary.wedgeCritical, result.summary.wedgeTotal, `${result.summary.wedgePercentage.toFixed(2)}%`],
+    ["Flexural Toppling (All)", result.summary.topplingCritical, result.summary.topplingTotal, `${result.summary.topplingPercentage.toFixed(2)}%`],
+    [],
+    ["Detailed Results"],
+    ["Mode", "Identifier", "Feasible", "Dip", "Dip Direction", "Trend", "Plunge", "Block Weight (kN)", "Cohesion (kPa)", "Friction Angle (°)", "Factor of Safety", "Status", "Reasons"],
+  ];
+
+  result.planar.forEach(item => rows.push(["Planar", item.structureId, item.feasible ? "Yes" : "No", item.dip, item.dipDirection, "", "", item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
+  result.wedge.forEach(item => rows.push(["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", "", "", item.lineOfIntersection.trend, item.lineOfIntersection.plunge, item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
+  result.toppling.forEach(item => rows.push(["Toppling", item.structureId, item.feasible ? "Yes" : "No", item.dip, item.dipDirection, "", "", item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
+
+  const csv = rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${(analysisTitle || "kinematic-analysis").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "kinematic-analysis"}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  toast.success("Kinematic results exported to CSV");
+}
+
 export default function KinematicAnalysis() {
   const utils = trpc.useUtils();
   const structures = trpc.mapping.list.useQuery();
@@ -149,7 +181,7 @@ export default function KinematicAnalysis() {
 
       <div className="grid grid-cols-12 gap-8">
         {/* inputs */}
-        <div className="col-span-12 lg:col-span-4">
+        <div className="kinematic-inputs col-span-12 lg:col-span-4">
           <SectionLabel>Slope & rock parameters</SectionLabel>
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="col-span-2">
@@ -243,7 +275,7 @@ export default function KinematicAnalysis() {
         </div>
 
         {/* results */}
-        <div className="col-span-12 lg:col-span-8">
+        <div className="kinematic-results col-span-12 lg:col-span-8">
           <SectionLabel>Results</SectionLabel>
           {!result ? (
             <div className="border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
@@ -252,6 +284,14 @@ export default function KinematicAnalysis() {
             </div>
           ) : (
             <div className="space-y-6">
+              <div className="no-print flex flex-wrap justify-end gap-2">
+                <Button variant="outline" className="rounded-none" onClick={() => downloadKinematicCsv(result, title)}>
+                  <Download className="h-4 w-4 mr-2" /> Export CSV
+                </Button>
+                <Button className="rounded-none" onClick={() => window.print()}>
+                  <FileDown className="h-4 w-4 mr-2" /> Print / Save PDF
+                </Button>
+              </div>
               {/* summary */}
               <div className="border-2 border-foreground p-4">
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 text-center mb-4">

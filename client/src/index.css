@@ -367,4 +367,8 @@
   .failure-report-title { min-height: 8in; padding: 0.6in; page-break-after: always; }
   .failure-report section { page-break-before: always; }
   .failure-section-title { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .kinematic-inputs { display: none !important; }
+  .kinematic-results { width: 100% !important; grid-column: span 12 / span 12 !important; }
+  .kinematic-results table { font-size: 8pt; }
+  .kinematic-results section { break-inside: avoid; }
 }
