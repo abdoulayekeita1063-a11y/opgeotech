@@ -11,6 +11,7 @@ export const wallRiskCategories = [
 
 export type WallRiskCategory = (typeof wallRiskCategories)[number];
 export type WallRiskLevel = "Low" | "Moderate" | "High" | "Critical";
+export type WallRiskClass = "Very low risk" | "Low risk" | "Medium risk" | "High risk" | "Very high risk" | "Extremely high risk";
 
 export interface WallRiskInput {
   bermWidth?: number | null;
@@ -64,6 +65,8 @@ export interface WallRiskCategoryScore {
 export interface WallRiskResult {
   overallScore: number;
   riskLevel: WallRiskLevel;
+  riskClass: WallRiskClass;
+  riskColour: "Cyan" | "Blue" | "Green" | "Brown" | "Orange" | "Red";
   actionPriority: string;
   categoryScores: WallRiskCategoryScore[];
   recommendations: string[];
@@ -106,10 +109,19 @@ function makeCategory(category: WallRiskCategory, values: Array<number | undefin
   return { category, score, weight: weights[category], contribution: Math.round(score * weights[category] * 100) / 100, basis };
 }
 
+function ratingClass(score: number): { label: WallRiskClass; colour: WallRiskResult["riskColour"]; action: string } {
+  if (score >= 8) return { label: "Extremely high risk", colour: "Red", action: "No entry. Cease all operations until the hazard is rectified." };
+  if (score >= 6) return { label: "Very high risk", colour: "Orange", action: "Demarcate with SSR, treat ASAP and operate in the area by permission only." };
+  if (score >= 4) return { label: "High risk", colour: "Brown", action: "Demarcate, monitor, treat ASAP and refer to the Special Areas Committee." };
+  if (score >= 3) return { label: "Medium risk", colour: "Green", action: "Demarcate the highwall stand-off, monitor and treat ASAP." };
+  if (score >= 2) return { label: "Low risk", colour: "Blue", action: "Notify people in the working area, treat ASAP and adhere to stand-offs." };
+  return { label: "Very low risk", colour: "Cyan", action: "Notify people in the working area and treat ASAP." };
+}
+
 function level(score: number): WallRiskLevel {
-  if (score >= 7.5) return "Critical";
-  if (score >= 5) return "High";
-  if (score >= 2.5) return "Moderate";
+  if (score >= 6) return "Critical";
+  if (score >= 4) return "High";
+  if (score >= 3) return "Moderate";
   return "Low";
 }
 
@@ -163,6 +175,7 @@ export function scoreWallRisk(input: WallRiskInput): WallRiskResult {
 
   const overallScore = Math.round(clamp(scores.reduce((sum, item) => sum + item.contribution, 0)) * 100) / 100;
   const riskLevel = level(overallScore);
+  const rating = ratingClass(overallScore);
   const recommendations: string[] = [];
   if (scores.find(item => item.category === "Water")!.score >= 5) recommendations.push("Inspect and restore drainage; control ponding and reassess the wet face after rainfall.");
   if (scores.find(item => item.category === "Rock Mass")!.score >= 5 || scores.find(item => item.category === "Failure Potential")!.score >= 5) recommendations.push("Complete structural mapping and geotechnical review before work continues below the wall.");
@@ -175,16 +188,18 @@ export function scoreWallRisk(input: WallRiskInput): WallRiskResult {
   return {
     overallScore,
     riskLevel,
-    actionPriority: action(riskLevel),
+    riskClass: rating.label,
+    riskColour: rating.colour,
+    actionPriority: rating.action,
     categoryScores: scores,
     recommendations,
     dataCompleteness: Math.round(fieldCount / Object.keys(input).length * 100),
-    method: "Eight-category weighted screening score on a 0–10 scale. Weights: Technical 14%, Water 12%, Rock Mass 14%, Geotechnical 14%, Failure Potential 18%, Fall of Ground 12%, Blasting 8%, Monitoring 8%. Thresholds: Low <2.5, Moderate 2.5–<5, High 5–<7.5, Critical ≥7.5.",
+    method: "Eight-category weighted rating on a 0–10 scale. Classes: 0–<2 Very low, 2–<3 Low, 3–<4 Medium, 4–<6 High, 6–<8 Very high, 8–10 Extremely high.",
   };
 }
 
 export function serializeWallRisk(result: WallRiskResult) {
-  return { riskLevel: result.riskLevel, riskScore: result.overallScore, actionPriority: result.actionPriority, categoryScoresJson: JSON.stringify(result.categoryScores), recommendations: result.recommendations.join(" ") };
+  return { riskLevel: result.riskLevel, riskClass: result.riskClass, riskColour: result.riskColour, riskScore: result.overallScore, actionPriority: result.actionPriority, categoryScoresJson: JSON.stringify(result.categoryScores), recommendations: result.recommendations.join(" ") };
 }
 
 export function parseWallRiskCategories(value: string | null | undefined): WallRiskCategoryScore[] {
@@ -193,6 +208,6 @@ export function parseWallRiskCategories(value: string | null | undefined): WallR
 }
 
 export const wallRiskWeights = weights;
-export const wallRiskThresholds = { moderate: 2.5, high: 5, critical: 7.5 } as const;
+export const wallRiskThresholds = { low: 2, medium: 3, high: 4, veryHigh: 6, extreme: 8 } as const;
 export const wallRiskActions = { Low: "Routine controls", Moderate: "Monitor and treat", High: "Restrict and control", Critical: "Stop and make safe" } as const;
 export const wallRiskEngineeringDisclaimer = "Engineering screening only; validate risk outputs against the site ground control management plan and competent-person review.";

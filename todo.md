@@ -246,6 +246,8 @@
 - [x] Add transparent weighted risk scoring with Low / Moderate / High / Critical outputs
 - [x] Add category scores, action priority, engineering recommendations and comments/report output
 - [x] Add regression tests, verify visually and publish a checkpoint
+- [x] Rebuild the page as a two-column rating sheet matching the supplied inspection images
+- [x] Add the 0–10 Very low / Low / Medium / High / Very high / Extremely high risk scale with colours and actions
 
 ## Kinematic Structure Capacity (user request)
 - [x] Increase Kinematic Analysis selection and API validation from 50 to 100 structures

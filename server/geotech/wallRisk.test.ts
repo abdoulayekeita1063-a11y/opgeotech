@@ -53,6 +53,6 @@ describe("wall risk classification", () => {
     const result = scoreWallRisk({ rockMassRating: 65, faceMoistureCondition: "Dry" });
     expect(result.overallScore).toBeLessThan(2.5);
     expect(result.dataCompleteness).toBeGreaterThan(0);
-    expect(result.method).toContain("Technical 14%");
+    expect(result.method).toContain("Very low");
   });
 });

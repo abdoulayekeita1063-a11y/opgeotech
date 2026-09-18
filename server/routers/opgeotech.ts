@@ -322,6 +322,8 @@ export const monitoringRouter = router({
         status: input.status,
         riskLevel: persistedRisk.riskLevel,
         riskScore: persistedRisk.riskScore,
+        riskClass: persistedRisk.riskClass,
+        riskColour: persistedRisk.riskColour,
         actionPriority: persistedRisk.actionPriority,
         categoryScoresJson: persistedRisk.categoryScoresJson,
         recommendations: persistedRisk.recommendations,

@@ -228,6 +228,8 @@ export const monitoringRecords = mysqlTable("monitoring_records", {
   status: mysqlEnum("status", ["Active", "Monitored", "Remediated", "Closed"]).default("Active").notNull(),
   riskLevel: mysqlEnum("riskLevel", ["Low", "Moderate", "High", "Critical"]).default("Low").notNull(),
   riskScore: double("riskScore"),
+  riskClass: varchar("riskClass", { length: 64 }),
+  riskColour: varchar("riskColour", { length: 32 }),
   actionPriority: text("actionPriority"),
   categoryScoresJson: longtext("categoryScoresJson"),
   recommendations: text("recommendations"),
