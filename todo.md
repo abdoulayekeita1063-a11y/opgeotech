@@ -248,6 +248,7 @@
 - [x] Add regression tests, verify visually and publish a checkpoint
 - [x] Rebuild the page as a two-column rating sheet matching the supplied inspection images
 - [x] Add the 0–10 Very low / Low / Medium / High / Very high / Extremely high risk scale with colours and actions
+- [x] Add Export completed inspection PDF with identifiers, observations, category ratings, overall rating and recommendations
 
 ## Kinematic Structure Capacity (user request)
 - [x] Increase Kinematic Analysis selection and API validation from 50 to 100 structures
