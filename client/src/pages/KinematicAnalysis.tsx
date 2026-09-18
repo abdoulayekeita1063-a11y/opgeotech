@@ -54,12 +54,15 @@ interface KinResult {
     planarCount: number;
     planarTotal: number;
     planarPercentage: number;
+    planarCritical: number;
     wedgeCount: number;
     wedgeTotal: number;
     wedgePercentage: number;
+    wedgeCritical: number;
     topplingCount: number;
     topplingTotal: number;
     topplingPercentage: number;
+    topplingCritical: number;
     criticalFs: number | null;
     overallAssessment: string;
   };
@@ -249,19 +252,19 @@ export default function KinematicAnalysis() {
               <div className="border-2 border-foreground p-4">
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 text-center mb-4">
                   <div className="border border-foreground p-3">
-                    <div className="text-3xl font-extrabold text-primary">{result.summary.planarPercentage.toFixed(1)}%</div>
-                    <div className="swiss-label text-[11px] mt-1">Planar feasible</div>
-                    <div className="text-xs text-muted-foreground mt-1">{result.summary.planarCount} / {result.summary.planarTotal} structures</div>
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.planarPercentage.toFixed(2)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Planar — Critical / Total / %</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.planarCritical} / {result.summary.planarTotal} structures</div>
                   </div>
                   <div className="border border-foreground p-3">
-                    <div className="text-3xl font-extrabold text-primary">{result.summary.wedgePercentage.toFixed(1)}%</div>
-                    <div className="swiss-label text-[11px] mt-1">Wedge feasible</div>
-                    <div className="text-xs text-muted-foreground mt-1">{result.summary.wedgeCount} / {result.summary.wedgeTotal} pairs</div>
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.wedgePercentage.toFixed(2)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Wedge — Critical / Total / %</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.wedgeCritical} / {result.summary.wedgeTotal} pairs</div>
                   </div>
                   <div className="border border-foreground p-3">
-                    <div className="text-3xl font-extrabold text-primary">{result.summary.topplingPercentage.toFixed(1)}%</div>
-                    <div className="swiss-label text-[11px] mt-1">Toppling feasible</div>
-                    <div className="text-xs text-muted-foreground mt-1">{result.summary.topplingCount} / {result.summary.topplingTotal} structures</div>
+                    <div className="text-3xl font-extrabold text-primary">{result.summary.topplingPercentage.toFixed(2)}%</div>
+                    <div className="swiss-label text-[11px] mt-1">Toppling — Critical / Total / %</div>
+                    <div className="text-xs text-muted-foreground mt-1">{result.summary.topplingCritical} / {result.summary.topplingTotal} structures</div>
                   </div>
                   <div className="border border-foreground p-3">
                     <div className={`text-2xl font-extrabold ${result.summary.criticalFs != null && result.summary.criticalFs < 1.3 ? "text-destructive" : ""}`}>
@@ -270,8 +273,20 @@ export default function KinematicAnalysis() {
                     <div className="swiss-label text-[11px] mt-1">Critical FS</div>
                   </div>
                 </div>
+                <div className="border border-foreground overflow-x-auto mb-4">
+                  <table className="w-full text-xs font-mono">
+                    <thead className="bg-secondary border-b border-foreground">
+                      <tr className="text-left"><th className="px-3 py-2">Mechanism</th><th className="px-3 py-2 text-right">Critical</th><th className="px-3 py-2 text-right">Total</th><th className="px-3 py-2 text-right">%</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-border"><td className="px-3 py-2">Planar Sliding</td><td className="px-3 py-2 text-right font-bold">{result.summary.planarCritical}</td><td className="px-3 py-2 text-right">{result.summary.planarTotal}</td><td className="px-3 py-2 text-right">{result.summary.planarPercentage.toFixed(2)}%</td></tr>
+                      <tr className="border-b border-border"><td className="px-3 py-2">Wedge Sliding</td><td className="px-3 py-2 text-right font-bold">{result.summary.wedgeCritical}</td><td className="px-3 py-2 text-right">{result.summary.wedgeTotal}</td><td className="px-3 py-2 text-right">{result.summary.wedgePercentage.toFixed(2)}%</td></tr>
+                      <tr><td className="px-3 py-2">Flexural Toppling (All)</td><td className="px-3 py-2 text-right font-bold">{result.summary.topplingCritical}</td><td className="px-3 py-2 text-right">{result.summary.topplingTotal}</td><td className="px-3 py-2 text-right">{result.summary.topplingPercentage.toFixed(2)}%</td></tr>
+                    </tbody>
+                  </table>
+                </div>
                 <p className="text-sm">{result.summary.overallAssessment}</p>
-                <p className="text-xs text-muted-foreground mt-2">Only feasible cases are listed below. Percentage denominators still include every analyzed structure or unique pair.</p>
+                <p className="text-xs text-muted-foreground mt-2">Critical is the DIPS-style kinematically feasible count. Percentages are calculated as Critical ÷ Total × 100; denominators include every analyzed structure or unique pair.</p>
               </div>
 
               {/* planar table */}
@@ -312,7 +327,7 @@ export default function KinematicAnalysis() {
 
               {/* wedge table */}
               <div>
-                <SectionLabel>Wedge sliding — {feasibleWedge.length} feasible pairs</SectionLabel>
+                <SectionLabel>Wedge sliding — {result.summary.wedgeCritical} Critical / {result.summary.wedgeTotal} Total / {result.summary.wedgePercentage.toFixed(2)}%</SectionLabel>
                 <div className="border border-foreground overflow-x-auto">
                   <table className="w-full text-xs font-mono">
                     <thead className="bg-secondary">
@@ -346,7 +361,7 @@ export default function KinematicAnalysis() {
 
               {/* toppling table */}
               <div>
-                <SectionLabel>Toppling — {feasibleToppling.length} feasible</SectionLabel>
+                <SectionLabel>Toppling — {result.summary.topplingCritical} Critical / {result.summary.topplingTotal} Total / {result.summary.topplingPercentage.toFixed(2)}%</SectionLabel>
                 <div className="border border-foreground overflow-x-auto">
                   <table className="w-full text-xs font-mono">
                     <thead className="bg-secondary">

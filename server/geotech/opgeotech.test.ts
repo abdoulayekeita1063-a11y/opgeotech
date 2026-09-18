@@ -74,6 +74,9 @@ describe("runKinematicAnalysis", () => {
     expect(r.wedge[0].feasible).toBe(true);
     expect(r.wedge[0].lineOfIntersection.plunge).toBeGreaterThan(30);
     expect(r.wedge[0].factorOfSafety).toBeGreaterThan(0);
+    expect(r.summary.wedgeCritical).toBe(1);
+    expect(r.summary.wedgeTotal).toBe(1);
+    expect(r.summary.wedgePercentage).toBe(100);
   });
 
   it("flags flexural toppling for steep planes dipping into the face", () => {
@@ -83,6 +86,9 @@ describe("runKinematicAnalysis", () => {
     });
     expect(r.toppling[0].feasible).toBe(true);
     expect(r.toppling[0].mode).toBe("flexural");
+    expect(r.summary.topplingCritical).toBe(1);
+    expect(r.summary.topplingTotal).toBe(1);
+    expect(r.summary.topplingPercentage).toBe(100);
   });
 
   it("returns a coherent summary with critical FS", () => {

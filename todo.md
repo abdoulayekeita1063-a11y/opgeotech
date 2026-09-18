@@ -251,6 +251,7 @@
 - [x] Increase Kinematic Analysis selection and API validation from 50 to 100 structures
 - [x] Add frontend cap guidance and regression coverage for 100 structures / 4,950 wedge pairs
 - [x] Typecheck, test and save a checkpoint
+- [x] Calculate and display Wedge and Toppling percentages using DIPS-style Critical ÷ Total × 100
 
 ## Blast Control and Tie-up Recommendations (user request)
 - [x] Add blast and structure orientation inputs with angular relationship analysis

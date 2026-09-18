@@ -80,12 +80,15 @@ export interface KinematicResult {
     planarCount: number;
     planarTotal: number;
     planarPercentage: number;
+    planarCritical: number;
     wedgeCount: number;
     wedgeTotal: number;
     wedgePercentage: number;
+    wedgeCritical: number;
     topplingCount: number;
     topplingTotal: number;
     topplingPercentage: number;
+    topplingCritical: number;
     criticalFs: number | null;
     overallAssessment: string;
   };
@@ -375,12 +378,15 @@ export function runKinematicAnalysis(input: KinematicInput): KinematicResult {
       planarCount: pc,
       planarTotal: planar.length,
       planarPercentage: pp,
+      planarCritical: pc,
       wedgeCount: wc,
       wedgeTotal: wedge.length,
       wedgePercentage: wp,
+      wedgeCritical: wc,
       topplingCount: tc,
       topplingTotal: toppling.length,
       topplingPercentage: tp,
+      topplingCritical: tc,
       criticalFs,
       overallAssessment: overall,
     },
