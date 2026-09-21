@@ -13,7 +13,26 @@ export interface StabilityInput {
   slopeHeight: number; // H in m
   slopeAngle: number; // β in degrees
   waterCondition: "dry" | "partial" | "saturated";
+  benches?: BenchInput[];
+  strengthModel?: StrengthModelInput;
 }
+
+export interface BenchInput {
+  height: number;
+  angle: number;
+  bermWidth: number;
+}
+
+export interface HoekBrownInput {
+  sigmaCi: number; // intact UCS, MPa
+  gsi: number;
+  mi: number;
+  disturbanceFactor: number; // D, 0–1
+}
+
+export type StrengthModelInput =
+  | { type: "mohr-coulomb" }
+  | ({ type: "hoek-brown" } & HoekBrownInput);
 
 export interface StabilityResult {
   fsFellenius: number;
@@ -23,6 +42,10 @@ export interface StabilityResult {
   slices: number;
   interpretation: string;
   status: "stable" | "marginal" | "unstable";
+  strengthModel: "Mohr–Coulomb" | "Hoek–Brown";
+  equivalentCohesion: number;
+  equivalentFrictionAngle: number;
+  profile: { totalHeight: number; totalWidth: number; benchCount: number };
 }
 
 const DEG = Math.PI / 180;
@@ -50,11 +73,36 @@ interface Slice {
  * Geometry: slope rising from (0,0) at the toe to (H/tanβ, H) at the crest.
  * Ground surface: y=0 for x<=0; y = x·tanβ for 0<x<L; y=H for x>=L.
  */
-function groundY(x: number, H: number, beta: number): number {
-  const L = H / Math.tan(beta);
+function profileFromInput(input: StabilityInput): { points: Array<{ x: number; y: number }>; totalHeight: number; totalWidth: number; benchCount: number } {
+  const benches = input.benches?.length
+    ? input.benches
+    : [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }];
+  const points = [{ x: 0, y: 0 }];
+  let x = 0;
+  let y = 0;
+  for (const bench of benches) {
+    const angle = Math.max(10, Math.min(85, bench.angle)) * DEG;
+    x += bench.height / Math.tan(angle);
+    y += bench.height;
+    points.push({ x, y });
+    x += Math.max(0, bench.bermWidth);
+    points.push({ x, y });
+  }
+  return { points, totalHeight: y, totalWidth: x, benchCount: benches.length };
+}
+
+function groundY(x: number, profile: Array<{ x: number; y: number }>): number {
   if (x <= 0) return 0;
-  if (x >= L) return H;
-  return x * Math.tan(beta);
+  if (x >= profile[profile.length - 1].x) return profile[profile.length - 1].y;
+  for (let i = 1; i < profile.length; i++) {
+    const a = profile[i - 1];
+    const b = profile[i];
+    if (x <= b.x) {
+      const ratio = b.x === a.x ? 0 : (x - a.x) / (b.x - a.x);
+      return a.y + (b.y - a.y) * ratio;
+    }
+  }
+  return profile[profile.length - 1].y;
 }
 
 /**
@@ -68,8 +116,8 @@ function buildSlices(
   R: number,
   nSlices = 50,
 ): Slice[] | null {
-  const beta = input.slopeAngle * DEG;
-  const H = input.slopeHeight;
+  const profile = profileFromInput(input);
+  const H = profile.totalHeight;
 
   // Intersections of the circle with the ground surface (numerical search)
   // f(x) = groundY(x) - yCircle(x); circle: y = yc - sqrt(R² - (x-xc)²)
@@ -80,7 +128,7 @@ function buildSlices(
     const disc = R * R - dx * dx;
     if (disc <= 0) return NaN;
     const yCircle = yc - Math.sqrt(disc);
-    return groundY(x, H, beta) - yCircle;
+    return groundY(x, profile.points) - yCircle;
   };
 
   // Sweep to find the two intersections (entry and exit)
@@ -121,7 +169,7 @@ function buildSlices(
     const disc = R * R - dx * dx;
     if (disc <= 0) return null;
     const yBase = yc - Math.sqrt(disc);
-    const yTop = groundY(xm, H, beta);
+    const yTop = groundY(xm, profile.points);
     const h = yTop - yBase;
     if (h < 0) return null;
     const alpha = Math.asin(dx / R); // inclinaison de la base
@@ -172,14 +220,46 @@ function fsBishop(input: StabilityInput, slices: Slice[]): number {
   return FS;
 }
 
+function resolveStrength(input: StabilityInput): { cohesion: number; frictionAngle: number; label: StabilityResult["strengthModel"] } {
+  if (input.strengthModel?.type !== "hoek-brown") {
+    return { cohesion: input.cohesion, frictionAngle: input.frictionAngle, label: "Mohr–Coulomb" };
+  }
+  const hb = input.strengthModel;
+  const sigmaCi = Math.max(0.1, hb.sigmaCi);
+  const gsi = Math.max(0, Math.min(100, hb.gsi));
+  const mi = Math.max(1, hb.mi);
+  const D = Math.max(0, Math.min(1, hb.disturbanceFactor));
+  const mb = mi * Math.exp((gsi - 100) / (28 - 14 * D));
+  const s = Math.exp((gsi - 100) / (9 - 3 * D));
+  const a = 0.5 + (Math.exp(-gsi / 15) - Math.exp(-20 / 3)) / 6;
+  const sigma3 = Math.max(0.01, sigmaCi * 0.1);
+  const sigma1AtZero = sigmaCi * Math.pow(s, a);
+  const sigma1AtConfinement = sigma3 + sigmaCi * Math.pow(mb * sigma3 / sigmaCi + s, a);
+  const slope = Math.max(1, (sigma1AtConfinement - sigma1AtZero) / sigma3);
+  const sinPhi = Math.max(0, Math.min(0.98, (slope - 1) / (slope + 1)));
+  const phi = Math.asin(sinPhi);
+  const cohesion = Math.max(0, sigma1AtZero * (1 - sinPhi) / (2 * Math.cos(phi)));
+  return {
+    cohesion: Math.round(cohesion * 100) / 100,
+    frictionAngle: Math.round((phi / DEG) * 100) / 100,
+    label: "Hoek–Brown",
+  };
+}
+
 /**
  * Searches for the critical circle over a grid of centers and radii,
  * then computes Fellenius and Bishop FS on that circle.
  */
 export function computeStability(input: StabilityInput): StabilityResult {
-  const beta = input.slopeAngle * DEG;
-  const H = input.slopeHeight;
-  const L = H / Math.tan(beta);
+  const profile = profileFromInput(input);
+  const strength = resolveStrength(input);
+  const calculationInput: StabilityInput = {
+    ...input,
+    cohesion: strength.cohesion,
+    frictionAngle: strength.frictionAngle,
+  };
+  const H = profile.totalHeight;
+  const L = profile.totalWidth;
 
   let best: {
     fsF: number;
@@ -199,10 +279,10 @@ export function computeStability(input: StabilityInput): StabilityResult {
       const rMax = Math.hypot(xc, yc) * 1.4;
       for (let ir = 0; ir <= 6; ir++) {
         const R = rMin + ((rMax - rMin) * ir) / 6;
-        const slices = buildSlices(input, xc, yc, R);
+        const slices = buildSlices(calculationInput, xc, yc, R);
         if (!slices || slices.length < 10) continue;
-        const fsF = fsFellenius(input, slices);
-        const fsB = fsBishop(input, slices);
+        const fsF = fsFellenius(calculationInput, slices);
+        const fsB = fsBishop(calculationInput, slices);
         if (!Number.isFinite(fsF) || !Number.isFinite(fsB)) continue;
         if (fsF <= 0 || fsB <= 0) continue;
         if (!best || fsB < best.fsB) {
@@ -246,5 +326,9 @@ export function computeStability(input: StabilityInput): StabilityResult {
     slices: 50,
     interpretation,
     status,
+    strengthModel: strength.label,
+    equivalentCohesion: strength.cohesion,
+    equivalentFrictionAngle: strength.frictionAngle,
+    profile: { totalHeight: H, totalWidth: L, benchCount: profile.benchCount },
   };
 }

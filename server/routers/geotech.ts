@@ -35,6 +35,21 @@ export const stabilityRouter = router({
         slopeHeight: z.number().min(1).max(1000),
         slopeAngle: z.number().min(10).max(85),
         waterCondition: z.enum(["dry", "partial", "saturated"]),
+        benches: z.array(z.object({
+          height: z.number().positive().max(500),
+          angle: z.number().min(10).max(85),
+          bermWidth: z.number().min(0).max(200),
+        })).min(1).max(50).optional(),
+        strengthModel: z.discriminatedUnion("type", [
+          z.object({ type: z.literal("mohr-coulomb") }),
+          z.object({
+            type: z.literal("hoek-brown"),
+            sigmaCi: z.number().positive().max(1000),
+            gsi: z.number().min(0).max(100),
+            mi: z.number().min(1).max(50),
+            disturbanceFactor: z.number().min(0).max(1),
+          }),
+        ]).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -52,11 +67,17 @@ export const stabilityRouter = router({
         fsFellenius: result.fsFellenius,
         fsBishop: result.fsBishop,
         interpretation: result.interpretation,
-        details: {
+          details: {
           criticalCircle: result.criticalCircle,
           ru: result.ru,
           slices: result.slices,
           status: result.status,
+          strengthModel: result.strengthModel,
+          equivalentCohesion: result.equivalentCohesion,
+          equivalentFrictionAngle: result.equivalentFrictionAngle,
+          profile: result.profile,
+          benches: input.benches ?? [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }],
+          strengthInput: input.strengthModel ?? { type: "mohr-coulomb" },
         },
       });
       return { id, ...result };

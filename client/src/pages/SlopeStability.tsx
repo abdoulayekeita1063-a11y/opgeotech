@@ -22,7 +22,13 @@ type Result = {
   ru: number;
   interpretation: string;
   status: "stable" | "marginal" | "unstable";
+  strengthModel: "Mohr–Coulomb" | "Hoek–Brown";
+  equivalentCohesion: number;
+  equivalentFrictionAngle: number;
+  profile: { totalHeight: number; totalWidth: number; benchCount: number };
 };
+
+type Bench = { height: string; angle: string; bermWidth: string };
 
 const statusStyle: Record<Result["status"], string> = {
   stable: "bg-foreground text-background",
@@ -46,7 +52,13 @@ export default function SlopeStability() {
     slopeHeight: "15",
     slopeAngle: "45",
     waterCondition: "dry" as "dry" | "partial" | "saturated",
+    strengthModel: "mohr-coulomb" as "mohr-coulomb" | "hoek-brown",
+    sigmaCi: "100",
+    gsi: "60",
+    mi: "10",
+    disturbanceFactor: "0.7",
   });
+  const [benches, setBenches] = useState<Bench[]>([{ height: "15", angle: "45", bermWidth: "0" }]);
   const [result, setResult] = useState<Result | null>(null);
 
   const compute = trpc.stability.compute.useMutation({
@@ -74,6 +86,10 @@ export default function SlopeStability() {
       slopeHeight: Number(form.slopeHeight),
       slopeAngle: Number(form.slopeAngle),
       waterCondition: form.waterCondition,
+      benches: benches.map(bench => ({ height: Number(bench.height), angle: Number(bench.angle), bermWidth: Number(bench.bermWidth) })),
+      strengthModel: form.strengthModel === "hoek-brown"
+        ? { type: "hoek-brown" as const, sigmaCi: Number(form.sigmaCi), gsi: Number(form.gsi), mi: Number(form.mi), disturbanceFactor: Number(form.disturbanceFactor) }
+        : { type: "mohr-coulomb" as const },
     });
   };
 
@@ -87,7 +103,7 @@ export default function SlopeStability() {
       <ModuleHeader
         index="02"
         title="Slope Stability"
-        description="Limit-equilibrium factor of safety using the Fellenius (ordinary) and simplified Bishop methods of slices, with automatic critical circle search on a homogeneous slope."
+        description="Limit-equilibrium factor of safety for single or multi-bench slopes using Fellenius and simplified Bishop methods, with optional Hoek–Brown rock-mass strength."
       />
 
       <div className="grid grid-cols-12 gap-8">
@@ -149,6 +165,45 @@ export default function SlopeStability() {
                 </Select>
               </div>
             </div>
+            <div className="border border-foreground p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <SectionLabel>Slope benches</SectionLabel>
+                <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => setBenches(current => [...current, { height: "10", angle: "45", bermWidth: "8" }])}>
+                  Add bench
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Define the bench sequence from toe to crest. Each row includes bench height, face angle and berm width above it.</p>
+              {benches.map((bench, index) => (
+                <div key={index} className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 items-end">
+                  <span className="swiss-label text-[10px] pb-2">{String(index + 1).padStart(2, "0")}</span>
+                  <div><Label className="swiss-label text-[10px]">Height (m)</Label><Input type="number" min="0.1" value={bench.height} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, height: e.target.value } : row))} /></div>
+                  <div><Label className="swiss-label text-[10px]">Face angle (°)</Label><Input type="number" min="10" max="85" value={bench.angle} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, angle: e.target.value } : row))} /></div>
+                  <div><Label className="swiss-label text-[10px]">Berm width (m)</Label><Input type="number" min="0" value={bench.bermWidth} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, bermWidth: e.target.value } : row))} /></div>
+                  <Button type="button" variant="ghost" className="h-9 px-2" disabled={benches.length === 1} onClick={() => setBenches(current => current.filter((_, rowIndex) => rowIndex !== index))}>×</Button>
+                </div>
+              ))}
+            </div>
+            <div className="border border-foreground p-4 space-y-3">
+              <div>
+                <Label className="swiss-label mb-1.5 block">Rock strength model</Label>
+                <Select value={form.strengthModel} onValueChange={v => set("strengthModel")(v)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mohr-coulomb">Mohr–Coulomb — cohesion and friction angle</SelectItem>
+                    <SelectItem value="hoek-brown">Hoek–Brown — rock-mass properties</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.strengthModel === "hoek-brown" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label className="swiss-label mb-1.5 block">Intact UCS σci (MPa)</Label><Input type="number" value={form.sigmaCi} onChange={num("sigmaCi")} /></div>
+                  <div><Label className="swiss-label mb-1.5 block">GSI</Label><Input type="number" min="0" max="100" value={form.gsi} onChange={num("gsi")} /></div>
+                  <div><Label className="swiss-label mb-1.5 block">Material constant mi</Label><Input type="number" min="1" max="50" value={form.mi} onChange={num("mi")} /></div>
+                  <div><Label className="swiss-label mb-1.5 block">Disturbance factor D</Label><Input type="number" min="0" max="1" step="0.1" value={form.disturbanceFactor} onChange={num("disturbanceFactor")} /></div>
+                  <p className="col-span-2 text-xs text-muted-foreground">The Hoek–Brown parameters are converted to equivalent cohesion and friction angle at a representative confinement for the limit-equilibrium calculation.</p>
+                </div>
+              )}
+            </div>
             <Button
               onClick={submit}
               disabled={compute.isPending}
@@ -170,6 +225,7 @@ export default function SlopeStability() {
             <SlopeSchematic
               height={Number(form.slopeHeight) || 15}
               angle={Number(form.slopeAngle) || 45}
+              benches={benches.map(bench => ({ height: Number(bench.height) || 1, angle: Number(bench.angle) || 45, bermWidth: Number(bench.bermWidth) || 0 }))}
               circle={result?.criticalCircle ?? null}
             />
           </div>
@@ -210,6 +266,12 @@ export default function SlopeStability() {
                 className={`px-4 py-3 font-bold uppercase tracking-wider text-sm ${statusStyle[result.status]}`}
               >
                 Assessment: {statusText[result.status]}
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-foreground border border-foreground">
+                <div className="bg-background p-4"><div className="swiss-label mb-1">Strength model</div><div className="font-bold">{result.strengthModel}</div></div>
+                <div className="bg-background p-4"><div className="swiss-label mb-1">Bench count</div><div className="font-bold">{result.profile.benchCount}</div></div>
+                <div className="bg-background p-4"><div className="swiss-label mb-1">Equivalent cohesion</div><div className="swiss-number">{result.equivalentCohesion.toFixed(2)} kPa</div></div>
+                <div className="bg-background p-4"><div className="swiss-label mb-1">Equivalent friction angle</div><div className="swiss-number">{result.equivalentFrictionAngle.toFixed(2)}°</div></div>
               </div>
               <div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">
                 {result.interpretation}
@@ -252,15 +314,26 @@ export default function SlopeStability() {
 function SlopeSchematic({
   height,
   angle,
+  benches,
   circle,
 }: {
   height: number;
   angle: number;
+  benches: Array<{ height: number; angle: number; bermWidth: number }>;
   circle: { xc: number; yc: number; radius: number } | null;
 }) {
-  // World coordinates: toe at (0,0), crest at (L,H)
-  const H = Math.max(1, height);
-  const L = H / Math.tan((Math.max(10, Math.min(85, angle)) * Math.PI) / 180);
+  const profile = [{ x: 0, y: 0 }];
+  let px = 0;
+  let py = 0;
+  for (const bench of benches.length ? benches : [{ height, angle, bermWidth: 0 }]) {
+    px += bench.height / Math.tan((Math.max(10, Math.min(85, bench.angle)) * Math.PI) / 180);
+    py += bench.height;
+    profile.push({ x: px, y: py });
+    px += Math.max(0, bench.bermWidth);
+    profile.push({ x: px, y: py });
+  }
+  const H = Math.max(1, py);
+  const L = Math.max(1, px);
   const pad = Math.max(H, L) * 0.5;
   const xMin = -pad;
   const xMax = L + pad;
@@ -277,14 +350,14 @@ function SlopeSchematic({
     <svg viewBox={`0 0 ${W} ${Hpx}`} className="w-full">
       {/* ground */}
       <polyline
-        points={`${X(xMin)},${Y(0)} ${X(0)},${Y(0)} ${X(L)},${Y(H)} ${X(xMax)},${Y(H)}`}
+        points={`${X(xMin)},${Y(0)} ${profile.map(point => `${X(point.x)},${Y(point.y)}`).join(" ")} ${X(xMax)},${Y(H)}`}
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
       />
       {/* fill under slope */}
       <polygon
-        points={`${X(xMin)},${Y(0)} ${X(0)},${Y(0)} ${X(L)},${Y(H)} ${X(xMax)},${Y(H)} ${X(xMax)},${Hpx} ${X(xMin)},${Hpx}`}
+        points={`${X(xMin)},${Y(0)} ${profile.map(point => `${X(point.x)},${Y(point.y)}`).join(" ")} ${X(xMax)},${Y(H)} ${X(xMax)},${Hpx} ${X(xMin)},${Hpx}`}
         fill="currentColor"
         opacity="0.06"
       />
@@ -305,7 +378,7 @@ function SlopeSchematic({
         H = {height} m
       </text>
       <text x={X(L / 2) - 20} y={Y(0) + 16} fontSize="11" fontFamily="monospace" fill="currentColor">
-        β = {angle}°
+        {benches.length > 1 ? `${benches.length} benches` : `β = ${angle}°`}
       </text>
     </svg>
   );

@@ -86,6 +86,29 @@ describe("slope stability (Fellenius & Bishop)", () => {
     expect(Number.isFinite(r.fsFellenius)).toBe(true);
     expect(r.criticalCircle.radius).toBeGreaterThan(0);
   });
+
+  it("analyzes multiple benches with Hoek–Brown rock-mass properties", () => {
+    const r = computeStability({
+      cohesion: 25,
+      frictionAngle: 30,
+      unitWeight: 20,
+      slopeHeight: 15,
+      slopeAngle: 45,
+      waterCondition: "partial",
+      benches: [
+        { height: 10, angle: 60, bermWidth: 8 },
+        { height: 12, angle: 55, bermWidth: 10 },
+        { height: 8, angle: 50, bermWidth: 0 },
+      ],
+      strengthModel: { type: "hoek-brown", sigmaCi: 100, gsi: 60, mi: 10, disturbanceFactor: 0.7 },
+    });
+    expect(r.profile.benchCount).toBe(3);
+    expect(r.profile.totalHeight).toBe(30);
+    expect(r.strengthModel).toBe("Hoek–Brown");
+    expect(r.equivalentCohesion).toBeGreaterThan(0);
+    expect(r.equivalentFrictionAngle).toBeGreaterThan(0);
+    expect(Number.isFinite(r.fsBishop)).toBe(true);
+  });
 });
 
 describe("RMR classification", () => {
