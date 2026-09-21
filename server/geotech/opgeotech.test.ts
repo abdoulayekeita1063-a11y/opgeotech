@@ -46,6 +46,21 @@ describe("runKinematicAnalysis", () => {
     expect(r.summary.planarCount).toBe(1);
   });
 
+  it("uses mapped persistence to limit effective block height and weight", () => {
+    const full = runKinematicAnalysis({
+      ...slope,
+      structures: [{ id: "J-full", dip: 45, dipDirection: 95, persistence: 100, jrc: 8 }],
+    });
+    const partial = runKinematicAnalysis({
+      ...slope,
+      structures: [{ id: "J-partial", dip: 45, dipDirection: 95, persistence: 50, jrc: 8 }],
+    });
+    expect(full.planar[0].persistence).toBe(100);
+    expect(partial.planar[0].persistence).toBe(50);
+    expect(partial.planar[0].effectiveHeightM).toBeCloseTo(15, 5);
+    expect(partial.planar[0].blockWeightKn).toBeLessThan(full.planar[0].blockWeightKn!);
+  });
+
   it("rejects planar sliding when the plane dips into the face", () => {
     const r = runKinematicAnalysis({
       ...slope,

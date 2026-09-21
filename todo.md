@@ -249,6 +249,9 @@
 - [x] Rebuild the page as a two-column rating sheet matching the supplied inspection images
 - [x] Add the 0–10 Very low / Low / Medium / High / Very high / Extremely high risk scale with colours and actions
 - [x] Add Export completed inspection PDF with identifiers, observations, category ratings, overall rating and recommendations
+- [x] Add structure persistence (%) to Structural Mapping manual entry, CSV import, template and saved table
+- [x] Use persistence to scale planar, wedge and toppling effective block height, weight and FS calculations
+- [x] Display persistence and effective height in Kinematic results/exports with regression coverage
 
 ## Kinematic Structure Capacity (user request)
 - [x] Increase Kinematic Analysis selection and API validation from 50 to 100 structures

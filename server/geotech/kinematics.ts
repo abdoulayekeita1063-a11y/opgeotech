@@ -18,6 +18,7 @@ export interface StructureInput {
   id: string;
   dip: number; // 0-90
   dipDirection: number; // 0-360
+  persistence?: number | null; // discontinuity persistence, percent 0-100
   jrc?: number | null; // 0-20, default 8
   structureType?: string;
 }
@@ -46,6 +47,8 @@ export interface PlanarResult {
   dipDirection: number;
   feasible: boolean;
   reasons: string[];
+  persistence?: number;
+  effectiveHeightM?: number;
   blockWeightKn?: number; // per metre thickness
   strength?: BartonStrength;
   factorOfSafety?: number;
@@ -57,6 +60,8 @@ export interface WedgeResult {
   lineOfIntersection: { trend: number; plunge: number };
   feasible: boolean;
   reasons: string[];
+  persistence?: number;
+  effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: BartonStrength;
   factorOfSafety?: number;
@@ -70,6 +75,8 @@ export interface TopplingResult {
   feasible: boolean;
   mode: "flexural" | "none";
   reasons: string[];
+  persistence?: number;
+  effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: BartonStrength;
   factorOfSafety?: number;
@@ -151,6 +158,10 @@ function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function persistencePct(value: number | null | undefined): number {
+  return Math.max(0, Math.min(100, typeof value === "number" && Number.isFinite(value) ? value : 100));
+}
+
 /**
  * Barton-Bandis strength at a given normal stress.
  * tau = sn * tan(phi_b + JRC*log10(JCS/sn)); the dilation-corrected angle is
@@ -204,12 +215,13 @@ function analyzePlanar(s: StructureInput, inp: Required<KinematicInput>): Planar
     dip: s.dip,
     dipDirection: s.dipDirection,
     feasible,
+    persistence: persistencePct(s.persistence),
     reasons: feasible ? ["Daylighting plane within lateral limits, dip exceeds friction angle"] : reasons,
   };
   if (!feasible) return res;
 
-  // Block geometry: unit-thickness wedge between slope face and plane
-  const H = inp.slopeHeight;
+  // Block geometry: unit-thickness wedge between slope face and plane; persistence limits the block height.
+  const H = inp.slopeHeight * (res.persistence! / 100);
   const psiF = inp.slopeDip * DEG;
   const psiP = s.dip * DEG;
   // Area of sliding block cross-section (m2): 0.5*H^2*(cot(psiP) - cot(psiF))
@@ -228,6 +240,7 @@ function analyzePlanar(s: StructureInput, inp: Required<KinematicInput>): Planar
   const fs = driving > 0 ? resisting / driving : 99;
 
   res.blockWeightKn = r2(W);
+  res.effectiveHeightM = r2(H);
   res.strength = strength;
   res.factorOfSafety = r2(Math.min(fs, 99));
   res.status = fs >= 1.3 ? "Stable" : fs >= 1.0 ? "Marginal" : "Unstable";
@@ -257,6 +270,7 @@ function analyzeWedge(
     pair: [s1.id, s2.id],
     lineOfIntersection: li,
     feasible,
+    persistence: Math.min(persistencePct(s1.persistence), persistencePct(s2.persistence)),
     reasons: feasible
       ? ["Line of intersection daylights in the face and exceeds the friction angle"]
       : reasons,
@@ -264,7 +278,7 @@ function analyzeWedge(
   if (!feasible) return res;
 
   // Tetrahedral wedge approximation sliding on the line of intersection.
-  const H = inp.slopeHeight;
+  const H = inp.slopeHeight * (res.persistence! / 100);
   const psiI = li.plunge * DEG;
   const psiF = inp.slopeDip * DEG;
   const included = Math.max(angleDiff(s1.dipDirection, s2.dipDirection), 10) * DEG;
@@ -286,6 +300,7 @@ function analyzeWedge(
   const fs = driving > 0 ? resisting / driving : 99;
 
   res.blockWeightKn = r2(W);
+  res.effectiveHeightM = r2(H);
   res.strength = strength;
   res.factorOfSafety = r2(Math.min(fs, 99));
   res.status = fs >= 1.3 ? "Stable" : fs >= 1.0 ? "Marginal" : "Unstable";
@@ -318,6 +333,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
     dipDirection: s.dipDirection,
     feasible,
     mode: feasible ? "flexural" : "none",
+    persistence: persistencePct(s.persistence),
     reasons: feasible
       ? ["Steep plane dipping into the face satisfying the Goodman-Bray slip condition"]
       : reasons,
@@ -327,7 +343,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
   // Screening-level Goodman–Bray toppling check. Treat each column as a
   // unit-thickness block and compare resisting friction/cohesion moment with
   // the gravity overturning moment about the toe of the column.
-  const H = inp.slopeHeight;
+  const H = inp.slopeHeight * (result.persistence! / 100);
   const blockInclination = Math.max(90 - s.dip, 2) * DEG;
   const blockWidth = Math.max(H * Math.tan(blockInclination), 0.5);
   const W = 0.5 * H * blockWidth * inp.unitWeight;
@@ -340,6 +356,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
   const overturningMoment = W * Math.sin(blockInclination) * (H / 2);
   const fs = overturningMoment > 0 ? resistingMoment / overturningMoment : 99;
   result.blockWeightKn = r2(W);
+  result.effectiveHeightM = r2(H);
   result.strength = strength;
   result.factorOfSafety = r2(Math.min(fs, 99));
   result.status = fs >= 1.3 ? "Stable" : fs >= 1.0 ? "Marginal" : "Unstable";
