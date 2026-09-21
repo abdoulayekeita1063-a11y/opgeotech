@@ -60,7 +60,7 @@ export default function DailyInspections({ embedded = false }: { embedded?: bool
       {!embedded && <ModuleHeader
         index="03"
         title="Daily Inspections"
-        description="Enter field data — observations, anomalies, weather, inspected zones — and the AI writes a structured, professionally worded daily geotechnical inspection report."
+        description="Enter field data — observations, anomalies, weather, inspected zones — to produce a structured, professionally worded daily geotechnical inspection report."
       />}
       <div className="grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-5 space-y-4">
@@ -131,7 +131,7 @@ export default function DailyInspections({ embedded = false }: { embedded?: bool
           )}
           {create.isPending && (
             <div className="border border-foreground p-10 flex items-center justify-center gap-3 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> The AI is writing the report…
+              <Loader2 className="h-4 w-4 animate-spin" /> Writing the report…
             </div>
           )}
           {report && !create.isPending && (
