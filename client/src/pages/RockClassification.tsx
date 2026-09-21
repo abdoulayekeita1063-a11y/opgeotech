@@ -15,7 +15,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-type ClassResult = { score: number; rockClass: string; interpretation: string };
+type ClassResult = { score: number; rockClass: string; interpretation: string; governingJointSet?: 1 | 2 };
 
 function ResultBlock({ result, label }: { result: ClassResult | null; label: string }) {
   if (!result)
@@ -44,6 +44,12 @@ function ResultBlock({ result, label }: { result: ClassResult | null; label: str
       <div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">
         {result.interpretation}
       </div>
+      {result.governingJointSet && label === "SMR" && (
+        <div className="border border-foreground p-4 text-sm">
+          <span className="swiss-label mr-2">Governing joint set</span>
+          Joint Set {result.governingJointSet} — lower SMR score controls the classification.
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">Saved to archive.</p>
     </div>
   );
@@ -219,6 +225,8 @@ function SMRForm() {
   const [rmrBasic, setRmrBasic] = useState("69");
   const [jointDip, setJointDip] = useState("65");
   const [jointDipDirection, setJointDipDirection] = useState("120");
+  const [jointDip2, setJointDip2] = useState("45");
+  const [jointDipDirection2, setJointDipDirection2] = useState("220");
   const [slopeDip, setSlopeDip] = useState("70");
   const [slopeDipDirection, setSlopeDipDirection] = useState("120");
   const [excavationMethod, setExcavationMethod] = useState("production-blasting");
@@ -238,7 +246,7 @@ function SMRForm() {
         <>
           <SectionLabel>SMR Parameters (Romana)</SectionLabel>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            SMR = RMRbasic + (F1 × F2 × F3) + F4. Use the basic RMR before slope-orientation adjustment and the discontinuity/slope geometry for a planar assessment.
+            SMR = RMRbasic + (F1 × F2 × F3) + F4. Enter two joint sets; both are evaluated independently and the lower governing SMR controls the classification.
           </p>
           <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
           <div>
@@ -246,13 +254,31 @@ function SMRForm() {
             <Input type="number" value={rmrBasic} onChange={e => setRmrBasic(e.target.value)} />
           </div>
           <FieldGrid>
-            <div>
-              <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
-              <Input type="number" value={jointDip} onChange={e => setJointDip(e.target.value)} />
+            <div className="col-span-2 border-l-4 border-primary pl-4">
+              <div className="swiss-label mb-3">Joint Set 1</div>
+              <FieldGrid>
+                <div>
+                  <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
+                  <Input type="number" value={jointDip} onChange={e => setJointDip(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
+                  <Input type="number" value={jointDipDirection} onChange={e => setJointDipDirection(e.target.value)} />
+                </div>
+              </FieldGrid>
             </div>
-            <div>
-              <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
-              <Input type="number" value={jointDipDirection} onChange={e => setJointDipDirection(e.target.value)} />
+            <div className="col-span-2 border-l-4 border-muted-foreground pl-4">
+              <div className="swiss-label mb-3">Joint Set 2</div>
+              <FieldGrid>
+                <div>
+                  <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
+                  <Input type="number" value={jointDip2} onChange={e => setJointDip2(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
+                  <Input type="number" value={jointDipDirection2} onChange={e => setJointDipDirection2(e.target.value)} />
+                </div>
+              </FieldGrid>
             </div>
             <div>
               <Label className="swiss-label mb-1.5 block">Slope dip (°)</Label>
@@ -288,6 +314,8 @@ function SMRForm() {
                 rmrBasic: Number(rmrBasic),
                 jointDip: Number(jointDip),
                 jointDipDirection: Number(jointDipDirection),
+                jointDip2: Number(jointDip2),
+                jointDipDirection2: Number(jointDipDirection2),
                 slopeDip: Number(slopeDip),
                 slopeDipDirection: Number(slopeDipDirection),
                 excavationMethod: excavationMethod as "natural" | "pre-splitting" | "smooth-blasting" | "mechanical" | "production-blasting" | "poor-blasting",

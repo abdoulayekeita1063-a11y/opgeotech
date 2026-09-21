@@ -134,6 +134,8 @@ export const classificationRouter = router({
         rmrBasic: z.number().min(0).max(100),
         jointDip: z.number().min(0).max(90),
         jointDipDirection: z.number().min(0).max(360),
+        jointDip2: z.number().min(0).max(90),
+        jointDipDirection2: z.number().min(0).max(360),
         slopeDip: z.number().min(0).max(90),
         slopeDipDirection: z.number().min(0).max(360),
         excavationMethod: z.enum([

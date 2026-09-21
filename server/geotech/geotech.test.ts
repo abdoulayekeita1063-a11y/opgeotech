@@ -162,6 +162,24 @@ describe("SMR classification", () => {
     expect(result.score).toBeLessThan(35);
     expect(result.rockClass).toMatch(/Class IV|Class V/);
   });
+
+  it("evaluates two joint sets and uses the lower governing SMR", () => {
+    const result = computeSMR({
+      rmrBasic: 69,
+      jointDip: 65,
+      jointDipDirection: 120,
+      jointDip2: 80,
+      jointDipDirection2: 300,
+      slopeDip: 70,
+      slopeDipDirection: 120,
+      excavationMethod: "production-blasting",
+    });
+
+    expect(result.governingJointSet).toBe(2);
+    expect(result.breakdown.set1Score).toBeGreaterThan(result.breakdown.set2Score);
+    expect(result.score).toBe(result.breakdown.set2Score);
+    expect(result.interpretation).toContain("Joint Set 2 governs");
+  });
 });
 
 describe("Q-system classification", () => {

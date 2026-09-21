@@ -104,8 +104,10 @@ export type SMRExcavationMethod =
 
 export interface SMRInput {
   rmrBasic: number; // basic RMR before orientation adjustment (0-100)
-  jointDip: number; // discontinuity dip (degrees)
-  jointDipDirection: number; // discontinuity dip direction (degrees)
+  jointDip: number; // joint set 1 dip (degrees)
+  jointDipDirection: number; // joint set 1 dip direction (degrees)
+  jointDip2?: number; // joint set 2 dip (degrees)
+  jointDipDirection2?: number; // joint set 2 dip direction (degrees)
   slopeDip: number; // slope dip (degrees)
   slopeDipDirection: number; // slope dip direction (degrees)
   excavationMethod: SMRExcavationMethod;
@@ -117,6 +119,7 @@ export interface SMRResult {
   interpretation: string;
   breakdown: Record<string, number>;
   excavationMethod: string;
+  governingJointSet: 1 | 2;
 }
 
 function angularDifference(a: number, b: number): number {
@@ -158,13 +161,27 @@ const SMR_METHODS: Record<SMRExcavationMethod, { label: string; f4: number }> = 
 
 export function computeSMR(input: SMRInput): SMRResult {
   const rmrBasic = Math.max(0, Math.min(100, input.rmrBasic));
-  const jointDip = Math.max(0, Math.min(90, input.jointDip));
   const slopeDip = Math.max(0, Math.min(90, input.slopeDip));
-  const f1 = smrF1(angularDifference(input.jointDipDirection, input.slopeDipDirection));
-  const f2 = smrF2(jointDip);
-  const f3 = smrF3(jointDip, slopeDip);
+  const set1 = {
+    dip: Math.max(0, Math.min(90, input.jointDip)),
+    dipDirection: input.jointDipDirection,
+  };
+  const set2 = {
+    dip: Math.max(0, Math.min(90, input.jointDip2 ?? input.jointDip)),
+    dipDirection: input.jointDipDirection2 ?? input.jointDipDirection,
+  };
+  const calculateSet = (set: typeof set1) => {
+    const f1 = smrF1(angularDifference(set.dipDirection, input.slopeDipDirection));
+    const f2 = smrF2(set.dip);
+    const f3 = smrF3(set.dip, slopeDip);
+    return { f1, f2, f3, score: rmrBasic + f1 * f2 * f3 };
+  };
+  const set1Result = calculateSet(set1);
+  const set2Result = calculateSet(set2);
   const method = SMR_METHODS[input.excavationMethod];
-  const score = Math.max(0, Math.min(100, Math.round((rmrBasic + f1 * f2 * f3 + method.f4) * 10) / 10));
+  const governingJointSet: 1 | 2 = set2Result.score < set1Result.score ? 2 : 1;
+  const governing = governingJointSet === 1 ? set1Result : set2Result;
+  const score = Math.max(0, Math.min(100, Math.round((governing.score + method.f4) * 10) / 10));
 
   let rockClass: string;
   let advice: string;
@@ -189,8 +206,27 @@ export function computeSMR(input: SMRInput): SMRResult {
     score,
     rockClass,
     excavationMethod: method.label,
-    breakdown: { rmrBasic, f1, f2, f3, f4: method.f4 },
-    interpretation: `SMR = ${score}. ${rockClass}. ${advice} The calculation uses the Romana correction factors F1, F2, F3 and excavation-method factor F4 for a planar discontinuity assessment.`,
+    breakdown: {
+      rmrBasic,
+      f1: governing.f1,
+      f2: governing.f2,
+      f3: governing.f3,
+      f4: method.f4,
+      set1Dip: set1.dip,
+      set1DipDirection: set1.dipDirection,
+      set1F1: set1Result.f1,
+      set1F2: set1Result.f2,
+      set1F3: set1Result.f3,
+      set1Score: Math.round((set1Result.score + method.f4) * 10) / 10,
+      set2Dip: set2.dip,
+      set2DipDirection: set2.dipDirection,
+      set2F1: set2Result.f1,
+      set2F2: set2Result.f2,
+      set2F3: set2Result.f3,
+      set2Score: Math.round((set2Result.score + method.f4) * 10) / 10,
+    },
+    governingJointSet,
+    interpretation: `SMR = ${score}. ${rockClass}. ${advice} Two joint sets were evaluated with the Romana factors; Joint Set ${governingJointSet} governs because it produces the lower SMR score.`,
   };
 }
 
