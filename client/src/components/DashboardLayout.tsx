@@ -50,7 +50,7 @@ const menuItems = [
   { icon: Layers, label: "Rock Classification", path: "/classification" },
   { icon: Bomb, label: "Blast Assessment", path: "/blast" },
   { icon: Ruler, label: "Design Compliance", path: "/compliance" },
-  { icon: Drill, label: "Drillhole Planning", path: "/drillhole" },
+  { icon: Drill, label: "Drilling", path: "/drilling" },
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: ShieldAlert, label: "Wall Risk Classification", path: "/wall-risk-classification" },
@@ -141,7 +141,7 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const activeMenuItem = menuItems.find(item => location === item.path || location.startsWith(`${item.path}/`));
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -211,7 +211,7 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
               {menuItems.map(item => {
-                const isActive = location === item.path;
+                const isActive = location === item.path || location.startsWith(`${item.path}/`);
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton

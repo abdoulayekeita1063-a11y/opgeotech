@@ -98,7 +98,42 @@ export const drillholeRouter = router({
     .mutation(async ({ ctx, input }) => {
       await db.deleteDrillhole(input.id, ctx.user.id);
       return { success: true } as const;
+  }),
+});
+
+const loggingMetadata = z.record(z.string(), z.string().max(500));
+const loggingRow = z.record(z.string(), z.string().max(500));
+
+export const loggingRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const logs = await db.listDrillholeLogs(ctx.user.id);
+    return logs.map(log => ({
+      ...log,
+      metadata: log.metadataJson ? JSON.parse(log.metadataJson) : {},
+      rows: log.rowsJson ? JSON.parse(log.rowsJson) : [],
+    }));
+  }),
+  save: protectedProcedure
+    .input(z.object({
+      holeId: z.string().min(1).max(64),
+      metadata: loggingMetadata,
+      rows: z.array(loggingRow).max(500),
+      comments: z.string().max(5000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const id = await db.replaceDrillholeLog({
+        userId: ctx.user.id,
+        holeId: input.holeId,
+        metadataJson: JSON.stringify(input.metadata),
+        rowsJson: JSON.stringify(input.rows),
+        comments: input.comments ?? null,
+      });
+      return { id };
     }),
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await db.deleteDrillholeLog(input.id, ctx.user.id);
+    return { success: true } as const;
+  }),
 });
 
 // ── Structural Mapping module ────────────────────────────────────────

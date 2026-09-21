@@ -19,6 +19,8 @@ import KinematicAnalysis from "./pages/KinematicAnalysis";
 import Monitoring from "./pages/Monitoring";
 import WallRiskClassification from "./pages/WallRiskClassification";
 import Download from "./pages/Download";
+import Drilling from "./pages/Drilling";
+import LoggingData from "./pages/LoggingData";
 
 function LegacyRedirect({ to }: { to: string }) {
   useEffect(() => { window.location.replace(to); }, [to]);
@@ -36,7 +38,10 @@ function Router() {
         <Route path={"/inspections"} component={() => <LegacyRedirect to="/reporting#inspections" />} />
         <Route path={"/blast"} component={PostBlast} />
         <Route path={"/compliance"} component={DesignCompliance} />
-        <Route path={"/drillhole"} component={Drillhole} />
+        <Route path={"/drilling"} component={Drilling} />
+        <Route path={"/drilling/planning"} component={Drillhole} />
+        <Route path={"/drilling/logging"} component={LoggingData} />
+        <Route path={"/drillhole"} component={() => <LegacyRedirect to="/drilling/planning" />} />
         <Route path={"/mapping"} component={StructuralMapping} />
         <Route path={"/kinematics"} component={KinematicAnalysis} />
         <Route path={"/wall-risk-classification"} component={WallRiskClassification} />

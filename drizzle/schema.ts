@@ -171,6 +171,18 @@ export const drillholes = mysqlTable("drillholes", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/** Workbook-style geological and discontinuity logging data per drillhole. */
+export const drillholeLogs = mysqlTable("drillhole_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  holeId: varchar("holeId", { length: 64 }).notNull(),
+  metadataJson: longtext("metadataJson"),
+  rowsJson: longtext("rowsJson"),
+  comments: text("comments"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 /** Structural mapping measurements (discontinuities). */
 export const structures = mysqlTable("structures", {
   id: int("id").autoincrement().primaryKey(),
@@ -209,6 +221,7 @@ export const kinematicAnalyses = mysqlTable("kinematic_analyses", {
 
 export type DxfPlan = typeof dxfPlans.$inferSelect;
 export type Drillhole = typeof drillholes.$inferSelect;
+export type DrillholeLog = typeof drillholeLogs.$inferSelect;
 export type Structure = typeof structures.$inferSelect;
 export type KinematicAnalysis = typeof kinematicAnalyses.$inferSelect;
 

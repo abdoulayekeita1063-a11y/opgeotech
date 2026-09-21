@@ -9,7 +9,7 @@ import {
   inspectionRouter,
   stabilityRouter,
 } from "./routers/geotech";
-import { drillholeRouter, kinematicsRouter, mappingRouter, monitoringRouter } from "./routers/opgeotech";
+import { drillholeRouter, kinematicsRouter, loggingRouter, mappingRouter, monitoringRouter } from "./routers/opgeotech";
 import { reportingRouter } from "./routers/reporting";
 
 export const appRouter = router({
@@ -32,6 +32,7 @@ export const appRouter = router({
   blast: blastRouter,
   compliance: complianceRouter,
   drillhole: drillholeRouter,
+  logging: loggingRouter,
   mapping: mappingRouter,
   kinematics: kinematicsRouter,
   monitoring: monitoringRouter,

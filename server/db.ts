@@ -4,6 +4,7 @@ import {
   blastAssessments,
   complianceChecks,
   drillholes,
+  drillholeLogs,
   dxfPlans,
   failureRecords,
   inspectionReports,
@@ -292,6 +293,22 @@ export async function listDrillholes(userId: number) {
 export async function deleteDrillhole(id: number, userId: number) {
   const db = await requireDb();
   await db.delete(drillholes).where(and(eq(drillholes.id, id), eq(drillholes.userId, userId)));
+}
+
+// Drillhole logging workbooks
+export async function replaceDrillholeLog(values: typeof drillholeLogs.$inferInsert) {
+  const db = await requireDb();
+  await db.delete(drillholeLogs).where(and(eq(drillholeLogs.userId, values.userId), eq(drillholeLogs.holeId, values.holeId)));
+  const [res] = await db.insert(drillholeLogs).values(values);
+  return res.insertId;
+}
+export async function listDrillholeLogs(userId: number) {
+  const db = await requireDb();
+  return db.select().from(drillholeLogs).where(eq(drillholeLogs.userId, userId)).orderBy(desc(drillholeLogs.updatedAt));
+}
+export async function deleteDrillholeLog(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(drillholeLogs).where(and(eq(drillholeLogs.id, id), eq(drillholeLogs.userId, userId)));
 }
 
 // Structures
