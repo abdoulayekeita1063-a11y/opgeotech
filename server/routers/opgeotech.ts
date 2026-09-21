@@ -109,7 +109,7 @@ const structureShape = {
   structureType: z.string().max(64).default("joint"),
   dip: z.number().min(0).max(90),
   dipDirection: z.number().min(0).max(360),
-  persistence: z.number().min(0).max(100).nullish(),
+  persistence: z.number().min(0).max(10000).nullish(),
   alteration: z.string().max(128).optional(),
   infill: z.string().max(128).optional(),
   roughness: z.string().max(128).optional(),

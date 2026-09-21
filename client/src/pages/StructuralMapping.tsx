@@ -37,7 +37,7 @@ export default function StructuralMapping() {
   const [structureType, setStructureType] = useState("joint");
   const [dip, setDip] = useState("");
   const [dipDirection, setDipDirection] = useState("");
-  const [persistence, setPersistence] = useState("100");
+  const [persistence, setPersistence] = useState("");
   const [alteration, setAlteration] = useState("fresh");
   const [infill, setInfill] = useState("none");
   const [roughness, setRoughness] = useState("rough");
@@ -52,7 +52,7 @@ export default function StructuralMapping() {
       setStructureId("");
       setDip("");
       setDipDirection("");
-      setPersistence("100");
+      setPersistence("");
       setJrc("");
     },
     onError: e => toast.error(e.message),
@@ -77,7 +77,7 @@ export default function StructuralMapping() {
     if (!Number.isFinite(d) || d < 0 || d > 90) return toast.error("Dip must be 0–90°");
     if (!Number.isFinite(dd) || dd < 0 || dd > 360) return toast.error("Dip direction must be 0–360°");
     const p = parseFloat(persistence);
-    if (!Number.isFinite(p) || p < 0 || p > 100) return toast.error("Persistence must be 0–100%");
+    if (!Number.isFinite(p) || p <= 0 || p > 10000) return toast.error("Structure persistence must be greater than 0 and no more than 10,000 m");
     create.mutate({
       structureId: structureId || undefined,
       zone: zone || undefined,
@@ -109,7 +109,7 @@ export default function StructuralMapping() {
     const iInf = col(["infill", "filling"]);
     const iRou = col(["roughness"]);
     const iJrc = col(["jrc"]);
-    const iPersistence = col(["persistence", "persistencepct", "persistence_percent"]);
+    const iPersistence = col(["persistence", "persistence_m", "structure_length", "length_m"]);
 
     const rows = [];
     for (let i = 1; i < lines.length && rows.length < 2000; i++) {
@@ -124,7 +124,7 @@ export default function StructuralMapping() {
         structureType: iType >= 0 && c[iType] ? c[iType].toLowerCase() : "joint",
         dip: d,
         dipDirection: dd,
-        persistence: iPersistence >= 0 && c[iPersistence] ? parseFloat(c[iPersistence]) : 100,
+        persistence: iPersistence >= 0 && c[iPersistence] ? parseFloat(c[iPersistence]) : undefined,
         alteration: iAlt >= 0 ? c[iAlt] || undefined : undefined,
         infill: iInf >= 0 ? c[iInf] || undefined : undefined,
         roughness: iRou >= 0 ? c[iRou] || undefined : undefined,
@@ -137,9 +137,9 @@ export default function StructuralMapping() {
 
   const downloadTemplate = () => {
     const csv =
-      "id,zone,type,dip,dip_direction,persistence,alteration,infill,roughness,jrc\n" +
-      "J-001,East wall,joint,55,120,85,fresh,none,rough,12\n" +
-      "F-001,East wall,fault,70,265,60,moderately weathered,gouge,slickensided,2\n";
+      "id,zone,type,dip,dip_direction,persistence_m,alteration,infill,roughness,jrc\n" +
+      "J-001,East wall,joint,55,120,18,fresh,none,rough,12\n" +
+      "F-001,East wall,fault,70,265,24,moderately weathered,gouge,slickensided,2\n";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     a.download = "structures_template.csv";
@@ -171,7 +171,7 @@ export default function StructuralMapping() {
       <ModuleHeader
         index="07"
         title="Structural Mapping"
-        description="Record discontinuity data — dip, dip direction, alteration, infill, roughness — manually or by CSV import, and review the pole distribution on a stereonet."
+        description="Record discontinuity data — dip, dip direction, persistence length, alteration, infill and roughness — manually or by CSV import, and review the pole distribution on a stereonet."
       />
 
       <div className="grid grid-cols-12 gap-8">
@@ -243,13 +243,13 @@ export default function StructuralMapping() {
               />
             </div>
             <div>
-              <Label className="swiss-label text-[11px]">Persistence (%) *</Label>
+              <Label className="swiss-label text-[11px]">Persistence length (m) *</Label>
               <Input
                 type="number"
-                min="0"
-                max="100"
+                min="0.01"
+                max="10000"
                 className="rounded-none border-foreground mt-1"
-                placeholder="0–100"
+                placeholder="e.g. 18.5 m"
                 value={persistence}
                 onChange={e => setPersistence(e.target.value)}
               />
@@ -390,7 +390,7 @@ export default function StructuralMapping() {
                     <th className="px-2 py-1.5">Type</th>
                     <th className="px-2 py-1.5">Dip</th>
                     <th className="px-2 py-1.5">Dip dir</th>
-                    <th className="px-2 py-1.5">Persistence</th>
+                    <th className="px-2 py-1.5">Persistence (m)</th>
                     <th className="px-2 py-1.5">JRC</th>
                     <th className="px-2 py-1.5">Alteration</th>
                     <th className="px-2 py-1.5">Infill</th>
@@ -404,7 +404,7 @@ export default function StructuralMapping() {
                       <td className="px-2 py-1">{s.structureType}</td>
                       <td className="px-2 py-1">{s.dip}°</td>
                       <td className="px-2 py-1">{s.dipDirection}°</td>
-                      <td className="px-2 py-1">{s.persistence ?? 100}%</td>
+                      <td className="px-2 py-1">{s.persistence == null ? "—" : `${s.persistence} m`}</td>
                       <td className="px-2 py-1">{s.jrc ?? "—"}</td>
                       <td className="px-2 py-1">{s.alteration || "—"}</td>
                       <td className="px-2 py-1">{s.infill || "—"}</td>

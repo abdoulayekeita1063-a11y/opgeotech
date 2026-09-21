@@ -18,7 +18,7 @@ export interface StructureInput {
   id: string;
   dip: number; // 0-90
   dipDirection: number; // 0-360
-  persistence?: number | null; // discontinuity persistence, percent 0-100
+  persistence?: number | null; // discontinuity persistence length, metres
   jrc?: number | null; // 0-20, default 8
   structureType?: string;
 }
@@ -47,7 +47,7 @@ export interface PlanarResult {
   dipDirection: number;
   feasible: boolean;
   reasons: string[];
-  persistence?: number;
+  persistence?: number; // effective persistence length (m)
   effectiveHeightM?: number;
   blockWeightKn?: number; // per metre thickness
   strength?: BartonStrength;
@@ -60,7 +60,7 @@ export interface WedgeResult {
   lineOfIntersection: { trend: number; plunge: number };
   feasible: boolean;
   reasons: string[];
-  persistence?: number;
+  persistence?: number; // effective persistence length (m)
   effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: BartonStrength;
@@ -75,7 +75,7 @@ export interface TopplingResult {
   feasible: boolean;
   mode: "flexural" | "none";
   reasons: string[];
-  persistence?: number;
+  persistence?: number; // effective persistence length (m)
   effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: BartonStrength;
@@ -158,8 +158,9 @@ function r2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function persistencePct(value: number | null | undefined): number {
-  return Math.max(0, Math.min(100, typeof value === "number" && Number.isFinite(value) ? value : 100));
+function persistenceLength(value: number | null | undefined, slopeHeight: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return slopeHeight;
+  return Math.min(value, slopeHeight);
 }
 
 /**
@@ -215,13 +216,13 @@ function analyzePlanar(s: StructureInput, inp: Required<KinematicInput>): Planar
     dip: s.dip,
     dipDirection: s.dipDirection,
     feasible,
-    persistence: persistencePct(s.persistence),
+    persistence: persistenceLength(s.persistence, inp.slopeHeight),
     reasons: feasible ? ["Daylighting plane within lateral limits, dip exceeds friction angle"] : reasons,
   };
   if (!feasible) return res;
 
   // Block geometry: unit-thickness wedge between slope face and plane; persistence limits the block height.
-  const H = inp.slopeHeight * (res.persistence! / 100);
+  const H = res.persistence!;
   const psiF = inp.slopeDip * DEG;
   const psiP = s.dip * DEG;
   // Area of sliding block cross-section (m2): 0.5*H^2*(cot(psiP) - cot(psiF))
@@ -270,7 +271,10 @@ function analyzeWedge(
     pair: [s1.id, s2.id],
     lineOfIntersection: li,
     feasible,
-    persistence: Math.min(persistencePct(s1.persistence), persistencePct(s2.persistence)),
+    persistence: Math.min(
+      persistenceLength(s1.persistence, inp.slopeHeight),
+      persistenceLength(s2.persistence, inp.slopeHeight)
+    ),
     reasons: feasible
       ? ["Line of intersection daylights in the face and exceeds the friction angle"]
       : reasons,
@@ -278,7 +282,7 @@ function analyzeWedge(
   if (!feasible) return res;
 
   // Tetrahedral wedge approximation sliding on the line of intersection.
-  const H = inp.slopeHeight * (res.persistence! / 100);
+  const H = res.persistence!;
   const psiI = li.plunge * DEG;
   const psiF = inp.slopeDip * DEG;
   const included = Math.max(angleDiff(s1.dipDirection, s2.dipDirection), 10) * DEG;
@@ -333,7 +337,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
     dipDirection: s.dipDirection,
     feasible,
     mode: feasible ? "flexural" : "none",
-    persistence: persistencePct(s.persistence),
+    persistence: persistenceLength(s.persistence, inp.slopeHeight),
     reasons: feasible
       ? ["Steep plane dipping into the face satisfying the Goodman-Bray slip condition"]
       : reasons,
@@ -343,7 +347,7 @@ function analyzeToppling(s: StructureInput, inp: Required<KinematicInput>): Topp
   // Screening-level Goodman–Bray toppling check. Treat each column as a
   // unit-thickness block and compare resisting friction/cohesion moment with
   // the gravity overturning moment about the toe of the column.
-  const H = inp.slopeHeight * (result.persistence! / 100);
+  const H = result.persistence!;
   const blockInclination = Math.max(90 - s.dip, 2) * DEG;
   const blockWidth = Math.max(H * Math.tan(blockInclination), 0.5);
   const W = 0.5 * H * blockWidth * inp.unitWeight;

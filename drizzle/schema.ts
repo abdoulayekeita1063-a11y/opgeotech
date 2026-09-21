@@ -180,7 +180,7 @@ export const structures = mysqlTable("structures", {
   structureType: varchar("structureType", { length: 64 }).default("joint").notNull(),
   dip: double("dip").notNull(), // 0-90 degrees
   dipDirection: double("dipDirection").notNull(), // 0-360 degrees
-  persistence: double("persistence"), // discontinuity persistence, percent 0-100
+  persistence: double("persistence"), // discontinuity persistence length (m)
   alteration: varchar("alteration", { length: 128 }),
   infill: varchar("infill", { length: 128 }),
   roughness: varchar("roughness", { length: 128 }),

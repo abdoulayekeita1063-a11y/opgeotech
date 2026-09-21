@@ -101,7 +101,7 @@ function downloadKinematicCsv(result: KinResult, analysisTitle: string) {
     ["Flexural Toppling (All)", result.summary.topplingCritical, result.summary.topplingTotal, `${result.summary.topplingPercentage.toFixed(2)}%`],
     [],
     ["Detailed Results"],
-    ["Mode", "Identifier", "Feasible", "Persistence (%)", "Effective Height (m)", "Dip", "Dip Direction", "Trend", "Plunge", "Block Weight (kN)", "Cohesion (kPa)", "Friction Angle (°)", "Factor of Safety", "Status", "Reasons"],
+    ["Mode", "Identifier", "Feasible", "Persistence Length (m)", "Effective Height (m)", "Dip", "Dip Direction", "Trend", "Plunge", "Block Weight (kN)", "Cohesion (kPa)", "Friction Angle (°)", "Factor of Safety", "Status", "Reasons"],
   ];
 
   result.planar.forEach(item => rows.push(["Planar", item.structureId, item.feasible ? "Yes" : "No", item.persistence, item.effectiveHeightM, item.dip, item.dipDirection, "", "", item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
@@ -126,12 +126,12 @@ function exportKinematicPdf(result: KinResult, analysisTitle: string) {
     ["Flexural Toppling (All)", result.summary.topplingCritical, result.summary.topplingTotal, `${result.summary.topplingPercentage.toFixed(2)}%`],
   ];
   const detailRows = [
-    ...result.planar.map(item => ["Planar", item.structureId, item.feasible ? "Yes" : "No", `${item.persistence ?? 100}%`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
-    ...result.wedge.map(item => ["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", `${item.persistence ?? 100}%`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
-    ...result.toppling.map(item => ["Toppling", item.structureId, item.feasible ? "Yes" : "No", `${item.persistence ?? 100}%`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+    ...result.planar.map(item => ["Planar", item.structureId, item.feasible ? "Yes" : "No", item.persistence == null ? "Not specified" : `${item.persistence} m`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+    ...result.wedge.map(item => ["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", item.persistence == null ? "Not specified" : `${item.persistence} m`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
+    ...result.toppling.map(item => ["Toppling", item.structureId, item.feasible ? "Yes" : "No", item.persistence == null ? "Not specified" : `${item.persistence} m`, `${item.effectiveHeightM ?? "—"} m`, item.factorOfSafety ?? "—", item.status ?? "—", item.reasons.join(" | ")]),
   ];
   const table = (headers: string[], rows: unknown[][]) => `<table><thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(String(value ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  const body = `<h1>Kinematic Analysis</h1><p><strong>Analysis:</strong> ${escapeHtml(analysisTitle || "Untitled")}</p><h2>Mechanism Summary</h2>${table(["Mechanism", "Critical", "Total", "%"], summaryRows)}<p><strong>Critical FS:</strong> ${result.summary.criticalFs == null ? "—" : result.summary.criticalFs.toFixed(2)}</p><h2>Detailed Results</h2>${table(["Mode", "Identifier", "Feasible", "Persistence", "Effective height", "FS", "Status", "Assessment"], detailRows)}`;
+  const body = `<h1>Kinematic Analysis</h1><p><strong>Analysis:</strong> ${escapeHtml(analysisTitle || "Untitled")}</p><h2>Mechanism Summary</h2>${table(["Mechanism", "Critical", "Total", "%"], summaryRows)}<p><strong>Critical FS:</strong> ${result.summary.criticalFs == null ? "—" : result.summary.criticalFs.toFixed(2)}</p><h2>Detailed Results</h2>${table(["Mode", "Identifier", "Feasible", "Persistence length", "Effective height", "FS", "Status", "Assessment"], detailRows)}`;
   exportRecordAsPdf(analysisTitle || "Kinematic Analysis", body);
 }
 
@@ -273,7 +273,7 @@ export default function KinematicAnalysis() {
                   <span className="font-bold">{s.structureId || `#${s.id}`}</span>
                   <span>{s.structureType}</span>
                   <span className="text-muted-foreground">
-                    {s.dip}°/{s.dipDirection}° · persistence {s.persistence ?? 100}% · JRC {s.jrc ?? "—"}
+                    {s.dip}°/{s.dipDirection}° · persistence length {s.persistence == null ? "not specified" : `${s.persistence} m`} · JRC {s.jrc ?? "—"}
                   </span>
                 </label>
               ))}
