@@ -158,6 +158,8 @@ describe("parseDxf", () => {
     expect(g.entityCount).toBeGreaterThanOrEqual(2);
     expect(g.layers).toContain("BENCH");
     expect(g.layers).toContain("CREST");
+    expect(g.layerBounds.BENCH.entityCount).toBe(1);
+    expect(g.layerBounds.CREST.maxX).toBe(100);
     expect(g.bounds.maxX).toBe(100);
     expect(g.bounds.maxY).toBe(50);
   });

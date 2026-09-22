@@ -32,6 +32,7 @@ export interface DxfGeometry {
   points: DxfPoint[];
   texts: DxfText[];
   layers: string[];
+  layerBounds: Record<string, { minX: number; minY: number; maxX: number; maxY: number; entityCount: number }>;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   entityCount: number;
 }
@@ -50,6 +51,7 @@ export function parseDxf(content: string): DxfGeometry {
   const points: DxfPoint[] = [];
   const texts: DxfText[] = [];
   const layerSet = new Set<string>();
+  const layerBounds: Record<string, { minX: number; minY: number; maxX: number; maxY: number; entityCount: number }> = {};
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
@@ -62,6 +64,17 @@ export function parseDxf(content: string): DxfGeometry {
     if (y < minY) minY = y;
     if (x > maxX) maxX = x;
     if (y > maxY) maxY = y;
+  };
+  const registerLayer = (layer: string, coordinates: Array<[number, number]>) => {
+    const existing = layerBounds[layer] ?? { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, entityCount: 0 };
+    for (const [x, y] of coordinates) {
+      existing.minX = Math.min(existing.minX, x);
+      existing.minY = Math.min(existing.minY, y);
+      existing.maxX = Math.max(existing.maxX, x);
+      existing.maxY = Math.max(existing.maxY, y);
+    }
+    existing.entityCount += 1;
+    layerBounds[layer] = existing;
   };
 
   for (const ent of dxf.entities as any[]) {
@@ -76,6 +89,7 @@ export function parseDxf(content: string): DxfGeometry {
       if (verts.length >= 2) {
         if (ent.shape) verts.push(verts[0]); // closed polyline
         verts.forEach(([x, y]: [number, number]) => extend(x, y));
+        registerLayer(layer, verts);
         segments.push({ type: "polyline", layer, points: verts });
         layerSet.add(layer);
         count++;
@@ -88,6 +102,7 @@ export function parseDxf(content: string): DxfGeometry {
           [round(vs[1].x), round(vs[1].y)],
         ];
         pts.forEach(([x, y]) => extend(x, y));
+        registerLayer(layer, pts);
         segments.push({ type: "line", layer, points: pts });
         layerSet.add(layer);
         count++;
@@ -97,6 +112,7 @@ export function parseDxf(content: string): DxfGeometry {
       if (p && Number.isFinite(p.x)) {
         points.push({ type: "point", layer, x: round(p.x), y: round(p.y) });
         extend(p.x, p.y);
+        registerLayer(layer, [[p.x, p.y]]);
         layerSet.add(layer);
         count++;
       }
@@ -106,6 +122,7 @@ export function parseDxf(content: string): DxfGeometry {
         points.push({ type: "circle", layer, x: round(c.x), y: round(c.y), r: round(ent.radius || 1) });
         extend(c.x - (ent.radius || 0), c.y - (ent.radius || 0));
         extend(c.x + (ent.radius || 0), c.y + (ent.radius || 0));
+        registerLayer(layer, [[c.x - (ent.radius || 0), c.y - (ent.radius || 0)], [c.x + (ent.radius || 0), c.y + (ent.radius || 0)]]);
         layerSet.add(layer);
         count++;
       }
@@ -122,6 +139,7 @@ export function parseDxf(content: string): DxfGeometry {
           height: ent.textHeight ? round(ent.textHeight) : undefined,
         });
         extend(p.x, p.y);
+        registerLayer(layer, [[p.x, p.y]]);
         layerSet.add(layer);
         count++;
       }
@@ -130,6 +148,7 @@ export function parseDxf(content: string): DxfGeometry {
       if (p && Number.isFinite(p.x)) {
         points.push({ type: "insert", layer, x: round(p.x), y: round(p.y) });
         extend(p.x, p.y);
+        registerLayer(layer, [[p.x, p.y]]);
         layerSet.add(layer);
         count++;
       }
@@ -145,6 +164,7 @@ export function parseDxf(content: string): DxfGeometry {
     points,
     texts,
     layers: Array.from(layerSet).sort(),
+    layerBounds,
     bounds: { minX: round(minX), minY: round(minY), maxX: round(maxX), maxY: round(maxY) },
     entityCount: count,
   };

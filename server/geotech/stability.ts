@@ -21,6 +21,7 @@ export interface BenchInput {
   height: number;
   angle: number;
   bermWidth: number;
+  materialLayer?: string;
   strengthModel?: StrengthModelInput;
 }
 

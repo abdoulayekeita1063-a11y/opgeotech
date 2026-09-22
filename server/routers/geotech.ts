@@ -39,6 +39,7 @@ export const stabilityRouter = router({
           height: z.number().positive().max(500),
           angle: z.number().min(10).max(85),
           bermWidth: z.number().min(0).max(200),
+          materialLayer: z.string().max(255).optional(),
           strengthModel: z.discriminatedUnion("type", [
             z.object({ type: z.literal("mohr-coulomb") }),
             z.object({
