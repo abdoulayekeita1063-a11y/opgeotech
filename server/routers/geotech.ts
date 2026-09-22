@@ -39,6 +39,16 @@ export const stabilityRouter = router({
           height: z.number().positive().max(500),
           angle: z.number().min(10).max(85),
           bermWidth: z.number().min(0).max(200),
+          strengthModel: z.discriminatedUnion("type", [
+            z.object({ type: z.literal("mohr-coulomb") }),
+            z.object({
+              type: z.literal("hoek-brown"),
+              sigmaCi: z.number().positive().max(1000),
+              gsi: z.number().min(0).max(100),
+              mi: z.number().min(1).max(50),
+              disturbanceFactor: z.number().min(0).max(1),
+            }),
+          ]).optional(),
         })).min(1).max(50).optional(),
         strengthModel: z.discriminatedUnion("type", [
           z.object({ type: z.literal("mohr-coulomb") }),
@@ -78,6 +88,7 @@ export const stabilityRouter = router({
           profile: result.profile,
           benches: input.benches ?? [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }],
           strengthInput: input.strengthModel ?? { type: "mohr-coulomb" },
+          benchStrengths: result.benchStrengths,
         },
       });
       return { id, ...result };

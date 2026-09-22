@@ -109,6 +109,25 @@ describe("slope stability (Fellenius & Bishop)", () => {
     expect(r.equivalentFrictionAngle).toBeGreaterThan(0);
     expect(Number.isFinite(r.fsBishop)).toBe(true);
   });
+
+  it("uses distinct strength properties for each bench", () => {
+    const r = computeStability({
+      cohesion: 20,
+      frictionAngle: 28,
+      unitWeight: 20,
+      slopeHeight: 15,
+      slopeAngle: 45,
+      waterCondition: "dry",
+      benches: [
+        { height: 12, angle: 55, bermWidth: 6, strengthModel: { type: "hoek-brown", sigmaCi: 80, gsi: 45, mi: 8, disturbanceFactor: 0.7 } },
+        { height: 12, angle: 50, bermWidth: 0, strengthModel: { type: "hoek-brown", sigmaCi: 150, gsi: 70, mi: 12, disturbanceFactor: 0.2 } },
+      ],
+    });
+    expect(r.strengthModel).toBe("Hoek–Brown");
+    expect(r.benchStrengths).toHaveLength(2);
+    expect(r.benchStrengths[0].cohesion).not.toBe(r.benchStrengths[1].cohesion);
+    expect(r.benchStrengths[0].frictionAngle).not.toBe(r.benchStrengths[1].frictionAngle);
+  });
 });
 
 describe("RMR classification", () => {

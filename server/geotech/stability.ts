@@ -21,6 +21,7 @@ export interface BenchInput {
   height: number;
   angle: number;
   bermWidth: number;
+  strengthModel?: StrengthModelInput;
 }
 
 export interface HoekBrownInput {
@@ -42,13 +43,20 @@ export interface StabilityResult {
   slices: number;
   interpretation: string;
   status: "stable" | "marginal" | "unstable";
-  strengthModel: "Mohr–Coulomb" | "Hoek–Brown";
+  strengthModel: "Mohr–Coulomb" | "Hoek–Brown" | "Mixed";
   equivalentCohesion: number;
   equivalentFrictionAngle: number;
   profile: { totalHeight: number; totalWidth: number; benchCount: number };
+  benchStrengths: Array<{ model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
 }
 
 const DEG = Math.PI / 180;
+
+type ResolvedStrength = {
+  cohesion: number;
+  frictionAngle: number;
+  label: "Mohr–Coulomb" | "Hoek–Brown";
+};
 
 /** Pore pressure ratio ru based on groundwater condition */
 function ruFromWater(w: StabilityInput["waterCondition"]): number {
@@ -67,28 +75,43 @@ interface Slice {
   alpha: number; // base inclination (rad)
   baseLength: number; // l (m)
   width: number; // b (m)
+  cohesion: number;
+  frictionAngle: number;
 }
 
 /**
  * Geometry: slope rising from (0,0) at the toe to (H/tanβ, H) at the crest.
  * Ground surface: y=0 for x<=0; y = x·tanβ for 0<x<L; y=H for x>=L.
  */
-function profileFromInput(input: StabilityInput): { points: Array<{ x: number; y: number }>; totalHeight: number; totalWidth: number; benchCount: number } {
+function profileFromInput(input: StabilityInput): {
+  points: Array<{ x: number; y: number }>;
+  totalHeight: number;
+  totalWidth: number;
+  benchCount: number;
+  benchRanges: Array<{ startX: number; endX: number; strength: ResolvedStrength }>;
+} {
   const benches = input.benches?.length
     ? input.benches
     : [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }];
   const points = [{ x: 0, y: 0 }];
+  const benchRanges: Array<{ startX: number; endX: number; strength: ResolvedStrength }> = [];
   let x = 0;
   let y = 0;
   for (const bench of benches) {
+    const startX = x;
     const angle = Math.max(10, Math.min(85, bench.angle)) * DEG;
     x += bench.height / Math.tan(angle);
     y += bench.height;
     points.push({ x, y });
     x += Math.max(0, bench.bermWidth);
     points.push({ x, y });
+    benchRanges.push({
+      startX,
+      endX: x,
+      strength: resolveStrength({ ...input, strengthModel: bench.strengthModel ?? input.strengthModel }),
+    });
   }
-  return { points, totalHeight: y, totalWidth: x, benchCount: benches.length };
+  return { points, totalHeight: y, totalWidth: x, benchCount: benches.length, benchRanges };
 }
 
 function groundY(x: number, profile: Array<{ x: number; y: number }>): number {
@@ -174,19 +197,28 @@ function buildSlices(
     if (h < 0) return null;
     const alpha = Math.asin(dx / R); // inclinaison de la base
     const W = input.unitWeight * h * b;
-    slices.push({ weight: W, alpha, baseLength: b / Math.cos(alpha), width: b });
+    const benchRange = profile.benchRanges.find(range => xm >= range.startX && xm <= range.endX);
+    const strength = benchRange?.strength ?? resolveStrength(input);
+    slices.push({
+      weight: W,
+      alpha,
+      baseLength: b / Math.cos(alpha),
+      width: b,
+      cohesion: strength.cohesion,
+      frictionAngle: strength.frictionAngle,
+    });
   }
   return slices;
 }
 
 /** FS by the Fellenius method (ordinary method of slices), with ru */
 function fsFellenius(input: StabilityInput, slices: Slice[]): number {
-  const phi = input.frictionAngle * DEG;
-  const c = input.cohesion;
   const ru = ruFromWater(input.waterCondition);
   let num = 0;
   let den = 0;
   for (const s of slices) {
+    const phi = s.frictionAngle * DEG;
+    const c = s.cohesion;
     const N = s.weight * Math.cos(s.alpha);
     const U = ru * s.weight; // simplified pore force u·l ≈ ru·W
     num += c * s.baseLength + (N - U * Math.cos(s.alpha)) * Math.tan(phi);
@@ -198,14 +230,14 @@ function fsFellenius(input: StabilityInput, slices: Slice[]): number {
 
 /** FS by the simplified Bishop method (iterative), with ru */
 function fsBishop(input: StabilityInput, slices: Slice[]): number {
-  const phi = input.frictionAngle * DEG;
-  const c = input.cohesion;
   const ru = ruFromWater(input.waterCondition);
   let FS = 1.2;
   for (let iter = 0; iter < 100; iter++) {
     let num = 0;
     let den = 0;
     for (const s of slices) {
+      const phi = s.frictionAngle * DEG;
+      const c = s.cohesion;
       const mAlpha =
         Math.cos(s.alpha) + (Math.sin(s.alpha) * Math.tan(phi)) / FS;
       num +=
@@ -220,7 +252,7 @@ function fsBishop(input: StabilityInput, slices: Slice[]): number {
   return FS;
 }
 
-function resolveStrength(input: StabilityInput): { cohesion: number; frictionAngle: number; label: StabilityResult["strengthModel"] } {
+function resolveStrength(input: StabilityInput): ResolvedStrength {
   if (input.strengthModel?.type !== "hoek-brown") {
     return { cohesion: input.cohesion, frictionAngle: input.frictionAngle, label: "Mohr–Coulomb" };
   }
@@ -314,6 +346,22 @@ export function computeStability(input: StabilityInput): StabilityResult {
     interpretation = `The Bishop factor of safety (FS = ${fsB.toFixed(2)}) is below 1.00: the slope is theoretically UNSTABLE under the analyzed conditions. Immediate measures are required: access restriction, re-profiling, emergency drainage, and continuous monitoring. The Fellenius method gives FS = ${fsF.toFixed(2)}.`;
   }
 
+  const benchStrengths = profile.benchRanges.map(range => ({
+    model: range.strength.label,
+    cohesion: range.strength.cohesion,
+    frictionAngle: range.strength.frictionAngle,
+  }));
+  const models = new Set(benchStrengths.map(bench => bench.model));
+  const resultStrengthModel: StabilityResult["strengthModel"] = models.size > 1
+    ? "Mixed"
+    : (benchStrengths[0]?.model ?? strength.label);
+  const averageCohesion = benchStrengths.length
+    ? benchStrengths.reduce((sum, bench) => sum + bench.cohesion, 0) / benchStrengths.length
+    : strength.cohesion;
+  const averageFrictionAngle = benchStrengths.length
+    ? benchStrengths.reduce((sum, bench) => sum + bench.frictionAngle, 0) / benchStrengths.length
+    : strength.frictionAngle;
+
   return {
     fsFellenius: fsF,
     fsBishop: fsB,
@@ -326,9 +374,10 @@ export function computeStability(input: StabilityInput): StabilityResult {
     slices: 50,
     interpretation,
     status,
-    strengthModel: strength.label,
-    equivalentCohesion: strength.cohesion,
-    equivalentFrictionAngle: strength.frictionAngle,
+    strengthModel: resultStrengthModel,
+    equivalentCohesion: Math.round(averageCohesion * 100) / 100,
+    equivalentFrictionAngle: Math.round(averageFrictionAngle * 100) / 100,
     profile: { totalHeight: H, totalWidth: L, benchCount: profile.benchCount },
+    benchStrengths,
   };
 }

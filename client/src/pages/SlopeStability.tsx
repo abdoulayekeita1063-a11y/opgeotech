@@ -22,13 +22,23 @@ type Result = {
   ru: number;
   interpretation: string;
   status: "stable" | "marginal" | "unstable";
-  strengthModel: "Mohr–Coulomb" | "Hoek–Brown";
+  strengthModel: "Mohr–Coulomb" | "Hoek–Brown" | "Mixed";
   equivalentCohesion: number;
   equivalentFrictionAngle: number;
   profile: { totalHeight: number; totalWidth: number; benchCount: number };
+  benchStrengths: Array<{ model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
 };
 
-type Bench = { height: string; angle: string; bermWidth: string };
+type Bench = {
+  height: string;
+  angle: string;
+  bermWidth: string;
+  strengthModel: "mohr-coulomb" | "hoek-brown";
+  sigmaCi: string;
+  gsi: string;
+  mi: string;
+  disturbanceFactor: string;
+};
 
 const statusStyle: Record<Result["status"], string> = {
   stable: "bg-foreground text-background",
@@ -52,13 +62,8 @@ export default function SlopeStability() {
     slopeHeight: "15",
     slopeAngle: "45",
     waterCondition: "dry" as "dry" | "partial" | "saturated",
-    strengthModel: "mohr-coulomb" as "mohr-coulomb" | "hoek-brown",
-    sigmaCi: "100",
-    gsi: "60",
-    mi: "10",
-    disturbanceFactor: "0.7",
   });
-  const [benches, setBenches] = useState<Bench[]>([{ height: "15", angle: "45", bermWidth: "0" }]);
+  const [benches, setBenches] = useState<Bench[]>([{ height: "15", angle: "45", bermWidth: "0", strengthModel: "mohr-coulomb", sigmaCi: "100", gsi: "60", mi: "10", disturbanceFactor: "0.7" }]);
   const [result, setResult] = useState<Result | null>(null);
 
   const compute = trpc.stability.compute.useMutation({
@@ -86,10 +91,14 @@ export default function SlopeStability() {
       slopeHeight: Number(form.slopeHeight),
       slopeAngle: Number(form.slopeAngle),
       waterCondition: form.waterCondition,
-      benches: benches.map(bench => ({ height: Number(bench.height), angle: Number(bench.angle), bermWidth: Number(bench.bermWidth) })),
-      strengthModel: form.strengthModel === "hoek-brown"
-        ? { type: "hoek-brown" as const, sigmaCi: Number(form.sigmaCi), gsi: Number(form.gsi), mi: Number(form.mi), disturbanceFactor: Number(form.disturbanceFactor) }
-        : { type: "mohr-coulomb" as const },
+      benches: benches.map(bench => ({
+        height: Number(bench.height),
+        angle: Number(bench.angle),
+        bermWidth: Number(bench.bermWidth),
+        strengthModel: bench.strengthModel === "hoek-brown"
+          ? { type: "hoek-brown" as const, sigmaCi: Number(bench.sigmaCi), gsi: Number(bench.gsi), mi: Number(bench.mi), disturbanceFactor: Number(bench.disturbanceFactor) }
+          : { type: "mohr-coulomb" as const },
+      })),
     });
   };
 
@@ -168,41 +177,23 @@ export default function SlopeStability() {
             <div className="border border-foreground p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <SectionLabel>Slope benches</SectionLabel>
-                <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => setBenches(current => [...current, { height: "10", angle: "45", bermWidth: "8" }])}>
+                <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => setBenches(current => [...current, { height: "10", angle: "45", bermWidth: "8", strengthModel: "mohr-coulomb", sigmaCi: "100", gsi: "60", mi: "10", disturbanceFactor: "0.7" }])}>
                   Add bench
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Define the bench sequence from toe to crest. Each row includes bench height, face angle and berm width above it.</p>
+              <p className="text-xs text-muted-foreground">Define the bench sequence from toe to crest. Each bench can use its own Hoek–Brown rock-mass properties.</p>
               {benches.map((bench, index) => (
-                <div key={index} className="grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-2 items-end">
-                  <span className="swiss-label text-[10px] pb-2">{String(index + 1).padStart(2, "0")}</span>
-                  <div><Label className="swiss-label text-[10px]">Height (m)</Label><Input type="number" min="0.1" value={bench.height} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, height: e.target.value } : row))} /></div>
-                  <div><Label className="swiss-label text-[10px]">Face angle (°)</Label><Input type="number" min="10" max="85" value={bench.angle} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, angle: e.target.value } : row))} /></div>
-                  <div><Label className="swiss-label text-[10px]">Berm width (m)</Label><Input type="number" min="0" value={bench.bermWidth} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, bermWidth: e.target.value } : row))} /></div>
-                  <Button type="button" variant="ghost" className="h-9 px-2" disabled={benches.length === 1} onClick={() => setBenches(current => current.filter((_, rowIndex) => rowIndex !== index))}>×</Button>
+                <div key={index} className="border-t border-muted-foreground/40 pt-3 space-y-2">
+                  <div className="flex items-center justify-between"><span className="swiss-label">Bench {String(index + 1).padStart(2, "0")}</span><Button type="button" variant="ghost" className="h-7 px-2" disabled={benches.length === 1} onClick={() => setBenches(current => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div><Label className="swiss-label text-[10px]">Height (m)</Label><Input type="number" min="0.1" value={bench.height} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, height: e.target.value } : row))} /></div>
+                    <div><Label className="swiss-label text-[10px]">Face angle (°)</Label><Input type="number" min="10" max="85" value={bench.angle} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, angle: e.target.value } : row))} /></div>
+                    <div><Label className="swiss-label text-[10px]">Berm width (m)</Label><Input type="number" min="0" value={bench.bermWidth} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, bermWidth: e.target.value } : row))} /></div>
+                  </div>
+                  <div><Label className="swiss-label text-[10px]">Strength model</Label><Select value={bench.strengthModel} onValueChange={value => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, strengthModel: value as Bench["strengthModel"] } : row))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="mohr-coulomb">Mohr–Coulomb</SelectItem><SelectItem value="hoek-brown">Hoek–Brown</SelectItem></SelectContent></Select></div>
+                  {bench.strengthModel === "hoek-brown" && <div className="grid grid-cols-2 gap-2"><div><Label className="swiss-label text-[10px]">UCS σci (MPa)</Label><Input type="number" min="0.1" value={bench.sigmaCi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, sigmaCi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">GSI</Label><Input type="number" min="0" max="100" value={bench.gsi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, gsi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">mi</Label><Input type="number" min="1" max="50" value={bench.mi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, mi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">Disturbance D</Label><Input type="number" min="0" max="1" step="0.1" value={bench.disturbanceFactor} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, disturbanceFactor: e.target.value } : row))} /></div></div>}
                 </div>
               ))}
-            </div>
-            <div className="border border-foreground p-4 space-y-3">
-              <div>
-                <Label className="swiss-label mb-1.5 block">Rock strength model</Label>
-                <Select value={form.strengthModel} onValueChange={v => set("strengthModel")(v)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mohr-coulomb">Mohr–Coulomb — cohesion and friction angle</SelectItem>
-                    <SelectItem value="hoek-brown">Hoek–Brown — rock-mass properties</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.strengthModel === "hoek-brown" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Label className="swiss-label mb-1.5 block">Intact UCS σci (MPa)</Label><Input type="number" value={form.sigmaCi} onChange={num("sigmaCi")} /></div>
-                  <div><Label className="swiss-label mb-1.5 block">GSI</Label><Input type="number" min="0" max="100" value={form.gsi} onChange={num("gsi")} /></div>
-                  <div><Label className="swiss-label mb-1.5 block">Material constant mi</Label><Input type="number" min="1" max="50" value={form.mi} onChange={num("mi")} /></div>
-                  <div><Label className="swiss-label mb-1.5 block">Disturbance factor D</Label><Input type="number" min="0" max="1" step="0.1" value={form.disturbanceFactor} onChange={num("disturbanceFactor")} /></div>
-                  <p className="col-span-2 text-xs text-muted-foreground">The Hoek–Brown parameters are converted to equivalent cohesion and friction angle at a representative confinement for the limit-equilibrium calculation.</p>
-                </div>
-              )}
             </div>
             <Button
               onClick={submit}
@@ -272,6 +263,14 @@ export default function SlopeStability() {
                 <div className="bg-background p-4"><div className="swiss-label mb-1">Bench count</div><div className="font-bold">{result.profile.benchCount}</div></div>
                 <div className="bg-background p-4"><div className="swiss-label mb-1">Equivalent cohesion</div><div className="swiss-number">{result.equivalentCohesion.toFixed(2)} kPa</div></div>
                 <div className="bg-background p-4"><div className="swiss-label mb-1">Equivalent friction angle</div><div className="swiss-number">{result.equivalentFrictionAngle.toFixed(2)}°</div></div>
+              </div>
+              <div className="border border-foreground">
+                <div className="px-4 py-3 border-b border-foreground swiss-label">Per-bench rock strength summary</div>
+                <div className="divide-y divide-foreground/30">
+                  {result.benchStrengths.map((bench, index) => (
+                    <div key={index} className="grid grid-cols-3 gap-3 px-4 py-2 text-sm"><span className="swiss-label">Bench {index + 1}</span><span>{bench.model}</span><span className="swiss-number text-right">c′ {bench.cohesion.toFixed(2)} kPa · φ′ {bench.frictionAngle.toFixed(2)}°</span></div>
+                  ))}
+                </div>
               </div>
               <div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">
                 {result.interpretation}
