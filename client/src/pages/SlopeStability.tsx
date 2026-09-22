@@ -26,7 +26,7 @@ type Result = {
   equivalentCohesion: number;
   equivalentFrictionAngle: number;
   profile: { totalHeight: number; totalWidth: number; benchCount: number };
-  benchStrengths: Array<{ model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
+  benchStrengths: Array<{ materialLayer?: string; model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
 };
 
 type Bench = {
@@ -42,6 +42,12 @@ type Bench = {
 };
 
 type MaterialLayer = { name: string; bounds: { minX: number; minY: number; maxX: number; maxY: number; entityCount: number } };
+type DxfGeometry = {
+  segments: Array<{ type: "polyline" | "line"; layer: string; points: [number, number][] }>;
+  points: Array<{ type: "point" | "circle" | "insert"; layer: string; x: number; y: number; r?: number }>;
+  texts: Array<{ type: "text"; layer: string; x: number; y: number; text: string }>;
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
+};
 
 const statusStyle: Record<Result["status"], string> = {
   stable: "bg-foreground text-background",
@@ -54,6 +60,27 @@ const statusText: Record<Result["status"], string> = {
   marginal: "Marginal",
   unstable: "Unstable",
 };
+
+const layerColor = (layer: string) => {
+  const palette = ["#d90429", "#1d4ed8", "#15803d", "#b45309", "#7c3aed", "#0891b2", "#111827"];
+  return palette[Math.abs(layer.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palette.length];
+};
+
+function DxfDrawing({ geometry, sectionOnly = false }: { geometry: DxfGeometry; sectionOnly?: boolean }) {
+  const { minX, minY, maxX, maxY } = geometry.bounds;
+  const width = Math.max(maxX - minX, 1);
+  const height = Math.max(maxY - minY, 1);
+  const pad = Math.max(width, height) * 0.06;
+  const viewBox = `${minX - pad} ${-(maxY + pad)} ${width + pad * 2} ${height + pad * 2}`;
+  const segments = sectionOnly ? geometry.segments.filter(segment => segment.type === "polyline") : geometry.segments;
+  return <svg viewBox={viewBox} className="w-full h-72 bg-white border border-foreground" role="img" aria-label={sectionOnly ? "DXF slope section" : "DXF drawing preview"}>
+    <g transform="scale(1,-1)">
+      {segments.map((segment, index) => <polyline key={`${segment.layer}-${index}`} points={segment.points.map(([x, y]) => `${x},${y}`).join(" ")} fill={sectionOnly && segment.points.length > 2 ? `${layerColor(segment.layer)}18` : "none"} stroke={layerColor(segment.layer)} strokeWidth={Math.max(width, height) / 500} />)}
+      {!sectionOnly && geometry.points.map((point, index) => <circle key={`${point.layer}-${index}`} cx={point.x} cy={point.y} r={point.r ?? Math.max(width, height) / 180} fill={layerColor(point.layer)} />)}
+    </g>
+    {sectionOnly && <line x1={minX} x2={maxX} y1={-minY} y2={-minY} stroke="#111827" strokeWidth={Math.max(width, height) / 800} strokeDasharray="4 4" />}
+  </svg>;
+}
 
 export default function SlopeStability() {
   const [form, setForm] = useState({
@@ -69,11 +96,13 @@ export default function SlopeStability() {
   const [benches, setBenches] = useState<Bench[]>([{ height: "15", angle: "45", bermWidth: "0", strengthModel: "mohr-coulomb", sigmaCi: "100", gsi: "60", mi: "10", disturbanceFactor: "0.7", materialLayer: "" }]);
   const [materialLayers, setMaterialLayers] = useState<MaterialLayer[]>([]);
   const [dxfName, setDxfName] = useState("");
+  const [dxfGeometry, setDxfGeometry] = useState<DxfGeometry | null>(null);
   const dxfInputRef = useRef<HTMLInputElement>(null);
   const importDxf = trpc.drillhole.importDxf.useMutation({
     onSuccess: data => {
       setMaterialLayers(data.layers.map(name => ({ name, bounds: data.layerBounds[name] })));
-      setDxfName("Imported DXF section");
+      setDxfName(data.name);
+      setDxfGeometry(data.geometry as DxfGeometry);
       toast.success(`${data.layers.length} DXF material layers detected`);
     },
     onError: error => toast.error(`DXF import failed: ${error.message}`),
@@ -197,6 +226,7 @@ export default function SlopeStability() {
               </div>
               <p className="text-xs text-muted-foreground">Import a section whose material types are separated by layers such as ORE, WASTE or OXIDE. Assign a layer to each bench below.</p>
               {materialLayers.length > 0 && <div className="border border-muted-foreground/40 p-2 space-y-1"><div className="swiss-label text-[10px]">{dxfName} · {materialLayers.length} layers</div>{materialLayers.map(layer => <div key={layer.name} className="flex justify-between text-xs"><span className="font-bold">{layer.name}</span><span className="swiss-number">{layer.bounds.entityCount} entities · X {layer.bounds.minX}–{layer.bounds.maxX}</span></div>)}</div>}
+              {dxfGeometry && <div className="space-y-3"><div><div className="swiss-label text-[10px] mb-1">Imported DXF drawing — original coordinates</div><DxfDrawing geometry={dxfGeometry} /></div><div><div className="swiss-label text-[10px] mb-1">Slope section extracted from DXF polylines</div><DxfDrawing geometry={dxfGeometry} sectionOnly /></div></div>}
             </div>
             <div className="border border-foreground p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -293,7 +323,7 @@ export default function SlopeStability() {
                 <div className="px-4 py-3 border-b border-foreground swiss-label">Per-bench rock strength summary</div>
                 <div className="divide-y divide-foreground/30">
                   {result.benchStrengths.map((bench, index) => (
-                    <div key={index} className="grid grid-cols-3 gap-3 px-4 py-2 text-sm"><span className="swiss-label">Bench {index + 1}</span><span>{bench.model}</span><span className="swiss-number text-right">c′ {bench.cohesion.toFixed(2)} kPa · φ′ {bench.frictionAngle.toFixed(2)}°</span></div>
+                    <div key={index} className="grid grid-cols-4 gap-3 px-4 py-2 text-sm"><span className="swiss-label">Bench {index + 1}</span><span className="font-bold">{bench.materialLayer || "Unassigned layer"}</span><span>{bench.model}</span><span className="swiss-number text-right">c′ {bench.cohesion.toFixed(2)} kPa · φ′ {bench.frictionAngle.toFixed(2)}°</span></div>
                   ))}
                 </div>
               </div>

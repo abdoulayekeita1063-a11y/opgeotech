@@ -48,7 +48,7 @@ export interface StabilityResult {
   equivalentCohesion: number;
   equivalentFrictionAngle: number;
   profile: { totalHeight: number; totalWidth: number; benchCount: number };
-  benchStrengths: Array<{ model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
+  benchStrengths: Array<{ materialLayer?: string; model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
 }
 
 const DEG = Math.PI / 180;
@@ -89,13 +89,13 @@ function profileFromInput(input: StabilityInput): {
   totalHeight: number;
   totalWidth: number;
   benchCount: number;
-  benchRanges: Array<{ startX: number; endX: number; strength: ResolvedStrength }>;
+  benchRanges: Array<{ startX: number; endX: number; materialLayer?: string; strength: ResolvedStrength }>;
 } {
   const benches = input.benches?.length
     ? input.benches
     : [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }];
   const points = [{ x: 0, y: 0 }];
-  const benchRanges: Array<{ startX: number; endX: number; strength: ResolvedStrength }> = [];
+  const benchRanges: Array<{ startX: number; endX: number; materialLayer?: string; strength: ResolvedStrength }> = [];
   let x = 0;
   let y = 0;
   for (const bench of benches) {
@@ -109,6 +109,7 @@ function profileFromInput(input: StabilityInput): {
     benchRanges.push({
       startX,
       endX: x,
+      materialLayer: bench.materialLayer,
       strength: resolveStrength({ ...input, strengthModel: bench.strengthModel ?? input.strengthModel }),
     });
   }
@@ -348,6 +349,7 @@ export function computeStability(input: StabilityInput): StabilityResult {
   }
 
   const benchStrengths = profile.benchRanges.map(range => ({
+    materialLayer: range.materialLayer,
     model: range.strength.label,
     cohesion: range.strength.cohesion,
     frictionAngle: range.strength.frictionAngle,

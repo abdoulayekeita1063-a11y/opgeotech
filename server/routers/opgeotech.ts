@@ -41,7 +41,7 @@ export const drillholeRouter = router({
         geometryJson: JSON.stringify(geometry),
         entityCount: geometry.entityCount,
       });
-      return { id, entityCount: geometry.entityCount, layers: geometry.layers, bounds: geometry.bounds, layerBounds: geometry.layerBounds };
+      return { id, name: input.name, entityCount: geometry.entityCount, layers: geometry.layers, bounds: geometry.bounds, layerBounds: geometry.layerBounds, geometry };
     }),
 
   listPlans: protectedProcedure.query(({ ctx }) => db.listDxfPlans(ctx.user.id)),
