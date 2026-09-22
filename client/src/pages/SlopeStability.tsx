@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileUp, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Result = {
@@ -41,13 +41,6 @@ type Bench = {
   materialLayer: string;
 };
 
-type MaterialLayer = { name: string; bounds: { minX: number; minY: number; maxX: number; maxY: number; entityCount: number } };
-type DxfGeometry = {
-  segments: Array<{ type: "polyline" | "line"; layer: string; points: [number, number][] }>;
-  points: Array<{ type: "point" | "circle" | "insert"; layer: string; x: number; y: number; r?: number }>;
-  texts: Array<{ type: "text"; layer: string; x: number; y: number; text: string }>;
-  bounds: { minX: number; minY: number; maxX: number; maxY: number };
-};
 
 const statusStyle: Record<Result["status"], string> = {
   stable: "bg-foreground text-background",
@@ -61,27 +54,6 @@ const statusText: Record<Result["status"], string> = {
   unstable: "Unstable",
 };
 
-const layerColor = (layer: string) => {
-  const palette = ["#d90429", "#1d4ed8", "#15803d", "#b45309", "#7c3aed", "#0891b2", "#111827"];
-  return palette[Math.abs(layer.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % palette.length];
-};
-
-function DxfDrawing({ geometry, sectionOnly = false }: { geometry: DxfGeometry; sectionOnly?: boolean }) {
-  const { minX, minY, maxX, maxY } = geometry.bounds;
-  const width = Math.max(maxX - minX, 1);
-  const height = Math.max(maxY - minY, 1);
-  const pad = Math.max(width, height) * 0.06;
-  const viewBox = `${minX - pad} ${-(maxY + pad)} ${width + pad * 2} ${height + pad * 2}`;
-  const segments = sectionOnly ? geometry.segments.filter(segment => segment.type === "polyline") : geometry.segments;
-  return <svg viewBox={viewBox} className="w-full h-72 bg-white border border-foreground" role="img" aria-label={sectionOnly ? "DXF slope section" : "DXF drawing preview"}>
-    <g transform="scale(1,-1)">
-      {segments.map((segment, index) => <polyline key={`${segment.layer}-${index}`} points={segment.points.map(([x, y]) => `${x},${y}`).join(" ")} fill={sectionOnly && segment.points.length > 2 ? `${layerColor(segment.layer)}18` : "none"} stroke={layerColor(segment.layer)} strokeWidth={Math.max(width, height) / 500} />)}
-      {!sectionOnly && geometry.points.map((point, index) => <circle key={`${point.layer}-${index}`} cx={point.x} cy={point.y} r={point.r ?? Math.max(width, height) / 180} fill={layerColor(point.layer)} />)}
-    </g>
-    {sectionOnly && <line x1={minX} x2={maxX} y1={-minY} y2={-minY} stroke="#111827" strokeWidth={Math.max(width, height) / 800} strokeDasharray="4 4" />}
-  </svg>;
-}
-
 export default function SlopeStability() {
   const [form, setForm] = useState({
     title: "",
@@ -94,19 +66,6 @@ export default function SlopeStability() {
     waterCondition: "dry" as "dry" | "partial" | "saturated",
   });
   const [benches, setBenches] = useState<Bench[]>([{ height: "15", angle: "45", bermWidth: "0", strengthModel: "mohr-coulomb", sigmaCi: "100", gsi: "60", mi: "10", disturbanceFactor: "0.7", materialLayer: "" }]);
-  const [materialLayers, setMaterialLayers] = useState<MaterialLayer[]>([]);
-  const [dxfName, setDxfName] = useState("");
-  const [dxfGeometry, setDxfGeometry] = useState<DxfGeometry | null>(null);
-  const dxfInputRef = useRef<HTMLInputElement>(null);
-  const importDxf = trpc.drillhole.importDxf.useMutation({
-    onSuccess: data => {
-      setMaterialLayers(data.layers.map(name => ({ name, bounds: data.layerBounds[name] })));
-      setDxfName(data.name);
-      setDxfGeometry(data.geometry as DxfGeometry);
-      toast.success(`${data.layers.length} DXF material layers detected`);
-    },
-    onError: error => toast.error(`DXF import failed: ${error.message}`),
-  });
   const [result, setResult] = useState<Result | null>(null);
 
   const compute = trpc.stability.compute.useMutation({
@@ -220,16 +179,6 @@ export default function SlopeStability() {
             </div>
             <div className="border border-foreground p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <SectionLabel>DXF material section</SectionLabel>
-                <input ref={dxfInputRef} type="file" accept=".dxf" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => importDxf.mutate({ name: file.name, base64: String(reader.result).split(",")[1] ?? "" }); reader.readAsDataURL(file); event.currentTarget.value = ""; }} />
-                <Button type="button" variant="outline" className="rounded-none text-xs" disabled={importDxf.isPending} onClick={() => dxfInputRef.current?.click()}><FileUp className="h-4 w-4 mr-1" />{importDxf.isPending ? "Reading DXF…" : "Import section DXF"}</Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Import a section whose material types are separated by layers such as ORE, WASTE or OXIDE. Assign a layer to each bench below.</p>
-              {materialLayers.length > 0 && <div className="border border-muted-foreground/40 p-2 space-y-1"><div className="swiss-label text-[10px]">{dxfName} · {materialLayers.length} layers</div>{materialLayers.map(layer => <div key={layer.name} className="flex justify-between text-xs"><span className="font-bold">{layer.name}</span><span className="swiss-number">{layer.bounds.entityCount} entities · X {layer.bounds.minX}–{layer.bounds.maxX}</span></div>)}</div>}
-              {dxfGeometry && <div className="space-y-3"><div><div className="swiss-label text-[10px] mb-1">Imported DXF drawing — original coordinates</div><DxfDrawing geometry={dxfGeometry} /></div><div><div className="swiss-label text-[10px] mb-1">Slope section extracted from DXF polylines</div><DxfDrawing geometry={dxfGeometry} sectionOnly /></div></div>}
-            </div>
-            <div className="border border-foreground p-4 space-y-3">
-              <div className="flex items-center justify-between">
                 <SectionLabel>Slope benches</SectionLabel>
                 <Button type="button" variant="outline" className="rounded-none text-xs" onClick={() => setBenches(current => [...current, { height: "10", angle: "45", bermWidth: "8", strengthModel: "mohr-coulomb", sigmaCi: "100", gsi: "60", mi: "10", disturbanceFactor: "0.7", materialLayer: "" }])}>
                   Add bench
@@ -244,7 +193,6 @@ export default function SlopeStability() {
                     <div><Label className="swiss-label text-[10px]">Face angle (°)</Label><Input type="number" min="10" max="85" value={bench.angle} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, angle: e.target.value } : row))} /></div>
                     <div><Label className="swiss-label text-[10px]">Berm width (m)</Label><Input type="number" min="0" value={bench.bermWidth} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, bermWidth: e.target.value } : row))} /></div>
                   </div>
-                  {materialLayers.length > 0 && <div><Label className="swiss-label text-[10px]">Material layer</Label><Select value={bench.materialLayer || "unassigned"} onValueChange={value => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, materialLayer: value === "unassigned" ? "" : value } : row))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{materialLayers.map(layer => <SelectItem key={layer.name} value={layer.name}>{layer.name}</SelectItem>)}</SelectContent></Select></div>}
                   <div><Label className="swiss-label text-[10px]">Strength model</Label><Select value={bench.strengthModel} onValueChange={value => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, strengthModel: value as Bench["strengthModel"] } : row))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="mohr-coulomb">Mohr–Coulomb</SelectItem><SelectItem value="hoek-brown">Hoek–Brown</SelectItem></SelectContent></Select></div>
                   {bench.strengthModel === "hoek-brown" && <div className="grid grid-cols-2 gap-2"><div><Label className="swiss-label text-[10px]">UCS σci (MPa)</Label><Input type="number" min="0.1" value={bench.sigmaCi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, sigmaCi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">GSI</Label><Input type="number" min="0" max="100" value={bench.gsi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, gsi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">mi</Label><Input type="number" min="1" max="50" value={bench.mi} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, mi: e.target.value } : row))} /></div><div><Label className="swiss-label text-[10px]">Disturbance D</Label><Input type="number" min="0" max="1" step="0.1" value={bench.disturbanceFactor} onChange={e => setBenches(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, disturbanceFactor: e.target.value } : row))} /></div></div>}
                 </div>
