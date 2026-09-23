@@ -4,8 +4,9 @@ import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { escapeHtml, exportRecordAsPdf } from "@/lib/exportPdf";
 
 type Mode = "presplit" | "no-presplit";
 type Result = { mode: Mode; designAchievement: number; faceCondition: number; classification: string; colour: string; action: string; compliancePct: number; interpretation: string; items: Array<{ parameter: string; rating: number; maximum: number; comment: string }> };
@@ -24,6 +25,23 @@ const fields: Field[] = [
 ];
 
 const colourStyle: Record<string, string> = { Green: "bg-green-600 text-white", Yellow: "bg-yellow-300 text-black", Orange: "bg-orange-500 text-white", Red: "bg-red-600 text-white" };
+
+function exportWallAssessmentPdf(title: string, zone: string, result: Result) {
+  const rows = result.items.map(item => `<tr><td>${escapeHtml(item.parameter)}</td><td class="metric">${item.rating} / ${item.maximum}</td><td>${escapeHtml(item.comment)}</td></tr>`).join("");
+  const body = `
+    <h1>Wall Assessment</h1>
+    <p><strong>Assessment:</strong> ${escapeHtml(title || "Untitled assessment")}<br />
+    <strong>Zone / sector:</strong> ${escapeHtml(zone || "Not specified")}<br />
+    <strong>Wall-control scenario:</strong> ${result.mode === "presplit" ? "With Presplit" : "Without Presplit"}</p>
+    <h2>Assessment classification</h2>
+    <table><tr><th>Classification</th><th>Colour</th><th>Overall index</th></tr><tr><td><strong>${escapeHtml(result.classification)}</strong></td><td>${escapeHtml(result.colour)}</td><td class="metric">${result.compliancePct}%</td></tr></table>
+    <table><tr><th>Design Achievement (Df)</th><th>Face Condition (Fc)</th></tr><tr><td class="metric">${result.designAchievement.toFixed(2)}</td><td class="metric">${result.faceCondition.toFixed(2)}</td></tr></table>
+    <h2>Component ratings</h2>
+    <table><tr><th>Component</th><th>Rating</th><th>Comments</th></tr>${rows}</table>
+    <h2>Recommended action</h2><p>${escapeHtml(result.action)}</p>
+    <h2>Interpretation</h2><p>${escapeHtml(result.interpretation)}</p>`;
+  exportRecordAsPdf(`${title || "Wall Assessment"} — ${result.mode === "presplit" ? "Presplit" : "No Presplit"}`, body);
+}
 
 export default function DesignCompliance() {
   const [title, setTitle] = useState("");
@@ -50,7 +68,7 @@ export default function DesignCompliance() {
         </div>
         <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>{compute.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Assessing…</> : "Assess wall quality"}</Button>
       </div>
-      <div className="col-span-12 lg:col-span-5 space-y-5"><SectionLabel>Assessment Result</SectionLabel>{!result && <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">Select the wall-control scenario and ratings, then assess the wall.</div>}{result && <div className="space-y-5"><div className={`px-4 py-5 font-bold uppercase tracking-wider ${colourStyle[result.colour] ?? "bg-foreground text-background"}`}><div className="text-2xl">{result.classification}</div><div className="mt-2 text-sm">{result.mode === "presplit" ? "With presplit" : "Without presplit"} · Overall index {result.compliancePct}%</div></div><div className="grid grid-cols-2 gap-px bg-foreground border border-foreground"><div className="bg-background p-4"><div className="swiss-label mb-1">Design Achievement Df</div><div className="swiss-number text-3xl font-bold">{result.designAchievement.toFixed(2)}</div></div><div className="bg-background p-4"><div className="swiss-label mb-1">Face Condition Fc</div><div className="swiss-number text-3xl font-bold">{result.faceCondition.toFixed(2)}</div></div></div><div className="border border-foreground"><div className="px-4 py-3 border-b border-foreground swiss-label">Recommended action</div><div className="p-4 text-sm leading-relaxed">{result.action}</div></div><div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">{result.interpretation}</div><div className="border border-foreground overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-foreground bg-secondary"><th className="px-3 py-2 text-left swiss-label">Component</th><th className="px-3 py-2 text-right swiss-label">Rating</th></tr></thead><tbody>{result.items.map(item => <tr key={item.parameter} className="border-b border-foreground"><td className="px-3 py-2">{item.parameter}</td><td className="px-3 py-2 text-right swiss-number">{item.rating}/{item.maximum}</td></tr>)}</tbody></table></div></div>}</div>
+      <div className="col-span-12 lg:col-span-5 space-y-5"><SectionLabel>Assessment Result</SectionLabel>{!result && <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">Select the wall-control scenario and ratings, then assess the wall.</div>}{result && <div className="space-y-5"><div className={`px-4 py-5 font-bold uppercase tracking-wider ${colourStyle[result.colour] ?? "bg-foreground text-background"}`}><div className="text-2xl">{result.classification}</div><div className="mt-2 text-sm">{result.mode === "presplit" ? "With presplit" : "Without presplit"} · Overall index {result.compliancePct}%</div></div><div className="grid grid-cols-2 gap-px bg-foreground border border-foreground"><div className="bg-background p-4"><div className="swiss-label mb-1">Design Achievement Df</div><div className="swiss-number text-3xl font-bold">{result.designAchievement.toFixed(2)}</div></div><div className="bg-background p-4"><div className="swiss-label mb-1">Face Condition Fc</div><div className="swiss-number text-3xl font-bold">{result.faceCondition.toFixed(2)}</div></div></div><div className="border border-foreground"><div className="px-4 py-3 border-b border-foreground swiss-label">Recommended action</div><div className="p-4 text-sm leading-relaxed">{result.action}</div></div><div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">{result.interpretation}</div><div className="border border-foreground overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-foreground bg-secondary"><th className="px-3 py-2 text-left swiss-label">Component</th><th className="px-3 py-2 text-right swiss-label">Rating</th></tr></thead><tbody>{result.items.map(item => <tr key={item.parameter} className="border-b border-foreground"><td className="px-3 py-2">{item.parameter}</td><td className="px-3 py-2 text-right swiss-number">{item.rating}/{item.maximum}</td></tr>)}</tbody></table></div><Button type="button" variant="outline" className="w-full rounded-none border-foreground font-bold" onClick={() => exportWallAssessmentPdf(title, zone, result)}><FileDown className="h-4 w-4 mr-2" /> Export PDF</Button></div>}</div>
     </div>
   </div>;
 }
