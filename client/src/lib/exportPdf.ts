@@ -28,6 +28,10 @@ export function exportRecordAsPdf(title: string, htmlBody: string) {
   th, td { border: 1px solid #111; padding: 6px 8px; text-align: left; }
   th { background: #f4f4f4; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; }
   .metric { font-family: monospace; }
+  .photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  figure { margin: 0; break-inside: avoid; }
+  figure img { display: block; width: 100%; max-height: 260px; object-fit: contain; border: 1px solid #111; }
+  figcaption { font-size: 10px; color: #555; margin-top: 4px; }
   ul { padding-left: 18px; }
   .footer { margin-top: 32px; border-top: 1px solid #111; padding-top: 8px; font-size: 10px; color: #666; font-family: monospace; }
 </style>
