@@ -7,196 +7,50 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-type Item = {
-  parameter: string;
-  design: number;
-  actual: number;
-  deviation: number;
-  tolerance: number;
-  compliant: boolean;
-  unit: string;
-  severity: "compliant" | "minor" | "major";
-};
+type Mode = "presplit" | "no-presplit";
+type Result = { mode: Mode; designAchievement: number; faceCondition: number; classification: string; colour: string; action: string; compliancePct: number; interpretation: string; items: Array<{ parameter: string; rating: number; maximum: number; comment: string }> };
+type Field = { key: string; label: string; max: number; options: Array<[string, number]>; group: "Design Achievement (Df)" | "Face Condition (Fc)" };
 
-type Result = {
-  compliant: boolean;
-  compliancePct: number;
-  items: Item[];
-  interpretation: string;
-};
+const fields: Field[] = [
+  { key: "benchFaceAngleRating", label: "Bench Face Angle (50%)", max: 50, options: [["≥ Design",50],["Design −3°",25],["Design −5°",10],["Design −10°",0]], group: "Design Achievement (Df)" },
+  { key: "benchWidthRating", label: "Bench Width (40%)", max: 40, options: [["≥ Design",40],["Design −1 m",35],["Design −2 m",25],["Design −3 m",15],["Design −5 m",0]], group: "Design Achievement (Df)" },
+  { key: "toePositionRating", label: "Toe Position (10%)", max: 10, options: [["On design",10],["Design −1 m",8],["Design −2 m",5],["Design −3 m",0]], group: "Design Achievement (Df)" },
+  { key: "halfBarrelsRating", label: "Half Barrels Visible (20%)", max: 20, options: [["≥80%",20],["70–80%",15],["60–70%",12],["50–60%",8],["30–50%",5],["10–30%",2],["<10%",0]], group: "Face Condition (Fc)" },
+  { key: "intactRockBreakageRating", label: "Intact Rock Breakage (15%)", max: 15, options: [["<1 /m³",15],[">5 /m³",0]], group: "Face Condition (Fc)" },
+  { key: "openJointsRating", label: "Open Joints (10%)", max: 10, options: [["All closed",10],["Many moved",0]], group: "Face Condition (Fc)" },
+  { key: "looseMaterialRating", label: "Loose Material on Face (20%)", max: 20, options: [["No blocks",20],["Few small blocks",15],["Large blocks",10],["Many blocks",0]], group: "Face Condition (Fc)" },
+  { key: "faceProfileRating", label: "Face Profile (20%)", max: 20, options: [["Straight",20],["Hard toe",10],["Overhanging crest",5],["Irregular face",0]], group: "Face Condition (Fc)" },
+  { key: "crestConditionRating", label: "Crest Condition (15%)", max: 15, options: [["Achieved",15],["<1 m loss",12],["1 m–2 m loss",10],["2 m–3 m loss",5],[">3 m loss",0]], group: "Face Condition (Fc)" },
+];
+
+const colourStyle: Record<string, string> = { Green: "bg-green-600 text-white", Yellow: "bg-yellow-300 text-black", Orange: "bg-orange-500 text-white", Red: "bg-red-600 text-white" };
 
 export default function DesignCompliance() {
-  const [form, setForm] = useState({
-    title: "",
-    zone: "",
-    designBenchHeight: "10",
-    actualBenchHeight: "10.2",
-    designBermWidth: "8",
-    actualBermWidth: "7.5",
-    designBatterAngle: "70",
-    actualBatterAngle: "72",
-    toleranceHeight: "0.5",
-    toleranceBerm: "1",
-    toleranceAngle: "2",
-  });
+  const [title, setTitle] = useState("");
+  const [zone, setZone] = useState("");
+  const [mode, setMode] = useState<Mode>("presplit");
+  const [ratings, setRatings] = useState<Record<string, string>>(() => Object.fromEntries(fields.map(field => [field.key, String(field.options[0][1])] )));
   const [result, setResult] = useState<Result | null>(null);
-
-  const compute = trpc.compliance.compute.useMutation({
-    onSuccess: d => {
-      setResult(d as Result);
-      toast.success("Compliance check completed");
-    },
-    onError: e => toast.error(e.message),
-  });
-
-  const set =
-    (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm(f => ({ ...f, [k]: e.target.value }));
-
+  const compute = trpc.compliance.compute.useMutation({ onSuccess: data => { setResult(data as Result); toast.success("Wall assessment completed"); }, onError: error => toast.error(error.message) });
   const submit = () => {
-    if (!form.title.trim()) return toast.error("Please provide a check title");
-    compute.mutate({
-      title: form.title.trim(),
-      zone: form.zone.trim() || undefined,
-      designBenchHeight: Number(form.designBenchHeight),
-      actualBenchHeight: Number(form.actualBenchHeight),
-      designBermWidth: Number(form.designBermWidth),
-      actualBermWidth: Number(form.actualBermWidth),
-      designBatterAngle: Number(form.designBatterAngle),
-      actualBatterAngle: Number(form.actualBatterAngle),
-      toleranceHeight: Number(form.toleranceHeight),
-      toleranceBerm: Number(form.toleranceBerm),
-      toleranceAngle: Number(form.toleranceAngle),
-    });
+    if (!title.trim()) return toast.error("Please provide an assessment title");
+    compute.mutate({ title: title.trim(), zone: zone.trim() || undefined, mode, ...Object.fromEntries(fields.map(field => [field.key, Number(ratings[field.key])])) } as never);
   };
-
-  const rows: Array<{ label: string; design: keyof typeof form; actual: keyof typeof form; tol: keyof typeof form }> = [
-    { label: "Bench height (m)", design: "designBenchHeight", actual: "actualBenchHeight", tol: "toleranceHeight" },
-    { label: "Berm width (m)", design: "designBermWidth", actual: "actualBermWidth", tol: "toleranceBerm" },
-    { label: "Batter angle (°)", design: "designBatterAngle", actual: "actualBatterAngle", tol: "toleranceAngle" },
-  ];
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <ModuleHeader
-        index="05"
-        title="Design Compliance"
-        description="Verify as-built geometry against the mine design: bench height, berm width and batter angle are compared to design values within defined tolerances, producing a compliance verdict."
-      />
-      <div className="grid grid-cols-12 gap-8">
-        <div className="col-span-12 lg:col-span-5 space-y-4">
-          <SectionLabel>As-Built vs Design</SectionLabel>
-          <div>
-            <Label className="swiss-label mb-1.5 block">Check title *</Label>
-            <Input value={form.title} onChange={set("title")} placeholder="e.g. Bench 1240 — East wall QA" />
-          </div>
-          <div>
-            <Label className="swiss-label mb-1.5 block">Zone / sector</Label>
-            <Input value={form.zone} onChange={set("zone")} placeholder="e.g. Phase 2 East" />
-          </div>
-          <div className="border border-foreground">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-foreground bg-secondary">
-                  <th className="px-3 py-2 text-left swiss-label">Parameter</th>
-                  <th className="px-3 py-2 swiss-label">Design</th>
-                  <th className="px-3 py-2 swiss-label">As-built</th>
-                  <th className="px-3 py-2 swiss-label">Tol. ±</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.label} className="border-b border-foreground last:border-b-0">
-                    <td className="px-3 py-2 text-xs font-medium">{r.label}</td>
-                    <td className="px-2 py-1.5">
-                      <Input type="number" step="0.1" className="h-8 swiss-number" value={form[r.design]} onChange={set(r.design)} />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Input type="number" step="0.1" className="h-8 swiss-number" value={form[r.actual]} onChange={set(r.actual)} />
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <Input type="number" step="0.1" className="h-8 swiss-number" value={form[r.tol]} onChange={set(r.tol)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify Compliance"}
-          </Button>
+  const update = (field: Field, value: string) => setRatings(current => ({ ...current, [field.key]: value }));
+  const group = (name: Field["group"]) => fields.filter(field => field.group === name);
+  return <div className="max-w-6xl mx-auto px-4 py-8">
+    <ModuleHeader index="05" title="Design Compliance" description="Wall assessment based on design achievement and face condition. Assess the wall with presplit or without presplit and classify the resulting wall quality." />
+    <div className="grid grid-cols-12 gap-8">
+      <div className="col-span-12 lg:col-span-7 space-y-5">
+        <SectionLabel>Wall Assessment</SectionLabel>
+        <div className="grid grid-cols-2 gap-4"><div><Label className="swiss-label mb-1.5 block">Assessment title *</Label><Input value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. East Wall — Bench 1240" /></div><div><Label className="swiss-label mb-1.5 block">Zone / sector</Label><Input value={zone} onChange={event => setZone(event.target.value)} placeholder="e.g. Phase 2 East" /></div></div>
+        <div className="grid grid-cols-2 gap-3"><Button type="button" className={`rounded-none ${mode === "presplit" ? "bg-foreground text-background" : ""}`} variant={mode === "presplit" ? "default" : "outline"} onClick={() => setMode("presplit")}>With Presplit</Button><Button type="button" className={`rounded-none ${mode === "no-presplit" ? "bg-foreground text-background" : ""}`} variant={mode === "no-presplit" ? "default" : "outline"} onClick={() => setMode("no-presplit")}>Without Presplit</Button></div>
+        <div className="border border-foreground"><div className="grid grid-cols-[1.3fr_1fr_0.35fr] bg-secondary border-b border-foreground px-3 py-2 swiss-label"><span>Component (weighting)</span><span>Assigned value</span><span>Rating</span></div>
+          {(["Design Achievement (Df)", "Face Condition (Fc)"] as const).map(section => <div key={section}><div className="px-3 py-2 font-bold border-b border-foreground">{section}</div>{group(section).map(field => <div key={field.key} className="grid grid-cols-[1.3fr_1fr_0.35fr] items-center gap-2 border-b border-foreground px-3 py-2"><Label className="text-xs font-medium">{field.label}</Label><select className="h-9 border border-foreground bg-background px-2 text-sm" value={ratings[field.key]} onChange={event => update(field, event.target.value)}>{field.options.map(([label, value]) => <option key={label} value={value}>{label}</option>)}</select><span className="swiss-number text-right font-bold">{ratings[field.key]}/{field.max}</span></div>)}</div>)}
         </div>
-        <div className="col-span-12 lg:col-span-7">
-          <SectionLabel>Verdict</SectionLabel>
-          {!result && (
-            <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">
-              Enter design and as-built values, then run the verification.
-            </div>
-          )}
-          {result && (
-            <div className="space-y-6">
-              <div
-                className={`px-4 py-4 font-bold uppercase tracking-wider ${
-                  result.compliant
-                    ? "bg-foreground text-background"
-                    : "bg-primary text-primary-foreground"
-                }`}
-              >
-                {result.compliant ? "Compliant" : "Non-compliant"} — {result.compliancePct}% of
-                parameters within tolerance
-              </div>
-              <div className="border border-foreground overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-foreground bg-secondary">
-                      <th className="px-3 py-2 text-left swiss-label">Parameter</th>
-                      <th className="px-3 py-2 text-right swiss-label">Design</th>
-                      <th className="px-3 py-2 text-right swiss-label">As-built</th>
-                      <th className="px-3 py-2 text-right swiss-label">Deviation</th>
-                      <th className="px-3 py-2 text-right swiss-label">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.items.map(i => (
-                      <tr key={i.parameter} className="border-b border-foreground last:border-b-0">
-                        <td className="px-3 py-2">{i.parameter}</td>
-                        <td className="px-3 py-2 text-right swiss-number">
-                          {i.design} {i.unit}
-                        </td>
-                        <td className="px-3 py-2 text-right swiss-number">
-                          {i.actual} {i.unit}
-                        </td>
-                        <td className="px-3 py-2 text-right swiss-number">
-                          {i.deviation > 0 ? "+" : ""}
-                          {i.deviation} {i.unit}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <span
-                            className={`inline-block px-2 py-0.5 text-xs font-bold uppercase ${
-                              i.severity === "compliant"
-                                ? "bg-foreground text-background"
-                                : i.severity === "minor"
-                                  ? "border border-foreground"
-                                  : "bg-primary text-primary-foreground"
-                            }`}
-                          >
-                            {i.severity}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">
-                {result.interpretation}
-              </div>
-              <p className="text-xs text-muted-foreground">Saved to archive.</p>
-            </div>
-          )}
-        </div>
+        <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>{compute.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Assessing…</> : "Assess wall quality"}</Button>
       </div>
+      <div className="col-span-12 lg:col-span-5 space-y-5"><SectionLabel>Assessment Result</SectionLabel>{!result && <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">Select the wall-control scenario and ratings, then assess the wall.</div>}{result && <div className="space-y-5"><div className={`px-4 py-5 font-bold uppercase tracking-wider ${colourStyle[result.colour] ?? "bg-foreground text-background"}`}><div className="text-2xl">{result.classification}</div><div className="mt-2 text-sm">{result.mode === "presplit" ? "With presplit" : "Without presplit"} · Overall index {result.compliancePct}%</div></div><div className="grid grid-cols-2 gap-px bg-foreground border border-foreground"><div className="bg-background p-4"><div className="swiss-label mb-1">Design Achievement Df</div><div className="swiss-number text-3xl font-bold">{result.designAchievement.toFixed(2)}</div></div><div className="bg-background p-4"><div className="swiss-label mb-1">Face Condition Fc</div><div className="swiss-number text-3xl font-bold">{result.faceCondition.toFixed(2)}</div></div></div><div className="border border-foreground"><div className="px-4 py-3 border-b border-foreground swiss-label">Recommended action</div><div className="p-4 text-sm leading-relaxed">{result.action}</div></div><div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">{result.interpretation}</div><div className="border border-foreground overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-foreground bg-secondary"><th className="px-3 py-2 text-left swiss-label">Component</th><th className="px-3 py-2 text-right swiss-label">Rating</th></tr></thead><tbody>{result.items.map(item => <tr key={item.parameter} className="border-b border-foreground"><td className="px-3 py-2">{item.parameter}</td><td className="px-3 py-2 text-right swiss-number">{item.rating}/{item.maximum}</td></tr>)}</tbody></table></div></div>}</div>
     </div>
-  );
+  </div>;
 }

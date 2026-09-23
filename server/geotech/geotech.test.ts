@@ -259,39 +259,41 @@ describe("GSI classification", () => {
 });
 
 describe("design compliance", () => {
-  it("passes when all deviations are within tolerance", () => {
+  it("classifies a strong presplit wall as good results", () => {
     const r = computeCompliance({
-      designBenchHeight: 10,
-      actualBenchHeight: 10.3,
-      designBermWidth: 8,
-      actualBermWidth: 7.5,
-      designBatterAngle: 70,
-      actualBatterAngle: 71,
-      toleranceHeight: 0.5,
-      toleranceBerm: 1,
-      toleranceAngle: 2,
+      mode: "presplit",
+      benchFaceAngleRating: 50,
+      benchWidthRating: 40,
+      toePositionRating: 10,
+      halfBarrelsRating: 20,
+      intactRockBreakageRating: 15,
+      openJointsRating: 10,
+      looseMaterialRating: 20,
+      faceProfileRating: 20,
+      crestConditionRating: 15,
     });
     expect(r.compliant).toBe(true);
     expect(r.compliancePct).toBe(100);
-    expect(r.interpretation).toContain("COMPLIANT");
+    expect(r.classification).toBe("Good results");
+    expect(r.designAchievement).toBe(1);
+    expect(r.faceCondition).toBe(1);
   });
-
-  it("fails with a major deviation flagged", () => {
+  it("classifies poor geometry and face condition as unacceptable", () => {
     const r = computeCompliance({
-      designBenchHeight: 10,
-      actualBenchHeight: 10.2,
-      designBermWidth: 8,
-      actualBermWidth: 4, // -4 m >> 2x tolerance → major
-      designBatterAngle: 70,
-      actualBatterAngle: 76, // +6° > 2x tolerance → major
-      toleranceHeight: 0.5,
-      toleranceBerm: 1,
-      toleranceAngle: 2,
+      mode: "no-presplit",
+      benchFaceAngleRating: 0,
+      benchWidthRating: 0,
+      toePositionRating: 0,
+      halfBarrelsRating: 0,
+      intactRockBreakageRating: 0,
+      openJointsRating: 0,
+      looseMaterialRating: 0,
+      faceProfileRating: 0,
+      crestConditionRating: 0,
     });
     expect(r.compliant).toBe(false);
-    expect(r.compliancePct).toBeCloseTo(33.3, 1);
-    const berm = r.items.find(i => i.parameter === "Berm width")!;
-    expect(berm.severity).toBe("major");
-    expect(r.interpretation).toContain("NON-COMPLIANT");
+    expect(r.compliancePct).toBe(0);
+    expect(r.classification).toBe("Unacceptable results");
+    expect(r.colour).toBe("Red");
   });
 });
