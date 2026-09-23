@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { escapeHtml, exportRecordAsPdf } from "@/lib/exportPdf";
+import { jsPDF } from "jspdf";
 
 type Mode = "presplit" | "no-presplit";
 type Result = { mode: Mode; designAchievement: number; faceCondition: number; classification: string; colour: string; action: string; compliancePct: number; interpretation: string; items: Array<{ parameter: string; rating: number; maximum: number; comment: string }> };
@@ -27,22 +27,33 @@ const fields: Field[] = [
 
 const colourStyle: Record<string, string> = { Green: "bg-green-600 text-white", Yellow: "bg-yellow-300 text-black", Orange: "bg-orange-500 text-white", Red: "bg-red-600 text-white" };
 
-function exportWallAssessmentPdf(title: string, zone: string, result: Result, photos: WallPhoto[]) {
-  const rows = result.items.map(item => `<tr><td>${escapeHtml(item.parameter)}</td><td class="metric">${item.rating} / ${item.maximum}</td><td>${escapeHtml(item.comment)}</td></tr>`).join("");
-  const photoSection = photos.length ? `<h2>Slope photographs</h2><div class="photo-grid">${photos.map(photo => `<figure><img src="${photo.dataUrl}" alt="${escapeHtml(photo.name)}" /><figcaption>${escapeHtml(photo.name)}</figcaption></figure>`).join("")}</div>` : "";
-  const body = `
-    <h1>Wall Assessment</h1>
-    <p><strong>Assessment:</strong> ${escapeHtml(title || "Untitled assessment")}<br />
-    <strong>Zone / sector:</strong> ${escapeHtml(zone || "Not specified")}<br />
-    <strong>Wall-control scenario:</strong> ${result.mode === "presplit" ? "With Presplit" : "Without Presplit"}</p>
-    <h2>Assessment classification</h2>
-    <table><tr><th>Classification</th><th>Colour</th><th>Overall index</th></tr><tr><td><strong>${escapeHtml(result.classification)}</strong></td><td>${escapeHtml(result.colour)}</td><td class="metric">${result.compliancePct}%</td></tr></table>
-    <table><tr><th>Design Achievement (Df)</th><th>Face Condition (Fc)</th></tr><tr><td class="metric">${result.designAchievement.toFixed(2)} (${(result.designAchievement * 100).toFixed(1)}%)</td><td class="metric">${result.faceCondition.toFixed(2)} (${(result.faceCondition * 100).toFixed(1)}%)</td></tr></table>
-    <h2>Component ratings</h2>
-    <table><tr><th>Component</th><th>Rating</th><th>Comments</th></tr>${rows}</table>
-    <h2>Recommended action</h2><p>${escapeHtml(result.action)}</p>
-    <h2>Interpretation</h2><p>${escapeHtml(result.interpretation)}</p>${photoSection}`;
-  exportRecordAsPdf(`${title || "Wall Assessment"} — ${result.mode === "presplit" ? "Presplit" : "No Presplit"}`, body);
+async function exportWallAssessmentPdf(title: string, zone: string, result: Result, photos: WallPhoto[]) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 16;
+  let y = 18;
+  const ensureSpace = (height: number) => { if (y + height > pageHeight - 16) { pdf.addPage(); y = 18; } };
+  const heading = (text: string) => { ensureSpace(12); pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.text(text, margin, y); y += 7; pdf.setDrawColor(30); pdf.line(margin, y, pageWidth - margin, y); y += 5; };
+  const paragraph = (text: string, size = 10) => { pdf.setFont("helvetica", "normal"); pdf.setFontSize(size); const lines = pdf.splitTextToSize(text, pageWidth - margin * 2); ensureSpace(lines.length * 5 + 3); pdf.text(lines, margin, y); y += lines.length * 5 + 3; };
+  const tableRow = (cells: string[], widths: number[], header = false) => { const rowHeight = 8; ensureSpace(rowHeight); let x = margin; pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(header ? 8 : 8.5); cells.forEach((cell, index) => { pdf.rect(x, y - 5, widths[index], rowHeight); pdf.text(pdf.splitTextToSize(cell, widths[index] - 3), x + 1.5, y); x += widths[index]; }); y += rowHeight; };
+  pdf.setFillColor(211, 47, 47); pdf.rect(margin, y - 5, 4, 4, "F"); pdf.setFont("helvetica", "bold"); pdf.setFontSize(14); pdf.text("OPGeotech — Wall Assessment", margin + 7, y); y += 10;
+  pdf.setFontSize(10); pdf.setFont("helvetica", "normal"); paragraph(`Assessment: ${title || "Untitled assessment"}\nZone / sector: ${zone || "Not specified"}\nWall-control scenario: ${result.mode === "presplit" ? "With Presplit" : "Without Presplit"}`);
+  heading("Assessment classification");
+  tableRow(["Classification", "Colour", "Overall index"], [85, 35, 55], true); tableRow([result.classification, result.colour, `${result.compliancePct}%`], [85, 35, 55]);
+  tableRow(["Design Achievement (Df)", "Face Condition (Fc)"], [87.5, 87.5], true); tableRow([`${result.designAchievement.toFixed(2)} (${(result.designAchievement * 100).toFixed(1)}%)`, `${result.faceCondition.toFixed(2)} (${(result.faceCondition * 100).toFixed(1)}%)`], [87.5, 87.5]);
+  heading("Component ratings");
+  tableRow(["Component", "Rating", "Comments"], [58, 25, 92], true); result.items.forEach(item => tableRow([item.parameter, `${item.rating} / ${item.maximum}`, item.comment], [58, 25, 92]));
+  heading("Recommended action"); paragraph(result.action);
+  heading("Interpretation"); paragraph(result.interpretation);
+  if (photos.length) {
+    heading("Slope photographs");
+    for (const photo of photos) {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => { const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = photo.dataUrl; });
+      const maxWidth = 82; const maxHeight = 62; const scale = Math.min(maxWidth / image.width, maxHeight / image.height); const width = image.width * scale; const height = image.height * scale; const format = photo.dataUrl.startsWith("data:image/png") ? "PNG" : photo.dataUrl.startsWith("data:image/webp") ? "WEBP" : "JPEG"; ensureSpace(height + 12); pdf.addImage(photo.dataUrl, format, margin, y, width, height, undefined, "FAST"); pdf.setFontSize(8); pdf.text(photo.name, margin, y + height + 4); y += height + 10;
+    }
+  }
+  pdf.save(`${(title || "wall-assessment").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "wall-assessment"}.pdf`);
 }
 
 export default function DesignCompliance() {
@@ -78,7 +89,7 @@ export default function DesignCompliance() {
         <Button className="w-full font-bold uppercase tracking-wider" disabled={compute.isPending} onClick={submit}>{compute.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Assessing…</> : "Assess wall quality"}</Button>
         <div className="border border-foreground p-4 space-y-3"><SectionLabel>Slope photographs</SectionLabel><p className="text-xs text-muted-foreground">Import up to 8 JPG, PNG or WebP photos. They will be included in the PDF report.</p><Input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addPhotos} />{photos.length > 0 && <div className="grid grid-cols-2 gap-3">{photos.map((photo, index) => <div key={`${photo.name}-${index}`} className="border border-foreground p-2"><img src={photo.dataUrl} alt={photo.name} className="h-28 w-full object-cover" /><div className="mt-1 flex items-center justify-between gap-2"><span className="truncate text-xs">{photo.name}</span><button type="button" className="text-xs font-bold underline" onClick={() => setPhotos(current => current.filter((_, photoIndex) => photoIndex !== index))}>Remove</button></div></div>)}</div>}</div>
       </div>
-      <div className="col-span-12 lg:col-span-5 space-y-5"><SectionLabel>Assessment Result</SectionLabel>{!result && <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">Select the wall-control scenario and ratings, then assess the wall.</div>}{result && <div className="space-y-5"><div className={`px-4 py-5 font-bold uppercase tracking-wider ${colourStyle[result.colour] ?? "bg-foreground text-background"}`}><div className="text-2xl">{result.classification}</div><div className="mt-2 text-sm">{result.mode === "presplit" ? "With presplit" : "Without presplit"} · Overall index {result.compliancePct}%</div></div><div className="grid grid-cols-2 gap-px bg-foreground border border-foreground"><div className="bg-background p-4"><div className="swiss-label mb-1">Design Achievement Df</div><div className="swiss-number text-3xl font-bold">{result.designAchievement.toFixed(2)} <span className="text-lg">({(result.designAchievement * 100).toFixed(1)}%)</span></div></div><div className="bg-background p-4"><div className="swiss-label mb-1">Face Condition Fc</div><div className="swiss-number text-3xl font-bold">{result.faceCondition.toFixed(2)} <span className="text-lg">({(result.faceCondition * 100).toFixed(1)}%)</span></div></div></div><div className="border border-foreground"><div className="px-4 py-3 border-b border-foreground swiss-label">Recommended action</div><div className="p-4 text-sm leading-relaxed">{result.action}</div></div><div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">{result.interpretation}</div><div className="border border-foreground overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-foreground bg-secondary"><th className="px-3 py-2 text-left swiss-label">Component</th><th className="px-3 py-2 text-right swiss-label">Rating</th></tr></thead><tbody>{result.items.map(item => <tr key={item.parameter} className="border-b border-foreground"><td className="px-3 py-2">{item.parameter}</td><td className="px-3 py-2 text-right swiss-number">{item.rating}/{item.maximum}</td></tr>)}</tbody></table></div><Button type="button" variant="outline" className="w-full rounded-none border-foreground font-bold" onClick={() => exportWallAssessmentPdf(title, zone, result, photos)}><FileDown className="h-4 w-4 mr-2" /> Download PDF</Button></div>}</div>
+      <div className="col-span-12 lg:col-span-5 space-y-5"><SectionLabel>Assessment Result</SectionLabel>{!result && <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">Select the wall-control scenario and ratings, then assess the wall.</div>}{result && <div className="space-y-5"><div className={`px-4 py-5 font-bold uppercase tracking-wider ${colourStyle[result.colour] ?? "bg-foreground text-background"}`}><div className="text-2xl">{result.classification}</div><div className="mt-2 text-sm">{result.mode === "presplit" ? "With presplit" : "Without presplit"} · Overall index {result.compliancePct}%</div></div><div className="grid grid-cols-2 gap-px bg-foreground border border-foreground"><div className="bg-background p-4"><div className="swiss-label mb-1">Design Achievement Df</div><div className="swiss-number text-3xl font-bold">{result.designAchievement.toFixed(2)} <span className="text-lg">({(result.designAchievement * 100).toFixed(1)}%)</span></div></div><div className="bg-background p-4"><div className="swiss-label mb-1">Face Condition Fc</div><div className="swiss-number text-3xl font-bold">{result.faceCondition.toFixed(2)} <span className="text-lg">({(result.faceCondition * 100).toFixed(1)}%)</span></div></div></div><div className="border border-foreground"><div className="px-4 py-3 border-b border-foreground swiss-label">Recommended action</div><div className="p-4 text-sm leading-relaxed">{result.action}</div></div><div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">{result.interpretation}</div><div className="border border-foreground overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-foreground bg-secondary"><th className="px-3 py-2 text-left swiss-label">Component</th><th className="px-3 py-2 text-right swiss-label">Rating</th></tr></thead><tbody>{result.items.map(item => <tr key={item.parameter} className="border-b border-foreground"><td className="px-3 py-2">{item.parameter}</td><td className="px-3 py-2 text-right swiss-number">{item.rating}/{item.maximum}</td></tr>)}</tbody></table></div><Button type="button" variant="outline" className="w-full rounded-none border-foreground font-bold" onClick={() => exportWallAssessmentPdf(title, zone, result, photos).catch(() => toast.error("Could not generate the PDF"))}><FileDown className="h-4 w-4 mr-2" /> Download PDF</Button></div>}</div>
     </div>
   </div>;
 }
