@@ -59,7 +59,7 @@ export default function Download() {
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Globe className="h-3.5 w-3.5" />
-            <span>Or simply use the web version at <strong>geotechai-lczirdg5.manus.space</strong></span>
+            <span>Or simply continue using the OPGeotech web application.</span>
           </div>
         </div>
       </div>
