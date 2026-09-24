@@ -3,6 +3,7 @@ import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
+import { useEffect, useState } from "react";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
@@ -70,12 +71,46 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+function StartupSplash({ onComplete }: { onComplete: () => void }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onComplete, 900);
+    return () => window.clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <div className="opgeotech-splash" role="status" aria-label="Loading OPGeotech">
+      <div className="opgeotech-splash__grid" aria-hidden="true" />
+      <div className="opgeotech-splash__content">
+        <div className="opgeotech-splash__mark">
+          <img src="/favicon.png" alt="" />
+        </div>
+        <p className="opgeotech-splash__eyebrow">GEOTECHNICAL ENGINEERING PLATFORM</p>
+        <h1>OP<span>GEOTECH</span></h1>
+        <div className="opgeotech-splash__rule" />
+        <p className="opgeotech-splash__status">INITIALIZING OPEN-PIT SUITE</p>
+      </div>
+    </div>
+  );
+}
+
+function RootApp() {
+  const [showSplash, setShowSplash] = useState(true);
+  return (
+    <>
+      <div className={showSplash ? "opgeotech-app opgeotech-app--hidden" : "opgeotech-app"}>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <App />
+          </QueryClientProvider>
+        </trpc.Provider>
+      </div>
+      {showSplash && <StartupSplash onComplete={() => setShowSplash(false)} />}
+    </>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
+  <RootApp />
 );
 
 // PWA: register the service worker (production only, to avoid interfering
