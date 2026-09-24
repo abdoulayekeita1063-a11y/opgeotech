@@ -1,4 +1,5 @@
 export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+import { captureApiOperation, parseApiPayload } from "./offlineStore";
 
 export function isRetryableProxyResponse(response: Response) {
   const explicitlyRetryable = response.headers.get("x-e2b-retryable") === "true";
@@ -20,15 +21,33 @@ export async function fetchWithTransientRetry(
   const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
   const delayMs = Math.max(0, options.delayMs ?? 350);
   let response: Response | undefined;
+  const requestUrl = new URL(typeof input === "string" ? input : input.toString(), typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  const shouldCapture = requestUrl.pathname.startsWith("/api/trpc") && (init?.method ?? "GET").toUpperCase() !== "GET";
+  const payload = shouldCapture ? parseApiPayload(init?.body) : undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    response = await fetchImpl(cloneInput(input), { ...(init ?? {}), credentials: "include" });
-    if (!isRetryableProxyResponse(response)) return response;
+    try {
+      response = await fetchImpl(cloneInput(input), { ...(init ?? {}), credentials: "include" });
+    } catch (error) {
+      if (shouldCapture) {
+        void captureApiOperation(requestUrl.pathname, payload, undefined, error instanceof Error ? error.message : "Network unavailable");
+      }
+      throw error;
+    }
+    if (!isRetryableProxyResponse(response)) {
+      if (shouldCapture) {
+        void response.clone().json().then(result => captureApiOperation(requestUrl.pathname, payload, result)).catch(() => undefined);
+      }
+      return response;
+    }
     if (attempt < maxAttempts && delayMs > 0) {
       await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
     }
   }
 
+  if (shouldCapture) {
+    void captureApiOperation(requestUrl.pathname, payload, undefined, `Gateway returned ${response?.status ?? "an unavailable response"}`);
+  }
   throw new Error(
     "The application gateway is temporarily unavailable. Please retry the analysis in a few seconds.",
   );

@@ -8,6 +8,7 @@ import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
 import { fetchWithTransientRetry } from "./lib/apiFetch";
+import { countPendingOfflineRecords } from "./lib/offlineStore";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -95,15 +96,20 @@ function StartupSplash({ exiting, onExit }: { exiting: boolean; onExit: () => vo
 
 function OfflineStatus() {
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [pending, setPending] = useState(0);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
+    const refreshPending = () => { void countPendingOfflineRecords().then(setPending).catch(() => undefined); };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("opgeotech:offline-store-updated", refreshPending);
+    refreshPending();
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("opgeotech:offline-store-updated", refreshPending);
     };
   }, []);
 
@@ -111,7 +117,7 @@ function OfflineStatus() {
   return (
     <div className="opgeotech-offline-banner" role="status">
       <span className="opgeotech-offline-banner__dot" aria-hidden="true" />
-      Offline mode — cached workspace available; server synchronization will resume when connected.
+      Offline mode — cached workspace available{pending > 0 ? ` · ${pending} operation${pending === 1 ? "" : "s"} stored locally` : ""}; server-backed actions are available again when connected.
     </div>
   );
 }
