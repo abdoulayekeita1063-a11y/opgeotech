@@ -71,14 +71,14 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-function StartupSplash({ onComplete }: { onComplete: () => void }) {
+function StartupSplash({ exiting, onExit }: { exiting: boolean; onExit: () => void }) {
   useEffect(() => {
-    const timer = window.setTimeout(onComplete, 900);
+    const timer = window.setTimeout(onExit, 900);
     return () => window.clearTimeout(timer);
-  }, [onComplete]);
+  }, [onExit]);
 
   return (
-    <div className="opgeotech-splash" role="status" aria-label="Loading OPGeotech">
+    <div className={`opgeotech-splash${exiting ? " opgeotech-splash--exiting" : ""}`} role="status" aria-label="Loading OPGeotech">
       <div className="opgeotech-splash__grid" aria-hidden="true" />
       <div className="opgeotech-splash__content">
         <div className="opgeotech-splash__mark">
@@ -94,17 +94,26 @@ function StartupSplash({ onComplete }: { onComplete: () => void }) {
 }
 
 function RootApp() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [splashPhase, setSplashPhase] = useState<"visible" | "exiting" | "done">("visible");
+
+  useEffect(() => {
+    if (splashPhase !== "exiting") return;
+    const timer = window.setTimeout(() => setSplashPhase("done"), 520);
+    return () => window.clearTimeout(timer);
+  }, [splashPhase]);
+
+  const showSplash = splashPhase !== "done";
+  const splashExiting = splashPhase === "exiting";
   return (
     <>
-      <div className={showSplash ? "opgeotech-app opgeotech-app--hidden" : "opgeotech-app"}>
+      <div className={showSplash && !splashExiting ? "opgeotech-app opgeotech-app--hidden" : "opgeotech-app"}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
           <QueryClientProvider client={queryClient}>
             <App />
           </QueryClientProvider>
         </trpc.Provider>
       </div>
-      {showSplash && <StartupSplash onComplete={() => setShowSplash(false)} />}
+      {showSplash && <StartupSplash exiting={splashExiting} onExit={() => setSplashPhase("exiting")} />}
     </>
   );
 }
