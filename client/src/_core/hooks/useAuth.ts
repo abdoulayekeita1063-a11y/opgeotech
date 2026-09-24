@@ -50,19 +50,33 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
+  const cachedUser = useMemo(() => {
+    if (typeof window === "undefined" || navigator.onLine) return null;
+    try {
+      const raw = localStorage.getItem("manus-runtime-user-info");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    if (meQuery.data) {
+      localStorage.setItem(
+        "manus-runtime-user-info",
+        JSON.stringify(meQuery.data)
+      );
+    }
+    const effectiveUser = meQuery.data ?? cachedUser;
     return {
-      user: meQuery.data ?? null,
+      user: effectiveUser,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isAuthenticated: Boolean(effectiveUser),
     };
   }, [
     meQuery.data,
+    cachedUser,
     meQuery.error,
     meQuery.isLoading,
     logoutMutation.error,

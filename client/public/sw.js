@@ -4,11 +4,19 @@
  *  - App shell (navigations): network-first with cache fallback, so the app
  *    opens even with a flaky connection while always preferring fresh code.
  *  - Static assets (scripts/styles/fonts/images): stale-while-revalidate.
- *  - API calls (/api/*): network-only — geotechnical computations and AI
- *    analysis require the server; never serve stale engineering results.
+ *  - API calls (/api/*): network-only — server-backed persistence and
+ *    synchronization resume automatically when a connection returns.
  */
-const CACHE = "opgeotech-v2";
-const OFFLINE_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const CACHE = "opgeotech-v3";
+const OFFLINE_URLS = [
+  "/",
+  "/manifest.webmanifest",
+  "/favicon.ico",
+  "/favicon.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+];
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -50,7 +58,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Static assets: stale-while-revalidate
+  // Static assets: stale-while-revalidate, so visited modules remain usable
+  // after the connection is lost.
   if (["script", "style", "font", "image"].includes(req.destination)) {
     event.respondWith(
       caches.match(req).then(cached => {
@@ -66,5 +75,22 @@ self.addEventListener("fetch", event => {
         return cached || network;
       })
     );
+    return;
   }
+
+  // Cache same-origin documents and data files opportunistically. The shell
+  // remains the fallback for navigation; API requests were excluded above.
+  event.respondWith(
+    caches.match(req).then(cached =>
+      fetch(req)
+        .then(res => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(cache => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => cached || caches.match("/"))
+    )
+  );
 });

@@ -93,6 +93,29 @@ function StartupSplash({ exiting, onExit }: { exiting: boolean; onExit: () => vo
   );
 }
 
+function OfflineStatus() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  if (online) return null;
+  return (
+    <div className="opgeotech-offline-banner" role="status">
+      <span className="opgeotech-offline-banner__dot" aria-hidden="true" />
+      Offline mode — cached workspace available; server synchronization will resume when connected.
+    </div>
+  );
+}
+
 function RootApp() {
   const [splashPhase, setSplashPhase] = useState<"visible" | "exiting" | "done">("visible");
 
@@ -106,6 +129,7 @@ function RootApp() {
   const splashExiting = splashPhase === "exiting";
   return (
     <>
+      <OfflineStatus />
       <div className={showSplash && !splashExiting ? "opgeotech-app opgeotech-app--hidden" : "opgeotech-app"}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
           <QueryClientProvider client={queryClient}>
