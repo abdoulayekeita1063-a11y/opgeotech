@@ -37,6 +37,7 @@ interface WedgeRes {
   feasible: boolean;
   reasons: string[];
   persistence?: number;
+  coordinateSpanM?: number;
   effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: Strength;
@@ -153,11 +154,11 @@ function downloadKinematicCsv(result: KinResult, analysisTitle: string) {
     ["Flexural Toppling (All)", result.summary.topplingCritical, result.summary.topplingTotal, `${result.summary.topplingPercentage.toFixed(2)}%`],
     [],
     ["Detailed Results"],
-    ["Mode", "Identifier", "Feasible", "Persistence Length (m)", "Effective Height (m)", "Dip", "Dip Direction", "Trend", "Plunge", "Block Weight (kN)", "Cohesion (kPa)", "Friction Angle (°)", "Factor of Safety", "Status", "Reasons"],
+    ["Mode", "Identifier", "Feasible", "Persistence Length (m)", "Coordinate Span (m)", "Effective Height (m)", "Dip", "Dip Direction", "Trend", "Plunge", "Block Weight (kN)", "Cohesion (kPa)", "Friction Angle (°)", "Factor of Safety", "Status", "Reasons"],
   ];
 
   result.planar.forEach(item => rows.push(["Planar", item.structureId, item.feasible ? "Yes" : "No", item.persistence, item.effectiveHeightM, item.dip, item.dipDirection, "", "", item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
-  result.wedge.forEach(item => rows.push(["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", item.persistence, item.effectiveHeightM, "", "", item.lineOfIntersection.trend, item.lineOfIntersection.plunge, item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
+  result.wedge.forEach(item => rows.push(["Wedge", item.pair.join(" × "), item.feasible ? "Yes" : "No", item.persistence, item.coordinateSpanM, item.effectiveHeightM, "", "", item.lineOfIntersection.trend, item.lineOfIntersection.plunge, item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
   result.toppling.forEach(item => rows.push(["Toppling", item.structureId, item.feasible ? "Yes" : "No", item.persistence, item.effectiveHeightM, item.dip, item.dipDirection, "", "", item.blockWeightKn, item.strength?.instantaneousCohesionKpa, item.strength?.instantaneousFrictionAngle, item.factorOfSafety, item.status, item.reasons.join(" | ")]));
 
   const csv = rows.map(row => row.map(csvCell).join(",")).join("\r\n");

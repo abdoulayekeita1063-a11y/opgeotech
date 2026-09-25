@@ -13,6 +13,7 @@ import {
 import { Loader2, Upload, Trash2, Download } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
+import { StructuralBlockViewer, type StructurePoint } from "@/components/StructuralBlockViewer";
 
 const STRUCTURE_TYPES = ["joint", "fault", "bedding", "foliation", "shear", "vein", "contact"];
 const ALTERATIONS = ["fresh", "slightly weathered", "moderately weathered", "highly weathered", "decomposed"];
@@ -37,6 +38,9 @@ export default function StructuralMapping() {
   const [structureType, setStructureType] = useState("joint");
   const [dip, setDip] = useState("");
   const [dipDirection, setDipDirection] = useState("");
+  const [easting, setEasting] = useState("");
+  const [northing, setNorthing] = useState("");
+  const [elevation, setElevation] = useState("");
   const [persistence, setPersistence] = useState("");
   const [alteration, setAlteration] = useState("fresh");
   const [infill, setInfill] = useState("none");
@@ -52,6 +56,9 @@ export default function StructuralMapping() {
       setStructureId("");
       setDip("");
       setDipDirection("");
+      setEasting("");
+      setNorthing("");
+      setElevation("");
       setPersistence("");
       setJrc("");
     },
@@ -78,12 +85,20 @@ export default function StructuralMapping() {
     if (!Number.isFinite(dd) || dd < 0 || dd > 360) return toast.error("Dip direction must be 0–360°");
     const p = parseFloat(persistence);
     if (!Number.isFinite(p) || p <= 0 || p > 10000) return toast.error("Structure persistence must be greater than 0 and no more than 10,000 m");
+    const coordinate = (value: string) => value.trim() ? parseFloat(value) : undefined;
+    const e = coordinate(easting);
+    const n = coordinate(northing);
+    const z = coordinate(elevation);
+    if ([e, n, z].some(value => value !== undefined && !Number.isFinite(value))) return toast.error("Coordinates must be valid numbers");
     create.mutate({
       structureId: structureId || undefined,
       zone: zone || undefined,
       structureType,
       dip: d,
       dipDirection: dd,
+      easting: e,
+      northing: n,
+      elevation: z,
       persistence: p,
       alteration,
       infill,
@@ -109,6 +124,9 @@ export default function StructuralMapping() {
     const iInf = col(["infill", "filling"]);
     const iRou = col(["roughness"]);
     const iJrc = col(["jrc"]);
+    const iEasting = col(["easting", "easting_m", "x"]);
+    const iNorthing = col(["northing", "northing_m", "y"]);
+    const iElevation = col(["elevation", "elevation_m", "rl", "z"]);
     const iPersistence = col(["persistence", "persistence_m", "structure_length", "length_m"]);
 
     const rows = [];
@@ -124,6 +142,9 @@ export default function StructuralMapping() {
         structureType: iType >= 0 && c[iType] ? c[iType].toLowerCase() : "joint",
         dip: d,
         dipDirection: dd,
+        easting: iEasting >= 0 && c[iEasting] ? parseFloat(c[iEasting]) : undefined,
+        northing: iNorthing >= 0 && c[iNorthing] ? parseFloat(c[iNorthing]) : undefined,
+        elevation: iElevation >= 0 && c[iElevation] ? parseFloat(c[iElevation]) : undefined,
         persistence: iPersistence >= 0 && c[iPersistence] ? parseFloat(c[iPersistence]) : undefined,
         alteration: iAlt >= 0 ? c[iAlt] || undefined : undefined,
         infill: iInf >= 0 ? c[iInf] || undefined : undefined,
@@ -137,9 +158,9 @@ export default function StructuralMapping() {
 
   const downloadTemplate = () => {
     const csv =
-      "id,zone,type,dip,dip_direction,persistence_m,alteration,infill,roughness,jrc\n" +
-      "J-001,East wall,joint,55,120,18,fresh,none,rough,12\n" +
-      "F-001,East wall,fault,70,265,24,moderately weathered,gouge,slickensided,2\n";
+      "id,zone,type,dip,dip_direction,easting,northing,elevation_m,persistence_m,alteration,infill,roughness,jrc\n" +
+      "J-001,East wall,joint,55,120,512340.2,1324567.8,1245.6,18,fresh,none,rough,12\n" +
+      "F-001,East wall,fault,70,265,512355.4,1324551.1,1238.2,24,moderately weathered,gouge,slickensided,2\n";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     a.download = "structures_template.csv";
@@ -241,6 +262,18 @@ export default function StructuralMapping() {
                 value={dipDirection}
                 onChange={e => setDipDirection(e.target.value)}
               />
+            </div>
+            <div>
+              <Label className="swiss-label text-[11px]">Easting (m)</Label>
+              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Projected X" value={easting} onChange={e => setEasting(e.target.value)} />
+            </div>
+            <div>
+              <Label className="swiss-label text-[11px]">Northing (m)</Label>
+              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Projected Y" value={northing} onChange={e => setNorthing(e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <Label className="swiss-label text-[11px]">Elevation / RL (m)</Label>
+              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Z / reduced level" value={elevation} onChange={e => setElevation(e.target.value)} />
             </div>
             <div>
               <Label className="swiss-label text-[11px]">Persistence length (m) *</Label>
@@ -380,6 +413,8 @@ export default function StructuralMapping() {
             <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#6a1b9a" }} />foliation</span>
           </div>
 
+          <StructuralBlockViewer structures={(list.data ?? []) as StructurePoint[]} />
+
           <div className="mt-6">
             <SectionLabel>Recorded structures ({(list.data ?? []).length})</SectionLabel>
             <div className="border border-foreground mt-2 max-h-[300px] overflow-y-auto">
@@ -390,6 +425,9 @@ export default function StructuralMapping() {
                     <th className="px-2 py-1.5">Type</th>
                     <th className="px-2 py-1.5">Dip</th>
                     <th className="px-2 py-1.5">Dip dir</th>
+                    <th className="px-2 py-1.5">Easting</th>
+                    <th className="px-2 py-1.5">Northing</th>
+                    <th className="px-2 py-1.5">Elevation</th>
                     <th className="px-2 py-1.5">Persistence (m)</th>
                     <th className="px-2 py-1.5">JRC</th>
                     <th className="px-2 py-1.5">Alteration</th>
@@ -404,6 +442,9 @@ export default function StructuralMapping() {
                       <td className="px-2 py-1">{s.structureType}</td>
                       <td className="px-2 py-1">{s.dip}°</td>
                       <td className="px-2 py-1">{s.dipDirection}°</td>
+                      <td className="px-2 py-1">{s.easting ?? "—"}</td>
+                      <td className="px-2 py-1">{s.northing ?? "—"}</td>
+                      <td className="px-2 py-1">{s.elevation ?? "—"}</td>
                       <td className="px-2 py-1">{s.persistence == null ? "—" : `${s.persistence} m`}</td>
                       <td className="px-2 py-1">{s.jrc ?? "—"}</td>
                       <td className="px-2 py-1">{s.alteration || "—"}</td>
@@ -420,7 +461,7 @@ export default function StructuralMapping() {
                   ))}
                   {(list.data ?? []).length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-4 text-muted-foreground">
+                      <td colSpan={12} className="px-3 py-4 text-muted-foreground">
                         No structures recorded yet. Add one or import a CSV.
                       </td>
                     </tr>

@@ -94,6 +94,25 @@ describe("runKinematicAnalysis", () => {
     expect(r.summary.wedgePercentage).toBe(100);
   });
 
+  it("uses mapped Easting/Northing/Elevation span in wedge block weight", () => {
+    const withoutCoordinates = runKinematicAnalysis({
+      ...slope,
+      structures: [
+        { id: "JA", dip: 55, dipDirection: 60, jrc: 8 },
+        { id: "JB", dip: 55, dipDirection: 120, jrc: 8 },
+      ],
+    });
+    const withCoordinates = runKinematicAnalysis({
+      ...slope,
+      structures: [
+        { id: "JA", dip: 55, dipDirection: 60, easting: 1000, northing: 2000, elevation: 1250, jrc: 8 },
+        { id: "JB", dip: 55, dipDirection: 120, easting: 1025, northing: 2000, elevation: 1250, jrc: 8 },
+      ],
+    });
+    expect(withCoordinates.wedge[0].coordinateSpanM).toBeCloseTo(25, 5);
+    expect(withCoordinates.wedge[0].blockWeightKn).toBeGreaterThan(withoutCoordinates.wedge[0].blockWeightKn!);
+  });
+
   it("flags flexural toppling for steep planes dipping into the face", () => {
     const r = runKinematicAnalysis({
       ...slope,

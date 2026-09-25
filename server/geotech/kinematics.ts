@@ -18,6 +18,9 @@ export interface StructureInput {
   id: string;
   dip: number; // 0-90
   dipDirection: number; // 0-360
+  easting?: number | null;
+  northing?: number | null;
+  elevation?: number | null;
   persistence?: number | null; // discontinuity persistence length, metres
   jrc?: number | null; // 0-20, default 8
   structureType?: string;
@@ -61,6 +64,7 @@ export interface WedgeResult {
   feasible: boolean;
   reasons: string[];
   persistence?: number; // effective persistence length (m)
+  coordinateSpanM?: number;
   effectiveHeightM?: number;
   blockWeightKn?: number;
   strength?: BartonStrength;
@@ -161,6 +165,16 @@ function r2(n: number): number {
 function persistenceLength(value: number | null | undefined, slopeHeight: number): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return slopeHeight;
   return Math.min(value, slopeHeight);
+}
+
+function coordinateDistance(a: StructureInput, b: StructureInput): number | undefined {
+  const values = [a.easting, a.northing, a.elevation, b.easting, b.northing, b.elevation];
+  if (!values.every(value => typeof value === "number" && Number.isFinite(value))) return undefined;
+  return Math.hypot(
+    (a.easting as number) - (b.easting as number),
+    (a.northing as number) - (b.northing as number),
+    (a.elevation as number) - (b.elevation as number),
+  );
 }
 
 /**
@@ -275,6 +289,7 @@ function analyzeWedge(
       persistenceLength(s1.persistence, inp.slopeHeight),
       persistenceLength(s2.persistence, inp.slopeHeight)
     ),
+    coordinateSpanM: coordinateDistance(s1, s2),
     reasons: feasible
       ? ["Line of intersection daylights in the face and exceeds the friction angle"]
       : reasons,
@@ -287,7 +302,11 @@ function analyzeWedge(
   const psiF = inp.slopeDip * DEG;
   const included = Math.max(angleDiff(s1.dipDirection, s2.dipDirection), 10) * DEG;
   // Volume approximation: (H^3 / 6) * (cot(psiI) - cot(psiF)) * tan(included/2), floored at 0
-  const vol = Math.max((H ** 3 / 6) * (1 / Math.tan(psiI) - 1 / Math.tan(psiF)) * Math.tan(included / 2), 0);
+  // Use the measured 3D spacing between mapped structures when available;
+  // this improves the plan-width estimate beyond orientation-only geometry.
+  const coordinateWidthFactor = (res.coordinateSpanM ?? 0) / Math.max(H, 1);
+  const widthFactor = Math.max(Math.tan(included / 2), coordinateWidthFactor);
+  const vol = Math.max((H ** 3 / 6) * (1 / Math.tan(psiI) - 1 / Math.tan(psiF)) * widthFactor, 0);
   const W = vol * inp.unitWeight; // kN
   // Contact area along both planes (rough approximation)
   const contact = Math.max((H * H) / Math.sin(psiI), 1);

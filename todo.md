@@ -274,3 +274,9 @@
 - [x] Plot structure poles and feasible wedge intersections with hover labels
 - [x] Highlight planar danger zone in red and toppling envelope in amber with legend and screening disclaimer
 - [x] Typecheck, run focused regression tests, build and visually verify /kinematics
+
+## 3D Structural Block Visualization (user request)
+- [x] Add an offline-compatible interactive 3D viewer using Easting, Northing and Elevation
+- [x] Normalize mapped coordinates and project them with draggable yaw/pitch rotation and zoom controls
+- [x] Show structure-type colours, selected coordinate readout, nearest-neighbour block edges and missing-coordinate count
+- [x] Add engineering screening disclaimer, run tests/build and visually verify Structural Mapping

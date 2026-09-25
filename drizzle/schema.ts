@@ -192,6 +192,9 @@ export const structures = mysqlTable("structures", {
   structureType: varchar("structureType", { length: 64 }).default("joint").notNull(),
   dip: double("dip").notNull(), // 0-90 degrees
   dipDirection: double("dipDirection").notNull(), // 0-360 degrees
+  easting: double("easting"), // projected X coordinate
+  northing: double("northing"), // projected Y coordinate
+  elevation: double("elevation"), // RL / Z coordinate, metres
   persistence: double("persistence"), // discontinuity persistence length (m)
   alteration: varchar("alteration", { length: 128 }),
   infill: varchar("infill", { length: 128 }),
