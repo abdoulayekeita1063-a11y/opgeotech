@@ -268,3 +268,9 @@
 - [x] Add tie-up recommendation for reducing backbreak and wall damage
 - [x] Add additional wall-control parameters, validation and engineering limitations
 - [x] Add regression tests, visually verify and publish a checkpoint (60 tests pass; Wall Control screenshot-verified)
+
+## Kinematic Stereonet Danger-Zone Plot (user request)
+- [x] Add lower-hemisphere stereonet with N/E/S/W orientation, grid rings and slope-direction reference
+- [x] Plot structure poles and feasible wedge intersections with hover labels
+- [x] Highlight planar danger zone in red and toppling envelope in amber with legend and screening disclaimer
+- [x] Typecheck, run focused regression tests, build and visually verify /kinematics

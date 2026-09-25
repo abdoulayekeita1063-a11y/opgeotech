@@ -124,6 +124,11 @@ export async function countPendingOfflineRecords(): Promise<number> {
   });
 }
 
+export async function latestOfflineResult(operation: string): Promise<unknown> {
+  const records = await listOfflineRecords(500);
+  return records.find(record => record.operation === operation && record.status === "completed")?.result;
+}
+
 export async function captureApiOperation(operation: string, payload: unknown, result?: unknown, error?: string) {
   await saveOfflineRecord({
     operation,

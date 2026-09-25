@@ -79,6 +79,58 @@ interface KinResult {
   };
 }
 
+
+const DEG = Math.PI / 180;
+
+type StereonetPoint = { x: number; y: number; trend: number; plunge: number; label: string; feasible: boolean; kind: string };
+
+function stereonetPoint(trend: number, plunge: number, cx: number, cy: number, radius: number) {
+  const r = Math.min(1, Math.max(0, Math.tan(((90 - Math.max(0, Math.min(90, plunge))) / 2) * DEG))) * radius;
+  const t = ((trend % 360) + 360) % 360;
+  return { x: cx + Math.sin(t * DEG) * r, y: cy - Math.cos(t * DEG) * r };
+}
+
+function dangerSector(centerTrend: number, halfWidth: number, cx: number, cy: number, radius: number) {
+  const points = Array.from({ length: 25 }, (_, i) => {
+    const offset = -halfWidth + (2 * halfWidth * i) / 24;
+    return stereonetPoint(centerTrend + offset, 0, cx, cy, radius);
+  });
+  return `M ${cx},${cy} L ${points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L ")} Z`;
+}
+
+function Stereonet({ result, slopeDip, slopeDipDirection, frictionAngle, lateralLimit }: { result: KinResult; slopeDip: number; slopeDipDirection: number; frictionAngle: number; lateralLimit: number }) {
+  const [hover, setHover] = useState<StereonetPoint | null>(null);
+  const cx = 260, cy = 270, radius = 214;
+  const poles: StereonetPoint[] = result.planar.map(item => {
+    const point = stereonetPoint(item.dipDirection + 180, 90 - item.dip, cx, cy, radius);
+    return { ...point, trend: item.dipDirection + 180, plunge: 90 - item.dip, label: item.structureId, feasible: item.feasible, kind: "Pole" };
+  });
+  const wedges: StereonetPoint[] = result.wedge.filter(item => item.feasible).map(item => {
+    const point = stereonetPoint(item.lineOfIntersection.trend, item.lineOfIntersection.plunge, cx, cy, radius);
+    return { ...point, trend: item.lineOfIntersection.trend, plunge: item.lineOfIntersection.plunge, label: item.pair.join(" × "), feasible: true, kind: "Wedge intersection" };
+  });
+  const ringScales = [0.25, 0.5, 0.75, 1];
+  const planarZone = dangerSector(slopeDipDirection + 180, Math.max(5, lateralLimit), cx, cy, radius);
+  const topplingZone = dangerSector(slopeDipDirection, Math.max(8, lateralLimit + 10), cx, cy, radius);
+  return <section className="border-2 border-foreground p-4 bg-white">
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-3"><div><SectionLabel>Stereonet — lower hemisphere</SectionLabel><p className="text-xs text-muted-foreground mt-1">Pole vectors, wedge intersections and kinematic danger envelopes.</p></div><div className="font-mono text-[10px] text-right text-muted-foreground"><div>Slope {slopeDip}° / {slopeDipDirection}°</div><div>φb {frictionAngle}° · ±{lateralLimit}°</div></div></div>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_210px] gap-4 items-center">
+      <div className="relative min-w-0"><svg viewBox="0 0 520 540" className="w-full max-w-[620px] mx-auto" role="img" aria-label="Kinematic stereonet showing red danger zone">
+        <defs><radialGradient id="stereonet-red-zone"><stop offset="0%" stopColor="#ef4444" stopOpacity="0.38"/><stop offset="100%" stopColor="#ef4444" stopOpacity="0.12"/></radialGradient></defs>
+        <rect width="520" height="540" fill="#fff" />
+        <g stroke="#a1a1aa" fill="none" strokeWidth="1">{ringScales.map(scale => <circle key={scale} cx={cx} cy={cy} r={radius * scale} strokeDasharray={scale === 1 ? undefined : "3 4"}/>)}{[0,30,60,90,120,150].map(angle => { const a = angle * DEG; return <line key={angle} x1={cx-radius*Math.sin(a)} y1={cy-radius*Math.cos(a)} x2={cx+radius*Math.sin(a)} y2={cy+radius*Math.cos(a)}/>; })}</g>
+        <path d={planarZone} fill="url(#stereonet-red-zone)" stroke="#dc2626" strokeWidth="1.5"/><path d={topplingZone} fill="#f59e0b" fillOpacity="0.12" stroke="#d97706" strokeDasharray="5 4" strokeWidth="1.2"/><circle cx={cx} cy={cy} r={radius} fill="none" stroke="#111" strokeWidth="2"/>
+        <g fill="#111" fontSize="13" fontFamily="IBM Plex Mono, monospace" fontWeight="700"><text x={cx} y={cy-radius-12} textAnchor="middle">N</text><text x={cx+radius+16} y={cy+4} textAnchor="middle">E</text><text x={cx} y={cy+radius+24} textAnchor="middle">S</text><text x={cx-radius-16} y={cy+4} textAnchor="middle">W</text></g>
+        <line x1={cx} y1={cy} x2={stereonetPoint(slopeDipDirection, 0, cx, cy, radius).x} y2={stereonetPoint(slopeDipDirection, 0, cx, cy, radius).y} stroke="#ea580c" strokeWidth="2" opacity="0.8"/>
+        {poles.map(point => <g key={`pole-${point.label}`} onMouseEnter={() => setHover(point)} onMouseLeave={() => setHover(null)} className="cursor-help"><circle cx={point.x} cy={point.y} r={point.feasible ? 7 : 5} fill={point.feasible ? "#dc2626" : "#111827"} stroke="#fff" strokeWidth="2"/><text x={point.x+8} y={point.y-7} fontSize="9" fontFamily="IBM Plex Mono, monospace" fill="#111">{point.label}</text></g>)}
+        {wedges.map(point => <g key={`wedge-${point.label}`} onMouseEnter={() => setHover(point)} onMouseLeave={() => setHover(null)} className="cursor-help"><rect x={point.x-5} y={point.y-5} width="10" height="10" fill="#7c3aed" stroke="#fff" strokeWidth="2" transform={`rotate(45 ${point.x} ${point.y})`}/><text x={point.x+8} y={point.y+4} fontSize="9" fontFamily="IBM Plex Mono, monospace" fill="#5b21b6">W</text></g>)}
+        {hover && <g><rect x={hover.x+12} y={hover.y-34} width="150" height="32" fill="#111" rx="2"/><text x={hover.x+18} y={hover.y-20} fill="#fff" fontSize="9" fontFamily="IBM Plex Mono, monospace">{hover.kind}: {hover.label}</text><text x={hover.x+18} y={hover.y-8} fill="#fff" fontSize="9" fontFamily="IBM Plex Mono, monospace">{hover.trend.toFixed(1)}° / {hover.plunge.toFixed(1)}°</text></g>}
+      </svg></div>
+      <div className="border border-foreground p-3 font-mono text-[10px] space-y-3"><div className="font-bold uppercase tracking-wider border-b border-foreground pb-2">Legend</div><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-red-600 border border-white shadow"/> Feasible / critical pole</div><div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-slate-900 border border-white shadow"/> Non-critical pole</div><div className="flex items-center gap-2"><span className="h-3 w-3 rotate-45 bg-violet-700 border border-white shadow"/> Feasible wedge intersection</div><div className="flex items-center gap-2"><span className="h-3 w-3 bg-red-500/35 border border-red-600"/> Planar danger zone</div><div className="flex items-center gap-2"><span className="h-3 w-3 bg-amber-500/20 border border-amber-600 border-dashed"/> Toppling envelope</div><div className="pt-2 border-t border-border text-muted-foreground leading-relaxed">Red zone highlights poles aligned with the slope direction, within the lateral limit and above the friction threshold. Screening plot only.</div></div>
+    </div>
+  </section>;
+}
+
 function statusColor(s?: string) {
   return s === "Unstable"
     ? "text-destructive font-bold"
@@ -354,6 +406,14 @@ export default function KinematicAnalysis() {
                 </div>
                 <p className="text-sm">{result.summary.overallAssessment}</p>
               </div>
+
+              <Stereonet
+                result={result}
+                slopeDip={parseFloat(slopeDip)}
+                slopeDipDirection={parseFloat(slopeDipDirection)}
+                frictionAngle={parseFloat(phiB)}
+                lateralLimit={parseFloat(lateralLimit)}
+              />
 
               {/* planar table */}
               <div>
