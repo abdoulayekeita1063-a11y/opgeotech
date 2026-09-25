@@ -280,3 +280,9 @@
 - [x] Normalize mapped coordinates and project them with draggable yaw/pitch rotation and zoom controls
 - [x] Show structure-type colours, selected coordinate readout, nearest-neighbour block edges and missing-coordinate count
 - [x] Add engineering screening disclaimer, run tests/build and visually verify Structural Mapping
+
+## 3D Block Face Enhancement (user request)
+- [x] Generate triangular faces from nearest spatial neighbours
+- [x] Render amber semi-transparent faces behind block edges and structure points
+- [x] Show translucent-face count and update the engineering screening disclaimer
+- [x] Typecheck, run 69 tests, build and visually verify the updated viewer

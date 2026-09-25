@@ -56,7 +56,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
   ), [structures]);
 
   const model = useMemo(() => {
-    if (!points.length) return { projected: [] as ProjectedPoint[], edges: [] as Array<[number, number]>, bounds: null };
+    if (!points.length) return { projected: [] as ProjectedPoint[], edges: [] as Array<[number, number]>, faces: [] as Array<[number, number, number]>, bounds: null };
     const min = {
       x: Math.min(...points.map(p => p.easting as number)),
       y: Math.min(...points.map(p => p.northing as number)),
@@ -84,6 +84,8 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       };
     });
     const edges: Array<[number, number]> = [];
+    const faces: Array<[number, number, number]> = [];
+    const faceKeys = new Set<string>();
     // Connect each point to its two nearest mapped neighbours as a transparent
     // screening network for potential block boundaries.
     points.forEach((a, i) => {
@@ -92,12 +94,25 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
         (a.northing as number) - (b.northing as number),
         (a.elevation as number) - (b.elevation as number),
       )})).sort((u, v) => u.d - v.d).slice(0, 2);
+      if (neighbours.length === 2) {
+        const face = [i, neighbours[0].j, neighbours[1].j].sort((u, v) => u - v) as [number, number, number];
+        const key = face.join("-");
+        if (!faceKeys.has(key)) {
+          faceKeys.add(key);
+          faces.push(face);
+        }
+      }
       neighbours.forEach(({ j }) => {
         const edge: [number, number] = i < j ? [i, j] : [j, i];
         if (!edges.some(existing => existing[0] === edge[0] && existing[1] === edge[1])) edges.push(edge);
       });
     });
-    return { projected, edges, bounds: { min, max, span } };
+    faces.sort((a, b) => {
+      const depthA = (projected[a[0]].depth + projected[a[1]].depth + projected[a[2]].depth) / 3;
+      const depthB = (projected[b[0]].depth + projected[b[1]].depth + projected[b[2]].depth) / 3;
+      return depthA - depthB;
+    });
+    return { projected, edges, faces, bounds: { min, max, span } };
   }, [points, yaw, pitch, zoom]);
 
   const reset = () => { setYaw(-0.65); setPitch(0.42); setZoom(1); };
@@ -152,6 +167,12 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
             <text x="570" y="430" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">E →</text>
             <text x="42" y="432" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">N ↑</text>
             <text x="310" y="32" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">RL / Z</text>
+            {model.faces.map(([a, b, c], index) => {
+              const p = model.projected[a];
+              const q = model.projected[b];
+              const r = model.projected[c];
+              return <polygon key={`face-${a}-${b}-${c}`} points={`${p.sx},${p.sy} ${q.sx},${q.sy} ${r.sx},${r.sy}`} fill={index % 2 ? "#fbbf24" : "#fb923c"} fillOpacity="0.16" stroke="#fbbf24" strokeWidth="1" strokeOpacity="0.55" />;
+            })}
             {model.edges.map(([a, b]) => {
               const p = model.projected[a];
               const q = model.projected[b];
@@ -177,9 +198,10 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs font-mono text-muted-foreground">
         <span><b className="text-foreground">{points.length}</b> coordinate points</span>
         <span><b className="text-foreground">{model.edges.length}</b> nearest-neighbour block edges</span>
+        <span><b className="text-foreground">{model.faces.length}</b> translucent block faces</span>
         {structures.length > points.length && <span>{structures.length - points.length} structures without complete coordinates hidden</span>}
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Screening visualization only: the yellow network indicates nearest-neighbour block connections; engineering block geometry should be confirmed with a surveyed surface and structural model.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Screening visualization only: amber faces and edges indicate nearest-neighbour block connections; engineering block geometry should be confirmed with a surveyed surface and structural model.</p>
     </div>
   );
 }
