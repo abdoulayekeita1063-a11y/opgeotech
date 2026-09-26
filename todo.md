@@ -293,3 +293,9 @@
 - [x] Use persistence length to control displayed plane extent
 - [x] Preserve perspective rotation, zoom, selection, wireframe edges and translucent block mesh
 - [x] Typecheck, run 69 tests, build and visually verify the Structural Mapping viewer
+
+## GEM-Style 3D Terrain Realism (user request)
+- [x] Add a triangulated olive geological terrain mesh behind mapped structures
+- [x] Add depth-sorted terrain facets, wireframe lines, radial lighting and shaded background
+- [x] Keep coloured oriented structural planes, dark outlines, rotation, zoom and selection
+- [x] Validate with typecheck, 69 tests, production build and visual screenshot

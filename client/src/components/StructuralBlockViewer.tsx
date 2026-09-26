@@ -18,6 +18,7 @@ type StructurePoint = {
 type Vec3 = { x: number; y: number; z: number };
 type ProjectedPoint = StructurePoint & { point: Vec3; sx: number; sy: number; depth: number };
 type StructurePlane = { id: number; type: string; vertices: ProjectedPoint[]; depth: number };
+type TerrainFacet = { points: string; fill: string; depth: number };
 
 const COLORS: Record<string, string> = {
   joint: "#111111",
@@ -60,7 +61,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
   ), [structures]);
 
   const model = useMemo(() => {
-    if (!points.length) return { projected: [] as ProjectedPoint[], planes: [] as StructurePlane[], edges: [] as Array<[number, number]>, faces: [] as Array<[number, number, number]>, bounds: null };
+    if (!points.length) return { projected: [] as ProjectedPoint[], planes: [] as StructurePlane[], terrain: [] as TerrainFacet[], edges: [] as Array<[number, number]>, faces: [] as Array<[number, number, number]>, bounds: null };
     const min = {
       x: Math.min(...points.map(p => p.easting as number)),
       y: Math.min(...points.map(p => p.northing as number)),
@@ -91,6 +92,28 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       const rotated = rotate(value, yaw, pitch);
       return { ...point, point: rotated, sx: 320 + rotated.x * 400 * zoom, sy: 230 - rotated.y * 400 * zoom, depth: rotated.z };
     };
+    const terrain: TerrainFacet[] = [];
+    const terrainPalette = ["#4c561d", "#596522", "#65732a", "#3f4818", "#727d31", "#515b20"];
+    const terrainPoint = (x: number, z: number) => ({
+      x,
+      y: -0.2 + Math.sin(x * 3.4 + z * 1.1) * 0.075 + Math.cos(z * 4.2 - x) * 0.055 - z * 0.04,
+      z,
+    });
+    const terrainCols = 9;
+    const terrainRows = 7;
+    for (let row = 0; row < terrainRows - 1; row += 1) {
+      for (let col = 0; col < terrainCols - 1; col += 1) {
+        const x0 = -1.35 + col * (2.7 / (terrainCols - 1));
+        const x1 = -1.35 + (col + 1) * (2.7 / (terrainCols - 1));
+        const z0 = -0.95 + row * (1.9 / (terrainRows - 1));
+        const z1 = -0.95 + (row + 1) * (1.9 / (terrainRows - 1));
+        const corners = [terrainPoint(x0, z0), terrainPoint(x1, z0), terrainPoint(x1, z1), terrainPoint(x0, z1)].map(value => project(points[0], value));
+        const paletteIndex = (row * 3 + col) % terrainPalette.length;
+        terrain.push({ points: `${corners[0].sx},${corners[0].sy} ${corners[1].sx},${corners[1].sy} ${corners[2].sx},${corners[2].sy}`, fill: terrainPalette[paletteIndex], depth: corners.reduce((sum, point) => sum + point.depth, 0) / 3 });
+        terrain.push({ points: `${corners[0].sx},${corners[0].sy} ${corners[2].sx},${corners[2].sy} ${corners[3].sx},${corners[3].sy}`, fill: terrainPalette[(paletteIndex + 2) % terrainPalette.length], depth: corners.reduce((sum, point) => sum + point.depth, 0) / 3 });
+      }
+    }
+    terrain.sort((a, b) => a.depth - b.depth);
     const planes: StructurePlane[] = points.map((point, index) => {
       const centerPoint = projected[index].point;
       const dipRad = (point.dip || 45) * Math.PI / 180;
@@ -138,7 +161,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       const depthB = (projected[b[0]].depth + projected[b[1]].depth + projected[b[2]].depth) / 3;
       return depthA - depthB;
     });
-    return { projected, planes, edges, faces, bounds: { min, max, span } };
+    return { projected, planes, terrain, edges, faces, bounds: { min, max, span } };
   }, [points, yaw, pitch, zoom]);
 
   const reset = () => { setYaw(-0.65); setPitch(0.42); setZoom(1); };
@@ -182,17 +205,22 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
             aria-label="Interactive three-dimensional structural plane and block view"
           >
             <defs>
-              <linearGradient id="blockGrid" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#334155" /><stop offset="1" stopColor="#0f172a" /></linearGradient>
+              <linearGradient id="blockGrid" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#172313" /><stop offset="0.48" stopColor="#28351a" /><stop offset="1" stopColor="#0c110b" /></linearGradient>
+              <radialGradient id="terrainLight" cx="42%" cy="22%" r="82%"><stop offset="0" stopColor="#a3b35a" stopOpacity="0.24" /><stop offset="0.55" stopColor="#5d6b24" stopOpacity="0.08" /><stop offset="1" stopColor="#020402" stopOpacity="0.42" /></radialGradient>
             </defs>
             <rect width="640" height="460" fill="url(#blockGrid)" />
-            <g opacity="0.35" stroke="#94a3b8" strokeWidth="1">
+            <g stroke="#1a210f" strokeWidth="0.8" strokeOpacity="0.72">
+              {model.terrain.map((facet, index) => <polygon key={`terrain-${index}`} points={facet.points} fill={facet.fill} fillOpacity="0.88" />)}
+            </g>
+            <rect width="640" height="460" fill="url(#terrainLight)" pointerEvents="none" />
+            <g opacity="0.42" stroke="#9aa452" strokeWidth="0.65">
               <path d="M40 390H600M70 350H570M100 310H540" />
               <path d="M90 420L220 365M190 420L320 365M290 420L420 365M390 420L520 365" />
             </g>
-            <text x="28" y="30" fill="#cbd5e1" fontSize="12" fontFamily="IBM Plex Mono">ORIENTED PLANES · DRAG TO ROTATE · ZOOM</text>
-            <text x="570" y="430" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">E →</text>
-            <text x="42" y="432" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">N ↑</text>
-            <text x="310" y="32" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">RL / Z</text>
+            <text x="28" y="30" fill="#d4df9a" fontSize="12" fontFamily="IBM Plex Mono">GEM-STYLE TERRAIN MESH · DRAG TO ROTATE · ZOOM</text>
+            <text x="570" y="430" fill="#a9b36b" fontSize="12" fontFamily="IBM Plex Mono">E →</text>
+            <text x="42" y="432" fill="#a9b36b" fontSize="12" fontFamily="IBM Plex Mono">N ↑</text>
+            <text x="310" y="32" fill="#a9b36b" fontSize="12" fontFamily="IBM Plex Mono">RL / Z</text>
             {model.planes.slice().sort((a, b) => a.depth - b.depth).map(plane => {
               const selected = selectedId === plane.id;
               const pointsString = plane.vertices.map(vertex => `${vertex.sx},${vertex.sy}`).join(" ");
@@ -233,11 +261,12 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs font-mono text-muted-foreground">
         <span><b className="text-foreground">{model.planes.length}</b> oriented structure planes</span>
+        <span><b className="text-foreground">{model.terrain.length}</b> terrain facets</span>
         <span><b className="text-foreground">{model.edges.length}</b> nearest-neighbour block edges</span>
         <span><b className="text-foreground">{model.faces.length}</b> translucent block faces</span>
         {structures.length > points.length && <span>{structures.length - points.length} structures without complete coordinates hidden</span>}
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Each coloured plane is oriented from the mapped dip and dip direction; persistence controls its displayed length. The amber mesh indicates nearest-neighbour block connections. Confirm engineering geometry with a surveyed surface and structural model.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">GEM-style terrain mesh is a visual approximation generated from the mapped coordinate envelope; coloured planes use dip, dip direction and persistence. Confirm engineering geometry with an imported surveyed surface or calibrated 3D model.</p>
     </div>
   );
 }
