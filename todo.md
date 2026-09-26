@@ -286,3 +286,10 @@
 - [x] Render amber semi-transparent faces behind block edges and structure points
 - [x] Show translucent-face count and update the engineering screening disclaimer
 - [x] Typecheck, run 69 tests, build and visually verify the updated viewer
+
+## Oriented 3D Structure Planes (user request)
+- [x] Replace point-only structure display with colored oriented planes
+- [x] Use mapped dip and dip direction to orient each plane in 3D
+- [x] Use persistence length to control displayed plane extent
+- [x] Preserve perspective rotation, zoom, selection, wireframe edges and translucent block mesh
+- [x] Typecheck, run 69 tests, build and visually verify the Structural Mapping viewer

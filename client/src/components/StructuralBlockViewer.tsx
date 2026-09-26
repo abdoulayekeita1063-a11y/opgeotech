@@ -7,6 +7,9 @@ type StructurePoint = {
   id: number;
   structureId: string | null;
   structureType: string;
+  dip: number;
+  dipDirection: number;
+  persistence: number | null;
   easting: number | null;
   northing: number | null;
   elevation: number | null;
@@ -14,6 +17,7 @@ type StructurePoint = {
 
 type Vec3 = { x: number; y: number; z: number };
 type ProjectedPoint = StructurePoint & { point: Vec3; sx: number; sy: number; depth: number };
+type StructurePlane = { id: number; type: string; vertices: ProjectedPoint[]; depth: number };
 
 const COLORS: Record<string, string> = {
   joint: "#111111",
@@ -56,7 +60,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
   ), [structures]);
 
   const model = useMemo(() => {
-    if (!points.length) return { projected: [] as ProjectedPoint[], edges: [] as Array<[number, number]>, faces: [] as Array<[number, number, number]>, bounds: null };
+    if (!points.length) return { projected: [] as ProjectedPoint[], planes: [] as StructurePlane[], edges: [] as Array<[number, number]>, faces: [] as Array<[number, number, number]>, bounds: null };
     const min = {
       x: Math.min(...points.map(p => p.easting as number)),
       y: Math.min(...points.map(p => p.northing as number)),
@@ -82,6 +86,28 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
         sy: 230 - rotated.y * 400 * zoom,
         depth: rotated.z,
       };
+    });
+    const project = (point: StructurePoint, value: Vec3): ProjectedPoint => {
+      const rotated = rotate(value, yaw, pitch);
+      return { ...point, point: rotated, sx: 320 + rotated.x * 400 * zoom, sy: 230 - rotated.y * 400 * zoom, depth: rotated.z };
+    };
+    const planes: StructurePlane[] = points.map((point, index) => {
+      const centerPoint = projected[index].point;
+      const dipRad = (point.dip || 45) * Math.PI / 180;
+      const dipDirectionRad = (point.dipDirection || 0) * Math.PI / 180;
+      const strikeRad = dipDirectionRad - Math.PI / 2;
+      const halfWidth = Math.min(0.19, Math.max(0.055, (point.persistence ?? span * 0.18) / span / 2));
+      const halfHeight = Math.min(0.18, Math.max(0.05, halfWidth * 0.85));
+      const strike: Vec3 = { x: Math.cos(strikeRad) * halfWidth, y: 0, z: Math.sin(strikeRad) * halfWidth };
+      const downDip: Vec3 = { x: Math.sin(dipDirectionRad) * Math.cos(dipRad) * halfHeight, y: -Math.sin(dipRad) * halfHeight, z: Math.cos(dipDirectionRad) * Math.cos(dipRad) * halfHeight };
+      const rawVertices = [
+        { x: centerPoint.x - strike.x - downDip.x, y: centerPoint.y - strike.y - downDip.y, z: centerPoint.z - strike.z - downDip.z },
+        { x: centerPoint.x + strike.x - downDip.x, y: centerPoint.y + strike.y - downDip.y, z: centerPoint.z + strike.z - downDip.z },
+        { x: centerPoint.x + strike.x + downDip.x, y: centerPoint.y + strike.y + downDip.y, z: centerPoint.z + strike.z + downDip.z },
+        { x: centerPoint.x - strike.x + downDip.x, y: centerPoint.y - strike.y + downDip.y, z: centerPoint.z - strike.z + downDip.z },
+      ];
+      const vertices = rawVertices.map(value => project(point, value));
+      return { id: point.id, type: point.structureType, vertices, depth: vertices.reduce((sum, vertex) => sum + vertex.depth, 0) / vertices.length };
     });
     const edges: Array<[number, number]> = [];
     const faces: Array<[number, number, number]> = [];
@@ -112,7 +138,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
       const depthB = (projected[b[0]].depth + projected[b[1]].depth + projected[b[2]].depth) / 3;
       return depthA - depthB;
     });
-    return { projected, edges, faces, bounds: { min, max, span } };
+    return { projected, planes, edges, faces, bounds: { min, max, span } };
   }, [points, yaw, pitch, zoom]);
 
   const reset = () => { setYaw(-0.65); setPitch(0.42); setZoom(1); };
@@ -132,7 +158,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between gap-3 mb-2">
-        <SectionLabel>3D block view — Easting / Northing / Elevation</SectionLabel>
+        <SectionLabel>3D structural planes — Easting / Northing / Elevation</SectionLabel>
         <div className="flex gap-1">
           <Button variant="outline" size="sm" className="rounded-none border-foreground" onClick={() => setZoom(value => Math.min(2.5, value + 0.15))} aria-label="Zoom in"><ZoomIn className="h-3.5 w-3.5" /></Button>
           <Button variant="outline" size="sm" className="rounded-none border-foreground" onClick={() => setZoom(value => Math.max(0.5, value - 0.15))} aria-label="Zoom out"><ZoomOut className="h-3.5 w-3.5" /></Button>
@@ -153,7 +179,7 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             role="img"
-            aria-label="Interactive three-dimensional structural block view"
+            aria-label="Interactive three-dimensional structural plane and block view"
           >
             <defs>
               <linearGradient id="blockGrid" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#334155" /><stop offset="1" stopColor="#0f172a" /></linearGradient>
@@ -163,15 +189,25 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
               <path d="M40 390H600M70 350H570M100 310H540" />
               <path d="M90 420L220 365M190 420L320 365M290 420L420 365M390 420L520 365" />
             </g>
-            <text x="28" y="30" fill="#cbd5e1" fontSize="12" fontFamily="IBM Plex Mono">DRAG TO ROTATE · USE BUTTONS TO ZOOM</text>
+            <text x="28" y="30" fill="#cbd5e1" fontSize="12" fontFamily="IBM Plex Mono">ORIENTED PLANES · DRAG TO ROTATE · ZOOM</text>
             <text x="570" y="430" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">E →</text>
             <text x="42" y="432" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">N ↑</text>
             <text x="310" y="32" fill="#94a3b8" fontSize="12" fontFamily="IBM Plex Mono">RL / Z</text>
+            {model.planes.slice().sort((a, b) => a.depth - b.depth).map(plane => {
+              const selected = selectedId === plane.id;
+              const pointsString = plane.vertices.map(vertex => `${vertex.sx},${vertex.sy}`).join(" ");
+              return (
+                <g key={`structure-plane-${plane.id}`} onClick={() => setSelectedId(plane.id)}>
+                  <polygon points={pointsString} fill={colorFor(plane.type)} fillOpacity={selected ? "0.72" : "0.48"} stroke={selected ? "#ffffff" : "#020617"} strokeWidth={selected ? "3" : "1.4"} strokeOpacity="0.95" />
+                  <polyline points={`${pointsString} ${plane.vertices[0].sx},${plane.vertices[0].sy}`} fill="none" stroke="#020617" strokeWidth="1.2" opacity="0.9" />
+                </g>
+              );
+            })}
             {model.faces.map(([a, b, c], index) => {
               const p = model.projected[a];
               const q = model.projected[b];
               const r = model.projected[c];
-              return <polygon key={`face-${a}-${b}-${c}`} points={`${p.sx},${p.sy} ${q.sx},${q.sy} ${r.sx},${r.sy}`} fill={index % 2 ? "#fbbf24" : "#fb923c"} fillOpacity="0.16" stroke="#fbbf24" strokeWidth="1" strokeOpacity="0.55" />;
+              return <polygon key={`face-${a}-${b}-${c}`} points={`${p.sx},${p.sy} ${q.sx},${q.sy} ${r.sx},${r.sy}`} fill={index % 2 ? "#fbbf24" : "#fb923c"} fillOpacity="0.09" stroke="#fbbf24" strokeWidth="1" strokeOpacity="0.35" />;
             })}
             {model.edges.map(([a, b]) => {
               const p = model.projected[a];
@@ -196,12 +232,12 @@ export function StructuralBlockViewer({ structures }: { structures: StructurePoi
         )}
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs font-mono text-muted-foreground">
-        <span><b className="text-foreground">{points.length}</b> coordinate points</span>
+        <span><b className="text-foreground">{model.planes.length}</b> oriented structure planes</span>
         <span><b className="text-foreground">{model.edges.length}</b> nearest-neighbour block edges</span>
         <span><b className="text-foreground">{model.faces.length}</b> translucent block faces</span>
         {structures.length > points.length && <span>{structures.length - points.length} structures without complete coordinates hidden</span>}
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Screening visualization only: amber faces and edges indicate nearest-neighbour block connections; engineering block geometry should be confirmed with a surveyed surface and structural model.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Each coloured plane is oriented from the mapped dip and dip direction; persistence controls its displayed length. The amber mesh indicates nearest-neighbour block connections. Confirm engineering geometry with a surveyed surface and structural model.</p>
     </div>
   );
 }
