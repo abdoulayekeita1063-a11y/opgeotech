@@ -45,7 +45,7 @@ describe("Logging Data rock-mass calculations", () => {
     const polished = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Planar polished", waterCondition: "12" });
     const irregular = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Stepped Irregular", waterCondition: "12" });
     expect(polished).toBe("70.0");
-    expect(irregular).toBe("84.0");
-    expect(getRoughnessProfile("Undulating Smooth")).toEqual({ jrc: 8, state: "Rough", rmrScore: 20 });
+    expect(irregular).toBe("89.0");
+    expect(getRoughnessProfile("Undulating Smooth")).toEqual({ jrc: 11, state: "Very rough", rmrScore: 25 });
   });
 });

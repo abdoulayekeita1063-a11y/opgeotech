@@ -23,14 +23,14 @@ export const roughnessOptions = [
 ] as const;
 
 const roughnessProfiles: Record<string, { jrc: number; state: string; rmrScore: number }> = {
-  "Planar polished": { jrc: 1.4, state: "Very smooth", rmrScore: 6 },
-  "Planar smooth": { jrc: 1.4, state: "Very smooth", rmrScore: 6 },
-  "Undulating Polished": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
-  "Undulating Smooth": { jrc: 8, state: "Rough", rmrScore: 20 },
-  "Undulating Rough": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
-  "Stepped Polished": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
-  "Stepped smooth": { jrc: 8, state: "Rough", rmrScore: 20 },
-  "Stepped Irregular": { jrc: 8, state: "Rough", rmrScore: 20 },
+  "Planar polished": { jrc: 0.5, state: "Very smooth", rmrScore: 6 },
+  "Planar smooth": { jrc: 1.5, state: "Very smooth", rmrScore: 6 },
+  "Undulating Polished": { jrc: 7, state: "Rough", rmrScore: 20 },
+  "Undulating Smooth": { jrc: 11, state: "Very rough", rmrScore: 25 },
+  "Undulating Rough": { jrc: 14, state: "Very rough", rmrScore: 25 },
+  "Stepped Polished": { jrc: 11, state: "Very rough", rmrScore: 25 },
+  "Stepped smooth": { jrc: 14, state: "Very rough", rmrScore: 25 },
+  "Stepped Irregular": { jrc: 20, state: "Extremely rough", rmrScore: 25 },
 };
 
 export function getRoughnessProfile(value: string | undefined) {
