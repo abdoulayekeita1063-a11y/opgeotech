@@ -35,6 +35,10 @@ const derivedColumns = [
 ] as const;
 
 const columns = [...sourceColumns, ...derivedColumns] as readonly Column[];
+const displayColumns = [
+  ["holeId", "Hole ID"], ["holeDip", "Hole Dip"], ["holeAzimuth", "Hole Azimuth"],
+  ...columns,
+] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
@@ -97,6 +101,9 @@ function findValue(row: unknown[], label: string) {
 }
 
 function valueFor(row: Row, key: string, metadata: Metadata) {
+  if (key === "holeId") return metadata.holeNo ?? "";
+  if (key === "holeDip") return metadata.dip ?? "";
+  if (key === "holeAzimuth") return metadata.azimuth ?? "";
   if (key === "dip" || key === "dipDirection") {
     return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", metadata.dip ?? "", metadata.azimuth ?? "")[key];
   }
@@ -263,9 +270,9 @@ export default function LoggingData() {
 
       <div className="flex items-center justify-between mb-2"><SectionLabel>Interval logging</SectionLabel><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div>
       <div className="border border-foreground overflow-x-auto">
-        <table className="text-xs font-mono min-w-[2200px] w-full">
-          <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => { const fieldError = key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${key === "dip" || key === "dipDirection" ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key, metadata)} readOnly={key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, hole Dip and hole Azimuth" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
+          <table className="text-xs font-mono min-w-[2500px] w-full">
+          <thead className="bg-secondary"><tr>{displayColumns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
+          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{displayColumns.map(([key]) => { const isHoleField = key === "holeId" || key === "holeDip" || key === "holeAzimuth"; const fieldError = key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${isHoleField || key === "dip" || key === "dipDirection" ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key, metadata)} readOnly={isHoleField || key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (isHoleField ? "From hole information above" : key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, hole Dip and hole Azimuth" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground mt-2 font-mono">Dip and Dip Direction are calculated automatically from Alpha / Dip and Beta / Dip Direction using the hole Dip and Azimuth entered above. Enter the hole orientation to activate the conversion.</p>
