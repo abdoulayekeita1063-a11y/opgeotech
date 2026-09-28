@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc";
 
 type Row = Record<string, string>;
 type Metadata = Record<string, string>;
+type Column = readonly [string, string];
 
 const metadataFields = [
   ["projectName", "Project name"], ["projectNo", "Project No"], ["deposit", "Deposit"], ["holeNo", "Hole No"],
@@ -20,7 +21,7 @@ const metadataFields = [
   ["drillingCompany", "Drilling company"], ["oriMethod", "ORI method"], ["rigNo", "Rig No."], ["oriLinePosition", "ORI line position"],
 ] as const;
 
-const columns = [
+const sourceColumns = [
   ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"],
   ["weathering", "Weathering"], ["strength", "Strength"], ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"],
   ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
@@ -29,19 +30,76 @@ const columns = [
   ["discontinuityCount", "Discontinuity Count"],
 ] as const;
 
+const derivedColumns = [
+  ["dip", "Dip"], ["dipDirection", "Dip Direction"],
+] as const;
+
+const columns = [...sourceColumns, ...derivedColumns] as readonly Column[];
+
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
+const exportColumnIndexes = [...workbookColumnIndexes, 31, 32] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
 const emptyRow = (): Row => Object.fromEntries(columns.map(([key]) => [key, ""]));
 const stringify = (value: unknown) => value == null ? "" : String(value);
 const csvSafeFileName = (value: string) => (value || "HOLEID").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toUpperCase();
+const numericValue = (value: string | undefined) => {
+  const parsed = Number.parseFloat((value ?? "").replace(/[^0-9.+-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/**
+ * Converts oriented-core alpha/beta measurements to true dip/dip direction.
+ * Convention: hole dip is positive downward from horizontal; azimuth is clockwise
+ * from north; alpha is the angle between the discontinuity plane and the core axis;
+ * beta is clockwise around the oriented core. The result is a lower-hemisphere
+ * plane orientation in degrees.
+ */
+function alphaBetaToTrueOrientation(alphaText: string, betaText: string, holeDipText: string, holeAzimuthText: string) {
+  const alpha = numericValue(alphaText);
+  const beta = numericValue(betaText);
+  const holeDip = numericValue(holeDipText);
+  const holeAzimuth = numericValue(holeAzimuthText);
+  if ([alpha, beta, holeDip, holeAzimuth].some(value => value === null)) return { dip: "", dipDirection: "" };
+
+  const rad = Math.PI / 180;
+  const dip = Math.max(0, Math.min(90, holeDip as number)) * rad;
+  const azimuth = ((holeAzimuth as number % 360) + 360) % 360 * rad;
+  const alphaRad = Math.max(0, Math.min(180, alpha as number)) * rad;
+  const betaRad = ((beta as number % 360) + 360) % 360 * rad;
+  const axis = { e: Math.sin(azimuth) * Math.cos(dip), n: Math.cos(azimuth) * Math.cos(dip), u: -Math.sin(dip) };
+  const reference = Math.abs(axis.u) < 0.95 ? { e: 0, n: 0, u: 1 } : { e: 1, n: 0, u: 0 };
+  const cross = (a: typeof axis, b: typeof axis) => ({ e: a.n * b.u - a.u * b.n, n: a.u * b.e - a.e * b.u, u: a.e * b.n - a.n * b.e });
+  const length = (v: typeof axis) => Math.hypot(v.e, v.n, v.u);
+  const normalize = (v: typeof axis) => { const size = length(v) || 1; return { e: v.e / size, n: v.n / size, u: v.u / size }; };
+  const radial = normalize(cross(axis, reference));
+  const transverse = normalize(cross(axis, radial));
+  const poleAngle = Math.PI / 2 - Math.min(Math.PI / 2, alphaRad);
+  let pole = normalize({
+    e: Math.cos(poleAngle) * axis.e + Math.sin(poleAngle) * (Math.cos(betaRad) * radial.e + Math.sin(betaRad) * transverse.e),
+    n: Math.cos(poleAngle) * axis.n + Math.sin(poleAngle) * (Math.cos(betaRad) * radial.n + Math.sin(betaRad) * transverse.n),
+    u: Math.cos(poleAngle) * axis.u + Math.sin(poleAngle) * (Math.cos(betaRad) * radial.u + Math.sin(betaRad) * transverse.u),
+  });
+  if (pole.u < 0) pole = { e: -pole.e, n: -pole.n, u: -pole.u };
+  const trueDip = Math.atan2(Math.hypot(pole.e, pole.n), pole.u) / rad;
+  const normalBearing = (Math.atan2(pole.e, pole.n) / rad + 360) % 360;
+  const trueDipDirection = (normalBearing + 180) % 360;
+  return { dip: trueDip.toFixed(1), dipDirection: trueDipDirection.toFixed(1) };
+}
 
 function findValue(row: unknown[], label: string) {
   const wanted = label.toLowerCase().replace(/[^a-z0-9]/g, "");
   const index = row.findIndex(value => stringify(value).toLowerCase().replace(/[^a-z0-9]/g, "").includes(wanted));
   if (index < 0) return "";
   return stringify(row.slice(index + 1).find(value => stringify(value).trim()));
+}
+
+function valueFor(row: Row, key: string, metadata: Metadata) {
+  if (key === "dip" || key === "dipDirection") {
+    return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", metadata.dip ?? "", metadata.azimuth ?? "")[key];
+  }
+  return row[key] ?? "";
 }
 
 export default function LoggingData() {
@@ -79,7 +137,7 @@ export default function LoggingData() {
       const start = labelRow + 1;
       const imported = matrix.slice(start).map(source => {
         const row = emptyRow();
-        columns.forEach(([key], index) => { row[key] = stringify(source[workbookColumnIndexes[index]] ?? ""); });
+        sourceColumns.forEach(([key], index) => { row[key] = stringify(source[workbookColumnIndexes[index]] ?? ""); });
         return row;
       }).filter(row => Object.values(row).some(value => value.trim()));
       setMetadata(nextMetadata);
@@ -95,21 +153,26 @@ export default function LoggingData() {
   const saveWorkbook = () => {
     const holeId = metadata.holeNo.trim();
     if (!holeId) return toast.error("Hole No is required before saving logging data");
-    const validRows = rows.filter(row => Object.values(row).some(value => value.trim()));
+    const validRows = rows.filter(row => Object.values(row).some(value => value.trim())).map(row => ({
+      ...row,
+      dip: valueFor(row, "dip", metadata),
+      dipDirection: valueFor(row, "dipDirection", metadata),
+    }));
     if (!validRows.length) return toast.error("Add at least one logging interval");
     save.mutate({ holeId, metadata, rows: validRows, comments: comments || undefined });
   };
 
   const exportWorkbook = () => {
-    const headerGroups = Array<string>(32).fill("");
+    const headerGroups = Array<string>(33).fill("");
     headerGroups[0] = "Hole ID";
     headerGroups[1] = "Depth";
     headerGroups[4] = "Rock Type";
     headerGroups[9] = "Rock Mass Data";
     headerGroups[18] = "Soil Data";
     headerGroups[21] = "Discontinuity Data";
-    const headerLabels = Array<string>(32).fill("");
-    columns.forEach(([key, label], index) => { headerLabels[workbookColumnIndexes[index]] = label; });
+    const headerLabels = Array<string>(33).fill("");
+    sourceColumns.forEach(([key, label], index) => { headerLabels[workbookColumnIndexes[index]] = label; });
+    derivedColumns.forEach(([key, label], index) => { headerLabels[exportColumnIndexes[sourceColumns.length + index]] = label; });
     const topRows = [
       ["", "", "", "", "PROJECT NAME:", "", metadata.projectName, "", "", "EASTING:", "", metadata.easting, "", "PRE COLLAR DEPTH:", metadata.preCollarDepth, "", "", "", "", "LOGGED BY:", metadata.loggedBy, "", "", "", "", "DRILL START DATE:", metadata.drillStartDate],
       ["", "", "", "", "PROJECT No:", "", metadata.projectNo, "", "", "NORTHING:", "", metadata.northing, "", "PQ DEPTH:", metadata.pqDepth, "", "", "", "", "DATE LOGGED:", metadata.dateLogged, "", "", "", "", "COMPLETION DATE:", metadata.completionDate],
@@ -117,15 +180,16 @@ export default function LoggingData() {
       ["", "", "", "", "HOLE No:", "", metadata.holeNo, "", "", "DIP:", "", metadata.dip, "", "AZIMUTH:", metadata.azimuth, "", "", "", "", "RIG No.:", metadata.rigNo, "", "", "", "", "ORI LINE POSITION:", metadata.oriLinePosition],
       [], headerGroups, headerLabels,
       ...rows.filter(row => Object.values(row).some(value => value.trim())).map(row => {
-        const output = Array<string>(32).fill("");
+        const output = Array<string>(33).fill("");
         output[0] = metadata.holeNo;
-        columns.forEach(([key], index) => { output[workbookColumnIndexes[index]] = row[key]; });
+        sourceColumns.forEach(([key], index) => { output[workbookColumnIndexes[index]] = row[key] ?? ""; });
+        derivedColumns.forEach(([key], index) => { output[exportColumnIndexes[sourceColumns.length + index]] = valueFor(row, key, metadata); });
         return output;
       }),
       [], ["Comments", comments],
     ];
     const sheet = XLSX.utils.aoa_to_sheet(topRows);
-    sheet["!cols"] = [{ wch: 16 }, ...columns.map(() => ({ wch: 18 }))];
+    sheet["!cols"] = [{ wch: 16 }, ...Array.from({ length: 32 }, () => ({ wch: 18 }))];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Sheet1");
     XLSX.writeFile(workbook, `${csvSafeFileName(metadata.holeNo)}_HOLEID_Logging.xlsx`);
@@ -158,9 +222,10 @@ export default function LoggingData() {
       <div className="border border-foreground overflow-x-auto">
         <table className="text-xs font-mono min-w-[2200px] w-full">
           <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => <td key={key} className="p-1"><Input className="rounded-none border-border min-w-24 h-8 text-xs" value={row[key] ?? ""} onChange={event => updateRow(index, key, event.target.value)} /></td>)}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
+          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${key === "dip" || key === "dipDirection" ? "bg-muted" : ""}`} value={valueFor(row, key, metadata)} readOnly={key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} title={key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, hole Dip and hole Azimuth" : undefined} /></td>)}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
         </table>
       </div>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Dip and Dip Direction are calculated automatically from Alpha / Dip and Beta / Dip Direction using the hole Dip and Azimuth entered above. Enter the hole orientation to activate the conversion.</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2"><Label className="swiss-label text-[10px]">Comments / sample selection information</Label><Textarea className="rounded-none border-foreground mt-1 min-h-24" value={comments} onChange={event => setComments(event.target.value)} /></div>
