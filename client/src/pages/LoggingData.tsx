@@ -162,7 +162,6 @@ export default function LoggingData() {
   });
   const validationErrors = orientationErrors(rows);
 
-  const updateMetadata = (key: string, value: string) => setMetadata(current => ({ ...current, [key]: value }));
   const updateRow = (index: number, key: string, value: string) => setRows(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row));
   const copyOrientationToAll = () => {
     const source = rows.find(row => String(row.holeId ?? "").trim() && String(row.holeDip ?? "").trim() && String(row.holeAzimuth ?? "").trim());
@@ -273,11 +272,6 @@ export default function LoggingData() {
         <Button variant="outline" className="rounded-none border-foreground" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" /> Import HOLEID Excel</Button>
         <Button variant="outline" className="rounded-none border-foreground" onClick={exportWorkbook}><Download className="h-4 w-4 mr-2" /> Export Excel</Button>
         <Button className="rounded-none" disabled={save.isPending} onClick={saveWorkbook}>{save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save logging data</Button>
-      </div>
-
-      <SectionLabel>Hole information</SectionLabel>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mt-3 mb-8">
-        {metadataFields.map(([key, label]) => <div key={key}><Label className="swiss-label text-[10px]">{label}</Label><Input className="rounded-none border-foreground mt-1" value={metadata[key] ?? ""} onChange={event => updateMetadata(key, event.target.value)} /></div>)}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Interval logging</SectionLabel><div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
