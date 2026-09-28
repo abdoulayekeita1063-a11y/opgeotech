@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality, getRoughnessProfile } from "../client/src/lib/loggingRmr";
+import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality, getRoughnessProfile, roughnessCodes } from "../client/src/lib/loggingRmr";
 
 describe("Logging Data rock-mass calculations", () => {
   it("calculates joint spacing as interval length divided by fracture count", () => {
@@ -47,5 +47,6 @@ describe("Logging Data rock-mass calculations", () => {
     expect(polished).toBe("70.0");
     expect(irregular).toBe("89.0");
     expect(getRoughnessProfile("Undulating Smooth")).toEqual({ jrc: 11, state: "Very rough", rmrScore: 25 });
+    expect(roughnessCodes["Undulating Smooth"]).toBe("US");
   });
 });

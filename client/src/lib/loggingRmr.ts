@@ -22,6 +22,17 @@ export const roughnessOptions = [
   "Stepped Irregular",
 ] as const;
 
+export const roughnessCodes: Record<(typeof roughnessOptions)[number], string> = {
+  "Planar polished": "PP",
+  "Planar smooth": "PS",
+  "Undulating Polished": "UP",
+  "Undulating Smooth": "US",
+  "Undulating Rough": "UR",
+  "Stepped Polished": "SP",
+  "Stepped smooth": "SS",
+  "Stepped Irregular": "SI",
+};
+
 const roughnessProfiles: Record<string, { jrc: number; state: string; rmrScore: number }> = {
   "Planar polished": { jrc: 0.5, state: "Very smooth", rmrScore: 6 },
   "Planar smooth": { jrc: 1.5, state: "Very smooth", rmrScore: 6 },
