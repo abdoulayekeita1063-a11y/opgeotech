@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateJointSpacing, calculateLoggingRmr } from "../client/src/lib/loggingRmr";
+import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality } from "../client/src/lib/loggingRmr";
 
 describe("Logging Data rock-mass calculations", () => {
   it("calculates joint spacing as interval length divided by fracture count", () => {
@@ -22,5 +22,14 @@ describe("Logging Data rock-mass calculations", () => {
     expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "", roughness: "5", waterCondition: "12" })).toBe("");
     expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "1", roughness: "7", waterCondition: "12" })).toBe("");
     expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "1", roughness: "5", waterCondition: "16" })).toBe("");
+  });
+
+  it("classifies RMR bands and marks low-quality intervals with alert colours", () => {
+    expect(getRmrQuality("85")?.label).toBe("Very good");
+    expect(getRmrQuality("45")?.label).toBe("Fair");
+    expect(getRmrQuality("35")?.label).toBe("Poor");
+    expect(getRmrQuality("35")?.cellClass).toContain("orange");
+    expect(getRmrQuality("15")?.label).toBe("Very poor");
+    expect(getRmrQuality("")).toBeNull();
   });
 });

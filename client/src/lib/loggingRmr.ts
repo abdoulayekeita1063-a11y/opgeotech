@@ -57,3 +57,19 @@ export function calculateLoggingRmr(row: Record<string, string>): string {
   const score = Math.max(0, Math.min(100, ratingUcs(ucs!) + ratingRqd(rqd!) + ratingSpacing(spacing!) + conditionRating + groundwaterRating));
   return (Math.round(score * 10) / 10).toFixed(1);
 }
+
+export type RmrQuality = {
+  label: string;
+  cellClass: string;
+  rowClass: string;
+};
+
+export function getRmrQuality(rmrText: string | undefined): RmrQuality | null {
+  const score = parseLoggingNumber(rmrText);
+  if (score === null) return null;
+  if (score >= 81) return { label: "Very good", cellClass: "bg-emerald-100 text-emerald-950 border-emerald-500", rowClass: "" };
+  if (score >= 61) return { label: "Good", cellClass: "bg-green-100 text-green-950 border-green-500", rowClass: "" };
+  if (score >= 41) return { label: "Fair", cellClass: "bg-amber-100 text-amber-950 border-amber-500", rowClass: "bg-amber-50/40" };
+  if (score >= 21) return { label: "Poor", cellClass: "bg-orange-200 text-orange-950 border-orange-600 font-semibold", rowClass: "bg-orange-50/60" };
+  return { label: "Very poor", cellClass: "bg-red-200 text-red-950 border-red-700 font-bold", rowClass: "bg-red-50/70" };
+}
