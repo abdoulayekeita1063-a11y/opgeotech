@@ -23,7 +23,7 @@ const metadataFields = [
 ] as const;
 
 const sourceColumns = [
-  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqdPercent", "RQD (%)"], ["rqd", "RQD (>100 mm)"],
+  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"], ["rqdPercent", "RQD (%)"],
   ["fractureCount", "Fracture Count"],
   ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
   ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["infillThickness", "Infill Thickness"],
@@ -40,7 +40,7 @@ const holeColumns = [
 const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
-const workbookColumnIndexes = [1, 2, 4, 9, 15, 10, 13, 21, 22, 23, 24, 26, 27, 33, 34] as const;
+const workbookColumnIndexes = [1, 2, 4, 9, 10, 15, 13, 21, 22, 23, 24, 26, 27, 33, 34] as const;
 const exportColumnIndexes = [...workbookColumnIndexes, 35, 36, 37, 38, 39, 40] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
