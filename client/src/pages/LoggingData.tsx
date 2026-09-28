@@ -21,17 +21,16 @@ const metadataFields = [
 ] as const;
 
 const columns = [
-  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["lithologyMax", "Max Lithology"], ["lithologyMin", "Min Lithology"],
-  ["colour", "Colour"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"], ["weathering", "Weathering"], ["strength", "Strength"],
-  ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"], ["spacing", "Bedding/Foliation Spacing"], ["development", "Bedding/Foliation Development"],
-  ["uscs", "USCS"], ["soilStrength", "Soil Strength"], ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
+  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"],
+  ["weathering", "Weathering"], ["strength", "Strength"], ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"],
+  ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
   ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["oriReliability", "ORI Reliability"], ["infillThickness", "Infill Thickness"],
   ["microRoughness", "Micro Roughness"], ["surfaceWeathering", "Surface Weathering"], ["jointAltInfill", "Joint Alt./Infill"],
-  ["discontinuityCount", "Discontinuity Count"], ["intervalPoint", "Interval (1) / Point (2)"],
+  ["discontinuityCount", "Discontinuity Count"],
 ] as const;
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
-const workbookColumnIndexes = [1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
+const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
 const emptyRow = (): Row => Object.fromEntries(columns.map(([key]) => [key, ""]));
