@@ -11,6 +11,34 @@ export function calculateJointSpacing(fromText: string | undefined, toText: stri
   return ((to - from) / fractureCount).toFixed(3);
 }
 
+export const roughnessOptions = [
+  "Planar polished",
+  "Planar smooth",
+  "Undulating Polished",
+  "Undulating Smooth",
+  "Undulating Rough",
+  "Stepped Polished",
+  "Stepped smooth",
+  "Stepped Irregular",
+] as const;
+
+const roughnessScores: Record<string, number> = {
+  "Planar polished": 0,
+  "Planar smooth": 1,
+  "Undulating Polished": 2,
+  "Undulating Smooth": 3,
+  "Undulating Rough": 4,
+  "Stepped Polished": 4,
+  "Stepped smooth": 5,
+  "Stepped Irregular": 6,
+};
+
+function roughnessScore(value: string | undefined): number | null {
+  const text = (value ?? "").trim();
+  if (text in roughnessScores) return roughnessScores[text];
+  return parseLoggingNumber(text);
+}
+
 function ratingUcs(ucs: number): number {
   if (ucs > 200) return 15;
   if (ucs >= 100) return 12;
@@ -54,7 +82,7 @@ function ratingWaterCondition(waterCondition: number): number {
 
 /**
  * Calculates Bieniawski RMR from the fields available in an interval row.
- * Roughness is entered on a 0–6 scale and mapped to the supplied joint-nature
+ * Roughness is selected from the supplied surface descriptions and mapped to the supplied joint-nature
  * notes (25 / 20 / 12 / 6 / 0). Water condition is entered on a 0–15 scale
  * and mapped to the supplied water ratings (10 / 7 / 4 / 0).
  */
@@ -62,7 +90,7 @@ export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
   const rqd = parseLoggingNumber(row.rqdPercent ?? row.rqd);
   const spacing = parseLoggingNumber(row.jointSpacing);
-  const roughness = parseLoggingNumber(row.roughness);
+  const roughness = roughnessScore(row.roughness);
   const waterCondition = parseLoggingNumber(row.waterCondition);
   if ([ucs, rqd, spacing, roughness, waterCondition].some(value => value === null)) return "";
   if (ucs! < 0 || rqd! < 0 || rqd! > 100 || spacing! < 0 || roughness! < 0 || roughness! > 6 || waterCondition! < 0 || waterCondition! > 15) return "";

@@ -40,4 +40,11 @@ describe("Logging Data rock-mass calculations", () => {
     expect(withHighPercent).toBe("84.0");
     expect(withLowPercent).toBe("70.0");
   });
+
+  it("accepts the requested roughness labels in the RMR calculation", () => {
+    const polished = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Planar polished", waterCondition: "12" });
+    const irregular = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Stepped Irregular", waterCondition: "12" });
+    expect(polished).toBe("64.0");
+    expect(irregular).toBe("89.0");
+  });
 });
