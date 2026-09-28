@@ -22,21 +22,19 @@ export const roughnessOptions = [
   "Stepped Irregular",
 ] as const;
 
-const roughnessScores: Record<string, number> = {
-  "Planar polished": 0,
-  "Planar smooth": 1,
-  "Undulating Polished": 2,
-  "Undulating Smooth": 3,
-  "Undulating Rough": 4,
-  "Stepped Polished": 4,
-  "Stepped smooth": 5,
-  "Stepped Irregular": 6,
+const roughnessProfiles: Record<string, { jrc: number; state: string; rmrScore: number }> = {
+  "Planar polished": { jrc: 1.4, state: "Very smooth", rmrScore: 6 },
+  "Planar smooth": { jrc: 1.4, state: "Very smooth", rmrScore: 6 },
+  "Undulating Polished": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
+  "Undulating Smooth": { jrc: 8, state: "Rough", rmrScore: 20 },
+  "Undulating Rough": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
+  "Stepped Polished": { jrc: 2.3, state: "Smooth", rmrScore: 6 },
+  "Stepped smooth": { jrc: 8, state: "Rough", rmrScore: 20 },
+  "Stepped Irregular": { jrc: 8, state: "Rough", rmrScore: 20 },
 };
 
-function roughnessScore(value: string | undefined): number | null {
-  const text = (value ?? "").trim();
-  if (text in roughnessScores) return roughnessScores[text];
-  return parseLoggingNumber(text);
+export function getRoughnessProfile(value: string | undefined) {
+  return roughnessProfiles[(value ?? "").trim()] ?? null;
 }
 
 function ratingUcs(ucs: number): number {
@@ -90,12 +88,13 @@ export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
   const rqd = parseLoggingNumber(row.rqdPercent ?? row.rqd);
   const spacing = parseLoggingNumber(row.jointSpacing);
-  const roughness = roughnessScore(row.roughness);
+  const roughnessProfile = getRoughnessProfile(row.roughness);
+  const roughness = roughnessProfile ? 1 : parseLoggingNumber(row.roughness);
   const waterCondition = parseLoggingNumber(row.waterCondition);
   if ([ucs, rqd, spacing, roughness, waterCondition].some(value => value === null)) return "";
   if (ucs! < 0 || rqd! < 0 || rqd! > 100 || spacing! < 0 || roughness! < 0 || roughness! > 6 || waterCondition! < 0 || waterCondition! > 15) return "";
 
-  const conditionRating = ratingJointNature(roughness!);
+  const conditionRating = roughnessProfile?.rmrScore ?? ratingJointNature(roughness!);
   const groundwaterRating = ratingWaterCondition(waterCondition!);
   const score = Math.max(0, Math.min(100, ratingUcs(ucs!) + ratingRqd(rqd!) + ratingSpacing(spacing!) + conditionRating + groundwaterRating));
   return (Math.round(score * 10) / 10).toFixed(1);

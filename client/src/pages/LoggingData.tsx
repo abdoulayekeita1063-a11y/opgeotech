@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { trpc } from "@/lib/trpc";
-import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality, roughnessOptions } from "@/lib/loggingRmr";
+import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality, getRoughnessProfile, roughnessOptions } from "@/lib/loggingRmr";
 
 type Row = Record<string, string>;
 type Metadata = Record<string, string>;
@@ -27,12 +27,12 @@ const sourceColumns = [
   ["weathering", "Weathering"], ["strength", "Strength"], ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"],
   ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
   ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["oriReliability", "ORI Reliability"], ["infillThickness", "Infill Thickness"],
-  ["microRoughness", "Roughness (0–6)"], ["surfaceWeathering", "Surface Weathering"], ["jointAltInfill", "Joint Alt./Infill"],
+  ["microRoughness", "Roughness profile"], ["surfaceWeathering", "Surface Weathering"], ["jointAltInfill", "Joint Alt./Infill"],
   ["discontinuityCount", "Discontinuity Count"], ["ucs", "UCS (MPa)"], ["waterCondition", "Water Condition (0–15)"],
 ] as const;
 
 const derivedColumns = [
-  ["jointSpacing", "Joint Spacing (m)"], ["dip", "Dip"], ["dipDirection", "Dip Direction"], ["rmr", "RMR"],
+  ["jointSpacing", "Joint Spacing (m)"], ["jrc", "JRC"], ["roughnessState", "Surface state"], ["dip", "Dip"], ["dipDirection", "Dip Direction"], ["rmr", "RMR"],
 ] as const;
 
 const holeColumns = [
@@ -42,7 +42,7 @@ const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonl
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 15, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34] as const;
-const exportColumnIndexes = [...workbookColumnIndexes, 35, 36, 37, 38] as const;
+const exportColumnIndexes = [...workbookColumnIndexes, 35, 36, 37, 38, 39, 40] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
 const emptyRow = (): Row => Object.fromEntries(columns.map(([key]) => [key, ""]));
@@ -103,6 +103,8 @@ function findValue(row: unknown[], label: string) {
 function valueFor(row: Row, key: string) {
   if (key === "holeId" || key === "holeDip" || key === "holeAzimuth") return row[key] ?? "";
   if (key === "jointSpacing") return calculateJointSpacing(row.from, row.to, row.fractureCount);
+  if (key === "jrc") return getRoughnessProfile(row.microRoughness)?.jrc.toFixed(1) ?? "";
+  if (key === "roughnessState") return getRoughnessProfile(row.microRoughness)?.state ?? "";
   if (key === "rmr") return calculateLoggingRmr({ ...row, jointSpacing: calculateJointSpacing(row.from, row.to, row.fractureCount), roughness: row.microRoughness });
   if (key === "dip" || key === "dipDirection") {
     return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", row.holeDip ?? "", row.holeAzimuth ?? "")[key];
@@ -290,10 +292,10 @@ export default function LoggingData() {
       <div className="border border-foreground overflow-x-auto">
           <table className="text-xs font-mono min-w-[2500px] w-full">
           <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{columns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = key === "dip" || key === "dipDirection" || key === "jointSpacing" || key === "rmr"; const cellQualityClass = key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""; const fieldValue = valueFor(row, key); return <td key={key} className="p-1">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} aria-label={`Interval ${index + 1} roughness`}> <option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${cellQualityClass} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (calculated ? `Calculated from interval inputs${rmrQuality ? ` — ${rmrQuality.label} quality` : ""}` : undefined)} />}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
+          <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{columns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = key === "dip" || key === "dipDirection" || key === "jointSpacing" || key === "jrc" || key === "roughnessState" || key === "rmr"; const cellQualityClass = key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""; const fieldValue = valueFor(row, key); return <td key={key} className="p-1">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} aria-label={`Interval ${index + 1} roughness`}> <option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${cellQualityClass} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (calculated ? `Calculated from interval inputs${rmrQuality ? ` — ${rmrQuality.label} quality` : ""}` : undefined)} />}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Joint Spacing = (To − From) ÷ Fracture Count. RMR follows the supplied table: UCS 15/12/7/4/2/1/0, RQD 20/17/13/8/3, spacing 30/25/20/10/5, joint nature 25/20/12/6/0 and water 10/7/4/0.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Joint Spacing = (To − From) ÷ Fracture Count. JRC and surface state are derived from the selected roughness profile, then the corresponding joint-nature score is added to RMR.</p>
       <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider" aria-label="RMR quality legend"><span className="font-semibold mr-1">RMR quality alert:</span><span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">81–100 Very good</span><span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">61–80 Good</span><span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">41–60 Fair</span><span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">21–40 Poor</span><span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">0–20 Very poor</span></div>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
