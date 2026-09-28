@@ -12,12 +12,12 @@ export function calculateJointSpacing(fromText: string | undefined, toText: stri
 }
 
 function ratingUcs(ucs: number): number {
-  if (ucs > 250) return 15;
-  if (ucs > 100) return 12;
-  if (ucs > 50) return 7;
-  if (ucs > 25) return 4;
-  if (ucs > 5) return 2;
-  if (ucs > 1) return 1;
+  if (ucs > 200) return 15;
+  if (ucs >= 100) return 12;
+  if (ucs >= 50) return 7;
+  if (ucs >= 25) return 4;
+  if (ucs >= 10) return 2;
+  if (ucs >= 3) return 1;
   return 0;
 }
 
@@ -30,18 +30,33 @@ function ratingRqd(rqd: number): number {
 }
 
 function ratingSpacing(spacing: number): number {
-  if (spacing > 2) return 20;
-  if (spacing > 0.6) return 15;
-  if (spacing > 0.2) return 10;
-  if (spacing > 0.06) return 8;
+  if (spacing > 3) return 30;
+  if (spacing >= 1) return 25;
+  if (spacing >= 0.3) return 20;
+  if (spacing >= 0.05) return 10;
   return 5;
+}
+
+function ratingJointNature(roughness: number): number {
+  if (roughness >= 6) return 25;
+  if (roughness >= 4) return 20;
+  if (roughness >= 2) return 12;
+  if (roughness > 0) return 6;
+  return 0;
+}
+
+function ratingWaterCondition(waterCondition: number): number {
+  if (waterCondition >= 10) return 10;
+  if (waterCondition >= 7) return 7;
+  if (waterCondition >= 4) return 4;
+  return 0;
 }
 
 /**
  * Calculates Bieniawski RMR from the fields available in an interval row.
- * Roughness is entered on a 0–6 scale and mapped to the 0–30 discontinuity
- * condition contribution. Water condition is entered directly on the standard
- * 0–15 groundwater rating scale, where 15 represents dry conditions.
+ * Roughness is entered on a 0–6 scale and mapped to the supplied joint-nature
+ * notes (25 / 20 / 12 / 6 / 0). Water condition is entered on a 0–15 scale
+ * and mapped to the supplied water ratings (10 / 7 / 4 / 0).
  */
 export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
@@ -52,8 +67,8 @@ export function calculateLoggingRmr(row: Record<string, string>): string {
   if ([ucs, rqd, spacing, roughness, waterCondition].some(value => value === null)) return "";
   if (ucs! < 0 || rqd! < 0 || rqd! > 100 || spacing! < 0 || roughness! < 0 || roughness! > 6 || waterCondition! < 0 || waterCondition! > 15) return "";
 
-  const conditionRating = Math.max(0, Math.min(30, roughness! * 5));
-  const groundwaterRating = Math.max(0, Math.min(15, waterCondition!));
+  const conditionRating = ratingJointNature(roughness!);
+  const groundwaterRating = ratingWaterCondition(waterCondition!);
   const score = Math.max(0, Math.min(100, ratingUcs(ucs!) + ratingRqd(rqd!) + ratingSpacing(spacing!) + conditionRating + groundwaterRating));
   return (Math.round(score * 10) / 10).toFixed(1);
 }

@@ -16,7 +16,7 @@ describe("Logging Data rock-mass calculations", () => {
       jointSpacing: "1.000",
       roughness: "5",
       waterCondition: "12",
-    })).toBe("81.0");
+    })).toBe("84.0");
   });
 
   it("returns a blank RMR when required inputs are incomplete or out of range", () => {
@@ -37,7 +37,7 @@ describe("Logging Data rock-mass calculations", () => {
   it("uses RQD (%) when both RQD fields are present", () => {
     const withHighPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", rqd: "10", jointSpacing: "1", roughness: "5", waterCondition: "12" });
     const withLowPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "10", rqd: "80", jointSpacing: "1", roughness: "5", waterCondition: "12" });
-    expect(withHighPercent).toBe("81.0");
-    expect(withLowPercent).toBe("67.0");
+    expect(withHighPercent).toBe("84.0");
+    expect(withLowPercent).toBe("70.0");
   });
 });
