@@ -11,7 +11,8 @@ describe("Logging Data rock-mass calculations", () => {
   it("calculates RMR from UCS, RQD, joint spacing, roughness and water condition", () => {
     expect(calculateLoggingRmr({
       ucs: "120",
-      rqd: "80",
+      rqdPercent: "80",
+      rqd: "10",
       jointSpacing: "1.000",
       roughness: "5",
       waterCondition: "12",
@@ -31,5 +32,12 @@ describe("Logging Data rock-mass calculations", () => {
     expect(getRmrQuality("35")?.cellClass).toContain("orange");
     expect(getRmrQuality("15")?.label).toBe("Very poor");
     expect(getRmrQuality("")).toBeNull();
+  });
+
+  it("uses RQD (%) when both RQD fields are present", () => {
+    const withHighPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", rqd: "10", jointSpacing: "1", roughness: "5", waterCondition: "12" });
+    const withLowPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "10", rqd: "80", jointSpacing: "1", roughness: "5", waterCondition: "12" });
+    expect(withHighPercent).toBe("81.0");
+    expect(withLowPercent).toBe("67.0");
   });
 });

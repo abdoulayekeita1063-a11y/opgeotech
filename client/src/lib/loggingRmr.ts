@@ -45,7 +45,7 @@ function ratingSpacing(spacing: number): number {
  */
 export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
-  const rqd = parseLoggingNumber(row.rqd);
+  const rqd = parseLoggingNumber(row.rqdPercent ?? row.rqd);
   const spacing = parseLoggingNumber(row.jointSpacing);
   const roughness = parseLoggingNumber(row.roughness);
   const waterCondition = parseLoggingNumber(row.waterCondition);

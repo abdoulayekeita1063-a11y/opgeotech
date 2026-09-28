@@ -23,7 +23,7 @@ const metadataFields = [
 ] as const;
 
 const sourceColumns = [
-  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"],
+  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqdPercent", "RQD (%)"], ["rqd", "RQD (>100 mm)"],
   ["weathering", "Weathering"], ["strength", "Strength"], ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"],
   ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
   ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["oriReliability", "ORI Reliability"], ["infillThickness", "Infill Thickness"],
@@ -41,7 +41,7 @@ const holeColumns = [
 const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
-const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34] as const;
+const workbookColumnIndexes = [1, 2, 4, 9, 15, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34] as const;
 const exportColumnIndexes = [...workbookColumnIndexes, 35, 36, 37, 38] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
@@ -293,7 +293,7 @@ export default function LoggingData() {
           <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{columns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = key === "dip" || key === "dipDirection" || key === "jointSpacing" || key === "rmr"; const cellQualityClass = key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${cellQualityClass} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key)} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (calculated ? `Calculated from interval inputs${rmrQuality ? ` — ${rmrQuality.label} quality` : ""}` : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Joint Spacing = (To − From) ÷ Fracture Count. RMR is calculated from UCS, RQD, Joint Spacing, Roughness (0–6 mapped to the 0–30 discontinuity-condition contribution) and Water Condition (0–15 groundwater rating).</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Joint Spacing = (To − From) ÷ Fracture Count. RMR uses RQD (%) together with UCS, Joint Spacing, Roughness (0–6 mapped to the 0–30 discontinuity-condition contribution) and Water Condition (0–15 groundwater rating).</p>
       <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider" aria-label="RMR quality legend"><span className="font-semibold mr-1">RMR quality alert:</span><span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">81–100 Very good</span><span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">61–80 Good</span><span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">41–60 Fair</span><span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">21–40 Poor</span><span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">0–20 Very poor</span></div>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
