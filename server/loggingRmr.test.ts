@@ -48,7 +48,7 @@ describe("Logging Data rock-mass calculations", () => {
     expect(irregular).toBe("89.0");
     expect(getRoughnessProfile("Undulating Smooth")).toEqual({ jrc: 11, state: "Very rough", rmrScore: 25 });
     expect(roughnessCodes["Undulating Smooth"]).toBe("US");
-    expect(getRoughnessProfile("Planar rough")).toEqual({ jrc: 2.5, state: "Smooth", rmrScore: 6 });
+    expect(getRoughnessProfile("Planar rough")).toEqual({ jrc: 2.5, state: "Rough", rmrScore: 20 });
     expect(roughnessCodes["Planar rough"]).toBe("PR");
   });
 });
