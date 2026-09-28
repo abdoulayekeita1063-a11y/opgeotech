@@ -15,7 +15,7 @@ type Column = readonly [string, string];
 
 const metadataFields = [
   ["projectName", "Project name"], ["projectNo", "Project No"], ["deposit", "Deposit"], ["holeNo", "Hole No"],
-  ["easting", "Easting"], ["northing", "Northing"], ["rl", "R.L."], ["dip", "Dip"], ["azimuth", "Azimuth"],
+  ["easting", "Easting"], ["northing", "Northing"], ["rl", "R.L."],
   ["preCollarDepth", "Pre collar depth"], ["pqDepth", "PQ depth"], ["hqDepth", "HQ depth"], ["loggedBy", "Logged by"],
   ["dateLogged", "Date logged"], ["drillStartDate", "Drill start date"], ["completionDate", "Completion date"],
   ["drillingCompany", "Drilling company"], ["oriMethod", "ORI method"], ["rigNo", "Rig No."], ["oriLinePosition", "ORI line position"],
@@ -34,11 +34,10 @@ const derivedColumns = [
   ["dip", "Dip"], ["dipDirection", "Dip Direction"],
 ] as const;
 
-const columns = [...sourceColumns, ...derivedColumns] as readonly Column[];
-const displayColumns = [
+const holeColumns = [
   ["holeId", "Hole ID"], ["holeDip", "Hole Dip"], ["holeAzimuth", "Hole Azimuth"],
-  ...columns,
-] as readonly Column[];
+] as const;
+const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
@@ -100,12 +99,10 @@ function findValue(row: unknown[], label: string) {
   return stringify(row.slice(index + 1).find(value => stringify(value).trim()));
 }
 
-function valueFor(row: Row, key: string, metadata: Metadata) {
-  if (key === "holeId") return metadata.holeNo ?? "";
-  if (key === "holeDip") return metadata.dip ?? "";
-  if (key === "holeAzimuth") return metadata.azimuth ?? "";
+function valueFor(row: Row, key: string) {
+  if (key === "holeId" || key === "holeDip" || key === "holeAzimuth") return row[key] ?? "";
   if (key === "dip" || key === "dipDirection") {
-    return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", metadata.dip ?? "", metadata.azimuth ?? "")[key];
+    return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", row.holeDip ?? "", row.holeAzimuth ?? "")[key];
   }
   return row[key] ?? "";
 }
@@ -120,26 +117,29 @@ function validateAngleText(value: string, label: string, min: number, max: numbe
   return null;
 }
 
-function orientationErrors(metadata: Metadata, rows: Row[]) {
+function orientationErrors(rows: Row[]) {
   const errors: string[] = [];
-  const holeDipError = validateAngleText(metadata.dip ?? "", "Hole Dip", 0, 90);
-  const azimuthError = validateAngleText(metadata.azimuth ?? "", "Hole Azimuth", 0, 360);
-  if (holeDipError) errors.push(holeDipError);
-  if (azimuthError) errors.push(azimuthError);
   rows.forEach((row, index) => {
+    const holeDipText = row.holeDip ?? "";
+    const holeAzimuthText = row.holeAzimuth ?? "";
+    const holeDipError = validateAngleText(holeDipText, `Interval ${index + 1} Hole Dip`, 0, 90);
+    const azimuthError = validateAngleText(holeAzimuthText, `Interval ${index + 1} Hole Azimuth`, 0, 360);
+    if (holeDipError) errors.push(holeDipError);
+    if (azimuthError) errors.push(azimuthError);
     const alphaText = row.alphaDip ?? "";
     const betaText = row.betaDipDir ?? "";
     const hasAlpha = alphaText.trim().length > 0;
     const hasBeta = betaText.trim().length > 0;
-    if (!hasAlpha && !hasBeta) return;
+    const hasHoleOrientation = holeDipText.trim().length > 0 || holeAzimuthText.trim().length > 0;
+    if (!hasAlpha && !hasBeta && !hasHoleOrientation) return;
+    if (!holeDipText.trim()) errors.push(`Interval ${index + 1}: Hole Dip is required for each interval.`);
+    if (!holeAzimuthText.trim()) errors.push(`Interval ${index + 1}: Hole Azimuth is required for each interval.`);
     if (!hasAlpha) errors.push(`Interval ${index + 1}: Alpha / Dip is required when Beta / Dip Dir. is entered.`);
     if (!hasBeta) errors.push(`Interval ${index + 1}: Beta / Dip Dir. is required when Alpha / Dip is entered.`);
     const alphaError = validateAngleText(alphaText, `Interval ${index + 1} Alpha / Dip`, 0, 180);
     const betaError = validateAngleText(betaText, `Interval ${index + 1} Beta / Dip Dir.`, 0, 360);
     if (alphaError) errors.push(alphaError);
     if (betaError) errors.push(betaError);
-    if (!holeDipError && !(metadata.dip ?? "").trim()) errors.push(`Interval ${index + 1}: Hole Dip is required for orientation conversion.`);
-    if (!azimuthError && !(metadata.azimuth ?? "").trim()) errors.push(`Interval ${index + 1}: Hole Azimuth is required for orientation conversion.`);
   });
   return Array.from(new Set(errors));
 }
@@ -160,7 +160,7 @@ export default function LoggingData() {
     onSuccess: () => { toast.success("Logging workbook deleted"); setSelectedLogId(null); setMetadata(emptyMetadata()); setRows([emptyRow()]); setComments(""); utils.logging.list.invalidate(); },
     onError: error => toast.error(error.message),
   });
-  const validationErrors = orientationErrors(metadata, rows);
+  const validationErrors = orientationErrors(rows);
 
   const updateMetadata = (key: string, value: string) => setMetadata(current => ({ ...current, [key]: value }));
   const updateRow = (index: number, key: string, value: string) => setRows(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row));
@@ -180,10 +180,13 @@ export default function LoggingData() {
       const start = labelRow + 1;
       const imported = matrix.slice(start).map(source => {
         const row = emptyRow();
+        row.holeId = stringify(source[0] ?? "") || nextMetadata.holeNo;
+        row.holeDip = nextMetadata.dip ?? "";
+        row.holeAzimuth = nextMetadata.azimuth ?? "";
         sourceColumns.forEach(([key], index) => { row[key] = stringify(source[workbookColumnIndexes[index]] ?? ""); });
         return row;
       }).filter(row => Object.values(row).some(value => value.trim()));
-      const importedErrors = orientationErrors(nextMetadata, imported);
+      const importedErrors = orientationErrors(imported);
       if (importedErrors.length) throw new Error(`Validation failed: ${importedErrors[0]}`);
       setMetadata(nextMetadata);
       setRows(imported.length ? imported : [emptyRow()]);
@@ -197,14 +200,15 @@ export default function LoggingData() {
 
   const saveWorkbook = () => {
     if (validationErrors.length) return toast.error(validationErrors[0]);
-    const holeId = metadata.holeNo.trim();
-    if (!holeId) return toast.error("Hole No is required before saving logging data");
+    const rowHoleId = rows.find(row => String(row.holeId ?? "").trim())?.holeId ?? "";
     const validRows = rows.filter(row => Object.values(row).some(value => value.trim())).map(row => ({
       ...row,
-      dip: valueFor(row, "dip", metadata),
-      dipDirection: valueFor(row, "dipDirection", metadata),
+      dip: valueFor(row, "dip"),
+      dipDirection: valueFor(row, "dipDirection"),
     }));
     if (!validRows.length) return toast.error("Add at least one logging interval");
+    const holeId = metadata.holeNo.trim() || String(rowHoleId).trim();
+    if (!holeId) return toast.error("Enter a Hole No or Hole ID before saving logging data");
     save.mutate({ holeId, metadata, rows: validRows, comments: comments || undefined });
   };
 
@@ -228,9 +232,9 @@ export default function LoggingData() {
       [], headerGroups, headerLabels,
       ...rows.filter(row => Object.values(row).some(value => value.trim())).map(row => {
         const output = Array<string>(33).fill("");
-        output[0] = metadata.holeNo;
+        output[0] = row.holeId || metadata.holeNo;
         sourceColumns.forEach(([key], index) => { output[workbookColumnIndexes[index]] = row[key] ?? ""; });
-        derivedColumns.forEach(([key], index) => { output[exportColumnIndexes[sourceColumns.length + index]] = valueFor(row, key, metadata); });
+        derivedColumns.forEach(([key], index) => { output[exportColumnIndexes[sourceColumns.length + index]] = valueFor(row, key); });
         return output;
       }),
       [], ["Comments", comments],
@@ -262,20 +266,17 @@ export default function LoggingData() {
 
       <SectionLabel>Hole information</SectionLabel>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mt-3 mb-8">
-        {metadataFields.map(([key, label]) => {
-          const fieldError = key === "dip" ? validateAngleText(metadata.dip ?? "", "Hole Dip", 0, 90) : key === "azimuth" ? validateAngleText(metadata.azimuth ?? "", "Hole Azimuth", 0, 360) : null;
-          return <div key={key}><Label className="swiss-label text-[10px]">{label}</Label><Input className={`rounded-none border-foreground mt-1 ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={metadata[key] ?? ""} onChange={event => updateMetadata(key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? undefined} />{fieldError && <p className="text-[10px] text-destructive mt-1">{fieldError}</p>}</div>;
-        })}
+        {metadataFields.map(([key, label]) => <div key={key}><Label className="swiss-label text-[10px]">{label}</Label><Input className="rounded-none border-foreground mt-1" value={metadata[key] ?? ""} onChange={event => updateMetadata(key, event.target.value)} /></div>)}
       </div>
 
       <div className="flex items-center justify-between mb-2"><SectionLabel>Interval logging</SectionLabel><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div>
       <div className="border border-foreground overflow-x-auto">
           <table className="text-xs font-mono min-w-[2500px] w-full">
-          <thead className="bg-secondary"><tr>{displayColumns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{displayColumns.map(([key]) => { const isHoleField = key === "holeId" || key === "holeDip" || key === "holeAzimuth"; const fieldError = key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${isHoleField || key === "dip" || key === "dipDirection" ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key, metadata)} readOnly={isHoleField || key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (isHoleField ? "From hole information above" : key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, hole Dip and hole Azimuth" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
+          <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
+          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => { const isHoleField = key === "holeId" || key === "holeDip" || key === "holeAzimuth"; const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${key === "dip" || key === "dipDirection" ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key)} readOnly={key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, Hole Dip and Hole Azimuth" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Dip and Dip Direction are calculated automatically from Alpha / Dip and Beta / Dip Direction using the hole Dip and Azimuth entered above. Enter the hole orientation to activate the conversion.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Dip and Dip Direction are calculated automatically from Alpha / Dip and Beta / Dip Direction using the Hole Dip and Hole Azimuth entered in the same interval row. Enter the row orientation to activate the conversion.</p>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
