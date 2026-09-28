@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import { trpc } from "@/lib/trpc";
+import { calculateJointSpacing, calculateLoggingRmr } from "@/lib/loggingRmr";
 
 type Row = Record<string, string>;
 type Metadata = Record<string, string>;
@@ -26,12 +27,12 @@ const sourceColumns = [
   ["weathering", "Weathering"], ["strength", "Strength"], ["fractureCount", "Fracture Count"], ["structuralSets", "Structural Sets"],
   ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"],
   ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["oriReliability", "ORI Reliability"], ["infillThickness", "Infill Thickness"],
-  ["microRoughness", "Micro Roughness"], ["surfaceWeathering", "Surface Weathering"], ["jointAltInfill", "Joint Alt./Infill"],
-  ["discontinuityCount", "Discontinuity Count"],
+  ["microRoughness", "Roughness (0–6)"], ["surfaceWeathering", "Surface Weathering"], ["jointAltInfill", "Joint Alt./Infill"],
+  ["discontinuityCount", "Discontinuity Count"], ["ucs", "UCS (MPa)"], ["waterCondition", "Water Condition (0–15)"],
 ] as const;
 
 const derivedColumns = [
-  ["dip", "Dip"], ["dipDirection", "Dip Direction"],
+  ["jointSpacing", "Joint Spacing (m)"], ["dip", "Dip"], ["dipDirection", "Dip Direction"], ["rmr", "RMR"],
 ] as const;
 
 const holeColumns = [
@@ -40,8 +41,8 @@ const holeColumns = [
 const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
-const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30] as const;
-const exportColumnIndexes = [...workbookColumnIndexes, 31, 32] as const;
+const workbookColumnIndexes = [1, 2, 4, 9, 10, 11, 12, 13, 14, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 34] as const;
+const exportColumnIndexes = [...workbookColumnIndexes, 35, 36, 37, 38] as const;
 
 const emptyMetadata = (): Metadata => Object.fromEntries(metadataFields.map(([key]) => [key, ""]));
 const emptyRow = (): Row => Object.fromEntries(columns.map(([key]) => [key, ""]));
@@ -101,6 +102,8 @@ function findValue(row: unknown[], label: string) {
 
 function valueFor(row: Row, key: string) {
   if (key === "holeId" || key === "holeDip" || key === "holeAzimuth") return row[key] ?? "";
+  if (key === "jointSpacing") return calculateJointSpacing(row.from, row.to, row.fractureCount);
+  if (key === "rmr") return calculateLoggingRmr({ ...row, jointSpacing: calculateJointSpacing(row.from, row.to, row.fractureCount), roughness: row.microRoughness });
   if (key === "dip" || key === "dipDirection") {
     return alphaBetaToTrueOrientation(row.alphaDip ?? "", row.betaDipDir ?? "", row.holeDip ?? "", row.holeAzimuth ?? "")[key];
   }
@@ -225,14 +228,14 @@ export default function LoggingData() {
 
   const exportWorkbook = () => {
     if (validationErrors.length) return toast.error(validationErrors[0]);
-    const headerGroups = Array<string>(33).fill("");
+    const headerGroups = Array<string>(39).fill("");
     headerGroups[0] = "Hole ID";
     headerGroups[1] = "Depth";
     headerGroups[4] = "Rock Type";
     headerGroups[9] = "Rock Mass Data";
     headerGroups[18] = "Soil Data";
     headerGroups[21] = "Discontinuity Data";
-    const headerLabels = Array<string>(33).fill("");
+    const headerLabels = Array<string>(39).fill("");
     sourceColumns.forEach(([key, label], index) => { headerLabels[workbookColumnIndexes[index]] = label; });
     derivedColumns.forEach(([key, label], index) => { headerLabels[exportColumnIndexes[sourceColumns.length + index]] = label; });
     const topRows = [
@@ -242,7 +245,7 @@ export default function LoggingData() {
       ["", "", "", "", "HOLE No:", "", metadata.holeNo, "", "", "DIP:", "", metadata.dip, "", "AZIMUTH:", metadata.azimuth, "", "", "", "", "RIG No.:", metadata.rigNo, "", "", "", "", "ORI LINE POSITION:", metadata.oriLinePosition],
       [], headerGroups, headerLabels,
       ...rows.filter(row => Object.values(row).some(value => value.trim())).map(row => {
-        const output = Array<string>(33).fill("");
+        const output = Array<string>(39).fill("");
         output[0] = row.holeId || metadata.holeNo;
         sourceColumns.forEach(([key], index) => { output[workbookColumnIndexes[index]] = row[key] ?? ""; });
         derivedColumns.forEach(([key], index) => { output[exportColumnIndexes[sourceColumns.length + index]] = valueFor(row, key); });
@@ -284,10 +287,10 @@ export default function LoggingData() {
       <div className="border border-foreground overflow-x-auto">
           <table className="text-xs font-mono min-w-[2500px] w-full">
           <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => { const isHoleField = key === "holeId" || key === "holeDip" || key === "holeAzimuth"; const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${key === "dip" || key === "dipDirection" ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key)} readOnly={key === "dip" || key === "dipDirection"} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (key === "dip" || key === "dipDirection" ? "Calculated from Alpha / Dip, Beta / Dip Direction, Hole Dip and Hole Azimuth" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
+          <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border align-top">{columns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = key === "dip" || key === "dipDirection" || key === "jointSpacing" || key === "rmr"; return <td key={key} className="p-1"><Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={valueFor(row, key)} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (calculated ? "Calculated from interval logging inputs" : undefined)} /></td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Dip and Dip Direction are calculated automatically from Alpha / Dip and Beta / Dip Direction using the Hole Dip and Hole Azimuth entered in the same interval row. Enter the row orientation to activate the conversion.</p>
+      <p className="text-[11px] text-muted-foreground mt-2 font-mono">Joint Spacing = (To − From) ÷ Fracture Count. RMR is calculated from UCS, RQD, Joint Spacing, Roughness (0–6 mapped to the 0–30 discontinuity-condition contribution) and Water Condition (0–15 groundwater rating).</p>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
