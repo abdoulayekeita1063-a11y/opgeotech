@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { ClipboardEvent } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { Download, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
@@ -316,9 +317,29 @@ export default function LoggingData() {
     setComments(log.comments ?? "");
   };
 
+  const pasteGrid = (startRow: number, startKey: string, tableColumns: readonly Column[], text: string) => {
+    const matrix = text.replace(/\r/g, "").split("\n").filter(line => line.length > 0).map(line => line.split("\t"));
+    const startColumn = tableColumns.findIndex(([key]) => key === startKey);
+    if (startColumn < 0 || !matrix.length) return;
+    setRows(current => {
+      const next = [...current];
+      while (next.length < startRow + matrix.length) next.push(emptyRow());
+      matrix.forEach((values, rowOffset) => values.forEach((value, columnOffset) => {
+        const column = tableColumns[startColumn + columnOffset];
+        if (column && !["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(column[0])) next[startRow + rowOffset] = { ...next[startRow + rowOffset], [column[0]]: value };
+      }));
+      return next;
+    });
+  };
+
+  const fillDown = (startRow: number, key: string, value: string) => {
+    if (!value.trim()) return;
+    setRows(current => current.map((row, index) => index >= startRow ? { ...row, [key]: value } : row));
+  };
+
   const renderIntervalTable = (tableColumns: readonly Column[]) => <div className="border border-foreground overflow-x-auto">
     <table className="text-xs font-mono min-w-[1200px] w-full"><thead className="bg-secondary"><tr>{tableColumns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-      <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{tableColumns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = ["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(key); const fieldValue = valueFor(row, key); return <td key={key} className="p-1">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} aria-label={`Interval ${index + 1} roughness`}><option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} />}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
+      <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{tableColumns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = ["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(key); const fieldValue = valueFor(row, key); const handlePaste = (event: ClipboardEvent) => { const text = event.clipboardData.getData("text/plain"); if (text.includes("\t") || text.includes("\n")) { event.preventDefault(); pasteGrid(index, key, tableColumns, text); } }; return <td key={key} className="p-1 relative group">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} aria-label={`Interval ${index + 1} roughness`}><option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} aria-invalid={Boolean(fieldError)} />}{!calculated && <button type="button" className="absolute right-0 bottom-0 hidden group-hover:block bg-primary text-primary-foreground text-[9px] leading-none px-1 py-0.5" onClick={() => fillDown(index, key, fieldValue)} title="Fill this value down" aria-label={`Fill ${key} down`}>↓</button>}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
     </table>
   </div>;
 
@@ -335,6 +356,7 @@ export default function LoggingData() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap gap-2"><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
+      <p className="text-[10px] text-muted-foreground font-mono mb-2">Excel-style editing: paste tabular cells directly into any input. Hover a cell and click ↓ to fill its value down the column.</p>
       {renderIntervalTable(rockMassColumns)}
       <div className="mt-6 mb-2"><SectionLabel>Discontinuity data</SectionLabel></div>
       {renderIntervalTable(discontinuityColumns)}
