@@ -46,6 +46,7 @@ const rockMassColumns = [
 const discontinuityColumns = [
   ...holeColumns, ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"], ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["dip", "Dip"], ["dipDirection", "Dip Direction"],
 ] as readonly Column[];
+const rockSourceColumns = sourceColumns.filter(([key]) => !["structureDepth", "structureType", "alphaDip", "betaDipDir"].includes(key));
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 10, 15, 13, 21, 22, 23, 24, 26, 27, 33, 34] as const;
@@ -165,7 +166,8 @@ function orientationErrors(rows: Row[]) {
 }
 
 export default function LoggingData() {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const rockMassFileRef = useRef<HTMLInputElement>(null);
+  const discontinuityFileRef = useRef<HTMLInputElement>(null);
   const [metadata, setMetadata] = useState<Metadata>(emptyMetadata);
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [comments, setComments] = useState("");
@@ -198,7 +200,7 @@ export default function LoggingData() {
     toast.success(`Copied hole orientation to ${rows.length} interval${rows.length === 1 ? "" : "s"}`);
   };
 
-  const importWorkbook = async (file: File) => {
+  const importSectionWorkbook = async (file: File, section: "rock" | "discontinuity") => {
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
       const sheet = workbook.Sheets[workbook.SheetNames[0] ?? ""];
@@ -208,32 +210,51 @@ export default function LoggingData() {
       const metadataRows = matrix.slice(0, 4);
       const lookup: Record<string, string> = { projectName: "project name", projectNo: "project no", deposit: "deposit", holeNo: "hole no", easting: "easting", northing: "northing", rl: "r.l.", dip: "dip", azimuth: "azimuth", preCollarDepth: "pre collar depth", pqDepth: "pq depth", hqDepth: "hq depth", loggedBy: "logged by", dateLogged: "date logged", drillStartDate: "drill start date", completionDate: "completion date", drillingCompany: "drilling company", oriMethod: "ori method", rigNo: "rig no.", oriLinePosition: "ori line position" };
       for (const [key, label] of Object.entries(lookup)) nextMetadata[key] = metadataRows.map(row => findValue(row, label)).find(Boolean) ?? "";
-      const labelRow = matrix.findIndex(row => row.some(value => stringify(value).toLowerCase().includes("stratigraphy")));
-      if (labelRow < 0) throw new Error("Could not find the HOLEID logging header row");
+      const sectionColumns = section === "rock" ? rockMassColumns : discontinuityColumns;
+      const headerLabels = sectionColumns.flatMap(([, label]) => [label]);
+      const labelRow = matrix.findIndex(row => {
+        const matches = headerLabels.filter(label => findHeaderIndex(row, [label]) >= 0).length;
+        return section === "rock" ? matches >= 2 && findHeaderIndex(row, ["Stratigraphy"]) >= 0 : matches >= 2 && (findHeaderIndex(row, ["Structure Depth", "Alpha / Dip", "Hole ID"]) >= 0);
+      });
+      if (labelRow < 0) throw new Error(`Could not find the ${section === "rock" ? "Rock mass classification" : "Discontinuity data"} header row`);
       const start = labelRow + 1;
       const header = matrix[labelRow] ?? [];
       const headerIndexes: Record<string, number> = {};
-      [...columns].forEach(([key, label]) => {
+      [...sectionColumns].forEach(([key, label]) => {
         const index = findHeaderIndex(header, [label, key]);
         if (index >= 0) headerIndexes[key] = index;
       });
       const imported = matrix.slice(start).map(source => {
         const row = emptyRow();
-        row.holeId = stringify(source[headerIndexes.holeId ?? 0] ?? "") || nextMetadata.holeNo;
-        row.holeDip = stringify(source[headerIndexes.holeDip ?? -1] ?? "") || (nextMetadata.dip ?? "");
-        row.holeAzimuth = stringify(source[headerIndexes.holeAzimuth ?? -1] ?? "") || (nextMetadata.azimuth ?? "");
-        sourceColumns.forEach(([key], index) => {
-          row[key] = stringify(source[headerIndexes[key] ?? workbookColumnIndexes[index]] ?? "");
+        sectionColumns.forEach(([key]) => {
+          const sourceIndex = headerIndexes[key];
+          if (sourceIndex !== undefined) row[key] = stringify(source[sourceIndex] ?? "");
         });
+        if (section === "rock") {
+          rockSourceColumns.forEach(([key]) => { if (!row[key]) row[key] = stringify(source[headerIndexes[key] ?? -1] ?? ""); });
+        }
+        row.holeId = row.holeId || nextMetadata.holeNo;
+        row.holeDip = row.holeDip || (nextMetadata.dip ?? "");
+        row.holeAzimuth = row.holeAzimuth || (nextMetadata.azimuth ?? "");
         return row;
       }).filter(row => Object.values(row).some(value => value.trim()));
-      const importedErrors = orientationErrors(imported);
-      if (importedErrors.length) throw new Error(`Validation failed: ${importedErrors[0]}`);
-      setMetadata(nextMetadata);
-      setRows(imported.length ? imported : [emptyRow()]);
-      setComments("");
+      if (section === "discontinuity") {
+        const importedErrors = orientationErrors(imported);
+        if (importedErrors.length) throw new Error(`Validation failed: ${importedErrors[0]}`);
+      }
+      setMetadata(current => section === "rock" ? nextMetadata : current);
+      setRows(current => {
+        const merged = current.slice(0, Math.max(current.length, imported.length));
+        while (merged.length < imported.length) merged.push(emptyRow());
+        const keysToMerge = sectionColumns.map(([key]) => key);
+        return merged.map((row, index) => {
+          const incoming = imported[index];
+          if (!incoming) return row;
+          return keysToMerge.reduce((mergedRow, key) => ({ ...mergedRow, [key]: incoming[key] ?? "" }), row);
+        });
+      });
       setSelectedLogId(null);
-      toast.success(`Imported ${imported.length} logging interval${imported.length === 1 ? "" : "s"}`);
+      toast.success(`Imported ${imported.length} ${section === "rock" ? "rock mass classification" : "discontinuity data"} interval${imported.length === 1 ? "" : "s"}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to read workbook");
     }
@@ -305,8 +326,10 @@ export default function LoggingData() {
     <div>
       <ModuleHeader index="06.02" title="Logging Data" description="Log rock mass, soil and discontinuity data by depth interval using the supplied HOLEID workbook structure." />
       <div className="flex flex-wrap gap-2 mb-6">
-        <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void importWorkbook(file); event.currentTarget.value = ""; }} />
-        <Button variant="outline" className="rounded-none border-foreground" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4 mr-2" /> Import Excel</Button>
+        <input ref={rockMassFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void importSectionWorkbook(file, "rock"); event.currentTarget.value = ""; }} />
+        <input ref={discontinuityFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void importSectionWorkbook(file, "discontinuity"); event.currentTarget.value = ""; }} />
+        <Button variant="outline" className="rounded-none border-foreground" onClick={() => rockMassFileRef.current?.click()}><Upload className="h-4 w-4 mr-2" /> Import Rock mass Excel</Button>
+        <Button variant="outline" className="rounded-none border-foreground" onClick={() => discontinuityFileRef.current?.click()}><Upload className="h-4 w-4 mr-2" /> Import Discontinuity Excel</Button>
         <Button variant="outline" className="rounded-none border-foreground" onClick={exportWorkbook}><Download className="h-4 w-4 mr-2" /> Export Excel</Button>
         <Button className="rounded-none" disabled={save.isPending} onClick={saveWorkbook}>{save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save logging data</Button>
       </div>
