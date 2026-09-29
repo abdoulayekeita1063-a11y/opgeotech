@@ -117,6 +117,14 @@ function findHeaderIndex(header: unknown[], labels: string[]) {
   });
 }
 
+function normalizeRoughnessValue(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[–—]/g, "-").replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  const codeMatch = normalized.match(/\b(pp|ps|pr|up|us|ur|sp|ss|si)\b/);
+  const byCode = roughnessOptions.find(option => roughnessCodes[option] === codeMatch?.[1]?.toUpperCase());
+  if (byCode) return byCode;
+  return roughnessOptions.find(option => option.toLowerCase() === normalized) ?? value.trim();
+}
+
 function valueFor(row: Row, key: string) {
   if (key === "holeId" || key === "holeDip" || key === "holeAzimuth") return row[key] ?? "";
   if (key === "jointSpacing") return calculateJointSpacing(row.from, row.to, row.fractureCount);
@@ -222,14 +230,14 @@ export default function LoggingData() {
       const header = matrix[labelRow] ?? [];
       const headerIndexes: Record<string, number> = {};
       [...sectionColumns].forEach(([key, label]) => {
-        const index = findHeaderIndex(header, [label, key]);
+        const index = findHeaderIndex(header, key === "microRoughness" ? [label, key, "Roughness"] : [label, key]);
         if (index >= 0) headerIndexes[key] = index;
       });
       const imported = matrix.slice(start).map(source => {
         const row = emptyRow();
         sectionColumns.forEach(([key]) => {
           const sourceIndex = headerIndexes[key];
-          if (sourceIndex !== undefined) row[key] = stringify(source[sourceIndex] ?? "");
+          if (sourceIndex !== undefined) row[key] = key === "microRoughness" ? normalizeRoughnessValue(stringify(source[sourceIndex] ?? "")) : stringify(source[sourceIndex] ?? "");
         });
         if (section === "rock") {
           rockSourceColumns.forEach(([key]) => { if (!row[key]) row[key] = stringify(source[headerIndexes[key] ?? -1] ?? ""); });
