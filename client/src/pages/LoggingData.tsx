@@ -38,6 +38,14 @@ const holeColumns = [
   ["holeId", "Hole ID"], ["holeDip", "Hole Dip"], ["holeAzimuth", "Hole Azimuth"],
 ] as const;
 const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
+const rockMassColumns = [
+  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"], ["rqdPercent", "RQD (%)"],
+  ["fractureCount", "Fracture Count"], ["infillThickness", "Infill Thickness"], ["microRoughness", "Roughness profile"], ["ucs", "UCS (MPa)"], ["waterCondition", "Water Condition (0–15)"],
+  ["jointSpacing", "Joint Spacing (m)"], ["jrc", "JRC"], ["roughnessState", "Surface state"], ["rmr", "RMR"],
+] as readonly Column[];
+const discontinuityColumns = [
+  ...holeColumns, ["structureDepth", "Structure Depth"], ["structureType", "Structure Type"], ["alphaDip", "Alpha / Dip"], ["betaDipDir", "Beta / Dip Dir."], ["dip", "Dip"], ["dipDirection", "Dip Direction"],
+] as readonly Column[];
 
 // Source workbook positions, including the blank separator columns used by HOLEID.
 const workbookColumnIndexes = [1, 2, 4, 9, 10, 15, 13, 21, 22, 23, 24, 26, 27, 33, 34] as const;
@@ -97,6 +105,14 @@ function findValue(row: unknown[], label: string) {
   const index = row.findIndex(value => stringify(value).toLowerCase().replace(/[^a-z0-9]/g, "").includes(wanted));
   if (index < 0) return "";
   return stringify(row.slice(index + 1).find(value => stringify(value).trim()));
+}
+
+function findHeaderIndex(header: unknown[], labels: string[]) {
+  const normalized = labels.map(label => label.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  return header.findIndex(value => {
+    const cell = stringify(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normalized.some(label => cell === label || cell.includes(label));
+  });
 }
 
 function valueFor(row: Row, key: string) {
@@ -195,12 +211,20 @@ export default function LoggingData() {
       const labelRow = matrix.findIndex(row => row.some(value => stringify(value).toLowerCase().includes("stratigraphy")));
       if (labelRow < 0) throw new Error("Could not find the HOLEID logging header row");
       const start = labelRow + 1;
+      const header = matrix[labelRow] ?? [];
+      const headerIndexes: Record<string, number> = {};
+      [...columns].forEach(([key, label]) => {
+        const index = findHeaderIndex(header, [label, key]);
+        if (index >= 0) headerIndexes[key] = index;
+      });
       const imported = matrix.slice(start).map(source => {
         const row = emptyRow();
-        row.holeId = stringify(source[0] ?? "") || nextMetadata.holeNo;
-        row.holeDip = nextMetadata.dip ?? "";
-        row.holeAzimuth = nextMetadata.azimuth ?? "";
-        sourceColumns.forEach(([key], index) => { row[key] = stringify(source[workbookColumnIndexes[index]] ?? ""); });
+        row.holeId = stringify(source[headerIndexes.holeId ?? 0] ?? "") || nextMetadata.holeNo;
+        row.holeDip = stringify(source[headerIndexes.holeDip ?? -1] ?? "") || (nextMetadata.dip ?? "");
+        row.holeAzimuth = stringify(source[headerIndexes.holeAzimuth ?? -1] ?? "") || (nextMetadata.azimuth ?? "");
+        sourceColumns.forEach(([key], index) => {
+          row[key] = stringify(source[headerIndexes[key] ?? workbookColumnIndexes[index]] ?? "");
+        });
         return row;
       }).filter(row => Object.values(row).some(value => value.trim()));
       const importedErrors = orientationErrors(imported);
@@ -271,6 +295,12 @@ export default function LoggingData() {
     setComments(log.comments ?? "");
   };
 
+  const renderIntervalTable = (tableColumns: readonly Column[]) => <div className="border border-foreground overflow-x-auto">
+    <table className="text-xs font-mono min-w-[1200px] w-full"><thead className="bg-secondary"><tr>{tableColumns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
+      <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{tableColumns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = ["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(key); const fieldValue = valueFor(row, key); return <td key={key} className="p-1">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} aria-label={`Interval ${index + 1} roughness`}><option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} />}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
+    </table>
+  </div>;
+
   return (
     <div>
       <ModuleHeader index="06.02" title="Logging Data" description="Log rock mass, soil and discontinuity data by depth interval using the supplied HOLEID workbook structure." />
@@ -282,12 +312,9 @@ export default function LoggingData() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap gap-2"><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
-      <div className="border border-foreground overflow-x-auto">
-          <table className="text-xs font-mono min-w-[2500px] w-full">
-          <thead className="bg-secondary"><tr>{columns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-          <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{columns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = key === "dip" || key === "dipDirection" || key === "jointSpacing" || key === "jrc" || key === "roughnessState" || key === "rmr"; const cellQualityClass = key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""; const fieldValue = valueFor(row, key); return <td key={key} className="p-1">{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} aria-label={`Interval ${index + 1} roughness`}> <option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${cellQualityClass} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} aria-invalid={Boolean(fieldError)} title={fieldError ?? (calculated ? `Calculated from interval inputs${rmrQuality ? ` — ${rmrQuality.label} quality` : ""}` : undefined)} />}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
-        </table>
-      </div>
+      {renderIntervalTable(rockMassColumns)}
+      <div className="mt-6 mb-2"><SectionLabel>Discontinuity data</SectionLabel></div>
+      {renderIntervalTable(discontinuityColumns)}
       <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider" aria-label="RMR quality legend"><span className="font-semibold mr-1">RMR quality alert:</span><span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">81–100 Very good</span><span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">61–80 Good</span><span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">41–60 Fair</span><span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">21–40 Poor</span><span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">0–20 Very poor</span></div>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
