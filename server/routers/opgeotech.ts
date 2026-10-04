@@ -30,6 +30,7 @@ export const aiSlopeRouter = router({
     .input(z.object({ imageDataUrl: z.string().regex(/^data:image\/(jpeg|jpg|png|webp);base64,/i).max(14_000_000), edgeDensity: z.number().min(0).max(1).optional() }))
     .mutation(async ({ input }) => {
       const response = await invokeLLM({
+        model: "gemini-3-flash-preview",
         messages: [
           {
             role: "system",
@@ -66,11 +67,18 @@ export const aiSlopeRouter = router({
             },
           },
         },
-        max_tokens: 1800,
+        max_tokens: 3000,
       });
 
-      const content = response.choices[0]?.message.content;
+      const firstChoice = Array.isArray(response.choices) ? response.choices[0] : undefined;
+      if (!firstChoice?.message) {
+        throw new Error("The vision model did not return an analysis. Please try again with a clear JPEG or PNG photo.");
+      }
+      const content = firstChoice.message.content;
       const json = typeof content === "string" ? content : content?.map(part => part.type === "text" ? part.text : "").join("") ?? "";
+      if (!json.trim()) {
+        throw new Error("The vision model returned an empty analysis. Please try a clearer photo showing the crest and toe.");
+      }
       let parsed: {
         crest: { x: number; y: number };
         toe: { x: number; y: number };
