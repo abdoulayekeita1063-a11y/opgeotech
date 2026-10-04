@@ -21,6 +21,7 @@ import WallRiskClassification from "./pages/WallRiskClassification";
 import Download from "./pages/Download";
 import Drilling from "./pages/Drilling";
 import LoggingData from "./pages/LoggingData";
+import AISlopeAnalysis from "./pages/AISlopeAnalysis";
 
 function LegacyRedirect({ to }: { to: string }) {
   useEffect(() => { window.location.replace(to); }, [to]);
@@ -34,6 +35,7 @@ function Router() {
         <Route path={"/"} component={Home} />
         <Route path={"/reporting"} component={Reporting} />
         <Route path={"/stability"} component={SlopeStability} />
+        <Route path={"/ai-slope-analysis"} component={AISlopeAnalysis} />
         <Route path={"/classification"} component={RockClassification} />
         <Route path={"/inspections"} component={() => <LegacyRedirect to="/reporting#inspections" />} />
         <Route path={"/blast"} component={PostBlast} />

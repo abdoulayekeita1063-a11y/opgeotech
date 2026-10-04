@@ -11,6 +11,91 @@ import { parseDxf } from "../geotech/dxf";
 import { runKinematicAnalysis } from "../geotech/kinematics";
 import { analyzeRadarTrend, DEFAULT_RADAR_THRESHOLDS } from "../geotech/radar";
 import { scoreWallRisk, serializeWallRisk } from "../geotech/wallRisk";
+import { invokeLLM } from "../_core/llm";
+
+// ── AI Slope Analysis module ──────────────────────────────────────────
+
+const slopePointSchema = {
+  type: "object",
+  properties: {
+    x: { type: "number", description: "Normalized image x coordinate from 0 to 1" },
+    y: { type: "number", description: "Normalized image y coordinate from 0 to 1, top to bottom" },
+  },
+  required: ["x", "y"],
+  additionalProperties: false,
+} as const;
+
+export const aiSlopeRouter = router({
+  analyzePhoto: protectedProcedure
+    .input(z.object({ imageDataUrl: z.string().regex(/^data:image\/(jpeg|jpg|png|webp);base64,/i).max(14_000_000), edgeDensity: z.number().min(0).max(1).optional() }))
+    .mutation(async ({ input }) => {
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: "You are a geotechnical computer-vision assistant. Analyze an open-pit slope photograph conservatively. Detect visible crest, toe, slope face, berms and boundaries. Return normalized image coordinates, not a guessed angle. Choose one representative straight face segment between a crest point and toe point. Use perspective cues when visible, but clearly mark uncertainty. This is a preliminary photo estimate, never a survey-grade measurement.",
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `Analyze this open-pit slope image. Identify the most representative visible slope face and its crest/toe endpoints. Coordinates must be normalized between 0 and 1. A deterministic browser edge-map pre-check returned ${(input.edgeDensity ?? 0).toFixed(3)}; use it as supporting evidence only, not as a substitute for visual segmentation.` },
+              { type: "image_url", image_url: { url: input.imageDataUrl, detail: "high" } },
+            ],
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "slope_photo_geometry",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                crest: slopePointSchema,
+                toe: slopePointSchema,
+                face: { type: "array", items: slopePointSchema, minItems: 2, maxItems: 24 },
+                berms: { type: "array", items: { type: "array", items: slopePointSchema, minItems: 2, maxItems: 12 }, maxItems: 12 },
+                visibleBoundaries: { type: "array", items: slopePointSchema, maxItems: 48 },
+                representativeSegment: { type: "string" },
+                perspectiveCorrectionApplied: { type: "boolean" },
+                confidence: { type: "number", minimum: 0, maximum: 100 },
+                limitations: { type: "array", items: { type: "string" }, maxItems: 8 },
+              },
+              required: ["crest", "toe", "face", "berms", "visibleBoundaries", "representativeSegment", "perspectiveCorrectionApplied", "confidence", "limitations"],
+              additionalProperties: false,
+            },
+          },
+        },
+        max_tokens: 1800,
+      });
+
+      const content = response.choices[0]?.message.content;
+      const json = typeof content === "string" ? content : content?.map(part => part.type === "text" ? part.text : "").join("") ?? "";
+      const parsed = JSON.parse(json) as {
+        crest: { x: number; y: number };
+        toe: { x: number; y: number };
+        face: Array<{ x: number; y: number }>;
+        berms: Array<Array<{ x: number; y: number }>>;
+        visibleBoundaries: Array<{ x: number; y: number }>;
+        representativeSegment: string;
+        perspectiveCorrectionApplied: boolean;
+        confidence: number;
+        limitations: string[];
+      };
+      const points = [parsed.crest, parsed.toe, ...parsed.face, ...parsed.visibleBoundaries].filter(point => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
+      if (points.length < 2) throw new Error("The visible slope geometry could not be identified reliably.");
+      const dx = Math.abs(parsed.toe.x - parsed.crest.x);
+      const dy = Math.abs(parsed.toe.y - parsed.crest.y);
+      const angle = Math.atan2(dy, Math.max(dx, 0.0001)) * 180 / Math.PI;
+      return {
+        estimatedFaceAngle: Number(angle.toFixed(1)),
+        confidence: Math.round(Math.max(0, Math.min(100, parsed.confidence))),
+        geometry: parsed,
+        method: ["edge-map pre-check", "AI segmentation", "crest/toe detection", "pixel geometry", parsed.perspectiveCorrectionApplied ? "perspective correction" : "perspective review"],
+        disclaimer: "Photo-based estimate only. Verify with survey, drone photogrammetry, LiDAR or field measurements before geotechnical design or decisions.",
+      };
+    }),
+});
 
 // ── Drillhole module ─────────────────────────────────────────────────
 

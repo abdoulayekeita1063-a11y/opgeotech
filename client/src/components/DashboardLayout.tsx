@@ -36,6 +36,7 @@ import {
   PanelLeft,
   Ruler,
   ShieldAlert,
+  ScanLine,
   Triangle,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -47,6 +48,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: FileText, label: "Reporting", path: "/reporting" },
   { icon: Mountain, label: "Slope Stability", path: "/stability" },
+  { icon: ScanLine, label: "AI Slope Analysis", path: "/ai-slope-analysis" },
   { icon: Layers, label: "Rock Classification", path: "/classification" },
   { icon: Bomb, label: "Blast Assessment", path: "/blast" },
   { icon: Ruler, label: "Design Compliance", path: "/compliance" },
