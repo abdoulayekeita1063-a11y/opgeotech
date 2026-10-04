@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { Readable } from "node:stream";
 import { ENV } from "./env";
 
 export function registerStorageProxy(app: Express) {
@@ -35,6 +36,22 @@ export function registerStorageProxy(app: Express) {
       const { url } = (await forgeResp.json()) as { url: string };
       if (!url) {
         res.status(502).send("Empty signed URL from backend");
+        return;
+      }
+
+      if (req.query.download === "1") {
+        const fileResp = await fetch(url);
+        if (!fileResp.ok || !fileResp.body) {
+          res.status(502).send("Unable to download stored file");
+          return;
+        }
+        const fileName = key.split("/").pop() || "download";
+        res.set("Cache-Control", "no-store");
+        res.set("Content-Type", fileResp.headers.get("content-type") || "application/octet-stream");
+        const length = fileResp.headers.get("content-length");
+        if (length) res.set("Content-Length", length);
+        res.set("Content-Disposition", `attachment; filename="${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}"`);
+        Readable.fromWeb(fileResp.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
         return;
       }
 

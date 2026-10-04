@@ -2,7 +2,7 @@ import { ModuleHeader } from "@/components/ModuleHeader";
 import { Button } from "@/components/ui/button";
 import { Download as DownloadIcon, Monitor, Smartphone, Globe } from "lucide-react";
 
-const DOWNLOAD_URL = "/manus-storage/OPGeotech-Setup_77674499.exe";
+const DOWNLOAD_URL = "/manus-storage/OPGeotech-Setup_77674499.exe?download=1";
 
 export default function Download() {
   return (
