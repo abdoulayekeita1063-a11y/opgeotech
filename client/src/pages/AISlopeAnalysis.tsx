@@ -28,7 +28,7 @@ function prepareImage(file: File) {
       const image = new Image();
       image.onerror = () => reject(new Error("Unable to decode the image."));
       image.onload = () => {
-        const scale = Math.min(1, 2000 / Math.max(image.naturalWidth, image.naturalHeight));
+        const scale = Math.min(1, 1400 / Math.max(image.naturalWidth, image.naturalHeight));
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -46,7 +46,7 @@ function prepareImage(file: File) {
         let gradient = 0;
         let comparisons = 0;
         for (let y = 0; y < 63; y++) for (let x = 0; x < 63; x++) { gradient += Math.abs(gray(x, y) - gray(x + 1, y)) + Math.abs(gray(x, y) - gray(x, y + 1)); comparisons += 2; }
-        resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.88), edgeDensity: Math.max(0, Math.min(1, gradient / Math.max(1, comparisons) / 255)) });
+        resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.72), edgeDensity: Math.max(0, Math.min(1, gradient / Math.max(1, comparisons) / 255)) });
       };
       image.src = String(reader.result);
     };
@@ -74,16 +74,17 @@ export default function AISlopeAnalysis() {
   const [error, setError] = useState("");
   const analyze = trpc.aiSlope.analyzePhoto.useMutation({
     onSuccess: result => { setAnalysis(result as Analysis); setError(""); },
-    onError: result => setError(result.message || "The slope image could not be analyzed."),
+    onError: result => setError(result.message || "The slope image could not be analyzed. Check that the image is JPEG, PNG or WebP and try again."),
   });
 
   const handleFile = async (file?: File) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setError("Please select a JPEG, PNG or WebP image."); return; }
+    if (!file.type.startsWith("image/")) { setError("Please select an image file."); return; }
+    if (["image/heic", "image/heif"].includes(file.type.toLowerCase()) || /\.hei[cf]$/i.test(file.name)) { setError("HEIC/HEIF photos are not supported by this browser workflow yet. Export the photo as JPEG or PNG and try again."); return; }
     try {
       setError("");
       setAnalysis(null);
-      setFileName(file.name);
+      setFileName(`${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB original)`);
       const prepared = await prepareImage(file);
       setImageData(prepared.dataUrl);
       setEdgeDensity(prepared.edgeDensity);

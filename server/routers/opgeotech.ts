@@ -71,7 +71,7 @@ export const aiSlopeRouter = router({
 
       const content = response.choices[0]?.message.content;
       const json = typeof content === "string" ? content : content?.map(part => part.type === "text" ? part.text : "").join("") ?? "";
-      const parsed = JSON.parse(json) as {
+      let parsed: {
         crest: { x: number; y: number };
         toe: { x: number; y: number };
         face: Array<{ x: number; y: number }>;
@@ -82,6 +82,11 @@ export const aiSlopeRouter = router({
         confidence: number;
         limitations: string[];
       };
+      try {
+        parsed = JSON.parse(json) as typeof parsed;
+      } catch {
+        throw new Error("The vision service did not return valid slope geometry. Try a clearer JPEG or PNG showing the complete crest and toe.");
+      }
       const points = [parsed.crest, parsed.toe, ...parsed.face, ...parsed.visibleBoundaries].filter(point => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
       if (points.length < 2) throw new Error("The visible slope geometry could not be identified reliably.");
       const dx = Math.abs(parsed.toe.x - parsed.crest.x);
