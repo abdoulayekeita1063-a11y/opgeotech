@@ -183,6 +183,7 @@ export default function LoggingData() {
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
   const [showRmrAlertsOnly, setShowRmrAlertsOnly] = useState(false);
   const [fillDrag, setFillDrag] = useState<{ key: string; value: string; startRow: number } | null>(null);
+  const rowsHistory = useRef<Row[][]>([]);
   const logs = trpc.logging.list.useQuery();
   const utils = trpc.useUtils();
   const save = trpc.logging.save.useMutation({
@@ -198,6 +199,15 @@ export default function LoggingData() {
   const displayedRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => !showRmrAlertsOnly || ["Poor", "Very poor"].includes(getRmrQuality(valueFor(row, "rmr"))?.label ?? ""));
 
   const updateRow = (index: number, key: string, value: string) => setRows(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row));
+  const commitRows = (updater: (current: Row[]) => Row[]) => setRows(current => { rowsHistory.current.push(current.map(row => ({ ...row }))); return updater(current); });
+  const undoRows = () => setRows(current => rowsHistory.current.length ? rowsHistory.current.pop() ?? current : current);
+  const handleUndoShortcut = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+    const target = event.target as HTMLElement;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) return;
+    event.preventDefault();
+    undoRows();
+  };
   const copyOrientationToAll = () => {
     const source = rows.find(row => String(row.holeId ?? "").trim() && String(row.holeDip ?? "").trim() && String(row.holeAzimuth ?? "").trim());
     if (!source) return toast.error("Complete Hole ID, Hole Dip and Hole Azimuth in one interval first");
@@ -206,7 +216,7 @@ export default function LoggingData() {
       validateAngleText(source.holeAzimuth ?? "", "Hole Azimuth", 0, 360),
     ].filter(Boolean) as string[];
     if (sourceErrors.length) return toast.error(sourceErrors[0]);
-    setRows(current => current.map(row => ({ ...row, holeId: source.holeId, holeDip: source.holeDip, holeAzimuth: source.holeAzimuth })));
+    commitRows(current => current.map(row => ({ ...row, holeId: source.holeId, holeDip: source.holeDip, holeAzimuth: source.holeAzimuth })));
     toast.success(`Copied hole orientation to ${rows.length} interval${rows.length === 1 ? "" : "s"}`);
   };
 
@@ -253,7 +263,7 @@ export default function LoggingData() {
         if (importedErrors.length) throw new Error(`Validation failed: ${importedErrors[0]}`);
       }
       setMetadata(current => section === "rock" ? nextMetadata : current);
-      setRows(current => {
+      commitRows(current => {
         const merged = current.slice(0, Math.max(current.length, imported.length));
         while (merged.length < imported.length) merged.push(emptyRow());
         const keysToMerge = sectionColumns.map(([key]) => key);
@@ -330,7 +340,7 @@ export default function LoggingData() {
     const matrix = text.replace(/\r/g, "").split("\n").filter(line => line.length > 0).map(line => line.split("\t"));
     const startColumn = tableColumns.findIndex(([key]) => key === startKey);
     if (startColumn < 0 || !matrix.length) return;
-    setRows(current => {
+    commitRows(current => {
       const next = [...current];
       while (next.length < startRow + matrix.length) next.push(emptyRow());
       matrix.forEach((values, rowOffset) => values.forEach((value, columnOffset) => {
@@ -343,7 +353,7 @@ export default function LoggingData() {
 
   const fillDown = (startRow: number, key: string, value: string) => {
     if (!value.trim()) return;
-    setRows(current => current.map((row, index) => index >= startRow ? { ...row, [key]: value } : row));
+    commitRows(current => current.map((row, index) => index >= startRow ? { ...row, [key]: value } : row));
   };
 
   const handleCellKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>, rowIndex: number, key: string, value: string) => {
@@ -360,12 +370,12 @@ export default function LoggingData() {
 
   const renderIntervalTable = (tableColumns: readonly Column[]) => <div className="border border-foreground overflow-x-auto" onMouseUp={() => setFillDrag(null)} onMouseLeave={() => setFillDrag(null)}>
     <table className="text-xs font-mono min-w-[1200px] w-full"><thead className="bg-secondary"><tr>{tableColumns.map(([, label]) => <th key={label} className="text-left px-2 py-2 border-b border-foreground whitespace-nowrap">{label}</th>)}<th className="px-2 border-b border-foreground" /></tr></thead>
-      <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{tableColumns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = ["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(key); const fieldValue = valueFor(row, key); const handlePaste = (event: ClipboardEvent) => { event.preventDefault(); pasteGrid(index, key, tableColumns, event.clipboardData.getData("text/plain")); }; const handleKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => handleCellKeyDown(event, index, key, fieldValue); const handleCellEnter = () => { if (fillDrag?.key === key && index >= fillDrag.startRow) updateRow(index, key, fillDrag.value); }; return <td key={key} className={`p-1 relative group ${fillDrag?.key === key ? "bg-primary/10" : ""}`} onMouseEnter={handleCellEnter}>{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown} aria-label={`Interval ${index + 1} roughness`}><option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown} aria-invalid={Boolean(fieldError)} />}{!calculated && <button type="button" className="absolute right-0 bottom-0 hidden group-hover:block bg-primary text-primary-foreground text-[9px] leading-none px-1 py-0.5 cursor-crosshair" onMouseDown={event => { event.preventDefault(); setFillDrag({ key, value: fieldValue, startRow: index }); }} title="Drag down in this column and release to stop" aria-label={`Drag ${key} down to fill`}>↓</button>}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => setRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
+      <tbody>{displayedRows.map(({ row, index }) => { const rmrQuality = getRmrQuality(valueFor(row, "rmr")); return <tr key={index} className={`border-b border-border align-top ${rmrQuality?.rowClass ?? ""}`}>{tableColumns.map(([key]) => { const fieldError = key === "holeDip" ? validateAngleText(row.holeDip ?? "", `Interval ${index + 1} Hole Dip`, 0, 90) : key === "holeAzimuth" ? validateAngleText(row.holeAzimuth ?? "", `Interval ${index + 1} Hole Azimuth`, 0, 360) : key === "alphaDip" ? validateAngleText(row.alphaDip ?? "", `Interval ${index + 1} Alpha / Dip`, 0, 180) : key === "betaDipDir" ? validateAngleText(row.betaDipDir ?? "", `Interval ${index + 1} Beta / Dip Dir.`, 0, 360) : null; const calculated = ["dip", "dipDirection", "jointSpacing", "jrc", "roughnessState", "rmr"].includes(key); const fieldValue = valueFor(row, key); const handlePaste = (event: ClipboardEvent) => { event.preventDefault(); pasteGrid(index, key, tableColumns, event.clipboardData.getData("text/plain")); }; const handleKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => handleCellKeyDown(event, index, key, fieldValue); const handleCellEnter = () => { if (fillDrag?.key === key && index >= fillDrag.startRow) updateRow(index, key, fillDrag.value); }; return <td key={key} className={`p-1 relative group ${fillDrag?.key === key ? "bg-primary/10" : ""}`} onMouseEnter={handleCellEnter}>{key === "microRoughness" ? <select className="rounded-none border border-border min-w-44 h-8 text-xs bg-background px-2" value={fieldValue} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown} aria-label={`Interval ${index + 1} roughness`}><option value="">Select roughness</option>{roughnessOptions.map(option => <option key={option} value={option}>{roughnessCodes[option]} — {option}</option>)}</select> : <Input className={`rounded-none border border-border min-w-24 h-8 text-xs ${calculated ? "bg-muted" : ""} ${key === "rmr" && rmrQuality ? rmrQuality.cellClass : ""} ${fieldError ? "border-destructive ring-1 ring-destructive" : ""}`} value={fieldValue} readOnly={calculated} onChange={event => updateRow(index, key, event.target.value)} onPaste={handlePaste} onKeyDown={handleKeyDown} aria-invalid={Boolean(fieldError)} />}{!calculated && <button type="button" className="absolute right-0 bottom-0 hidden group-hover:block bg-primary text-primary-foreground text-[9px] leading-none px-1 py-0.5 cursor-crosshair" onMouseDown={event => { event.preventDefault(); rowsHistory.current.push(rows.map(currentRow => ({ ...currentRow }))); setFillDrag({ key, value: fieldValue, startRow: index }); }} title="Drag down in this column and release to stop" aria-label={`Drag ${key} down to fill`}>↓</button>}</td>; })}<td className="p-2"><button type="button" className="text-destructive" onClick={() => commitRows(current => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyRow()])}><Trash2 className="h-4 w-4" /></button></td></tr>; })}</tbody>
     </table>
   </div>;
 
   return (
-    <div>
+    <div onKeyDown={handleUndoShortcut}>
       <ModuleHeader index="06.02" title="Logging Data" description="Log rock mass, soil and discontinuity data by depth interval using the supplied HOLEID workbook structure." />
       <div className="flex flex-wrap gap-2 mb-6">
         <input ref={rockMassFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void importSectionWorkbook(file, "rock"); event.currentTarget.value = ""; }} />
@@ -376,8 +386,8 @@ export default function LoggingData() {
         <Button className="rounded-none" disabled={save.isPending} onClick={saveWorkbook}>{save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save logging data</Button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap gap-2"><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => setRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
-      <p className="text-[10px] text-muted-foreground font-mono mb-2">Excel-style editing: Ctrl+C copies a cell, Ctrl+V replaces the active cell or pastes a table range, and Ctrl+D fills down. Drag the ↓ handle in one column only, then release where you want the fill to stop.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap gap-2"><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => commitRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
+      <p className="text-[10px] text-muted-foreground font-mono mb-2">Excel-style editing: Ctrl+C copies a cell, Ctrl+V replaces the active cell or pastes a table range, Ctrl+D fills down, and Ctrl+Z undoes the last table operation. Drag the ↓ handle in one column only, then release where you want the fill to stop.</p>
       {renderIntervalTable(rockMassColumns)}
       <div className="mt-6 mb-2"><SectionLabel>Discontinuity data</SectionLabel></div>
       {renderIntervalTable(discontinuityColumns)}
