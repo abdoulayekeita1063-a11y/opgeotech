@@ -55,17 +55,58 @@ function toNumber(value: string) {
   return value.trim() && Number.isFinite(number) ? number : undefined;
 }
 
+type FieldRisk = "favorable" | "watch" | "critical" | "neutral";
+
+function fieldRisk(field: FieldName, value: string): FieldRisk {
+  if (!value.trim()) return "neutral";
+  const numeric = Number(value);
+  if (field === "slopeAngle" && Number.isFinite(numeric)) return numeric > 45 ? "critical" : numeric > 35 ? "watch" : "favorable";
+  if (field === "factorOfSafety" && Number.isFinite(numeric)) return numeric < 1 ? "critical" : numeric < 1.3 ? "watch" : "favorable";
+  if (field === "probabilityOfFailure" && Number.isFinite(numeric)) return numeric > 20 ? "critical" : numeric > 10 ? "watch" : "favorable";
+  const criticalValues: Partial<Record<FieldName, string[]>> = {
+    faceMoistureCondition: ["Flow", "Saturated"], ponding: ["Water present", "Severe ponding"], drainage: ["Poor", "Blocked", "None"],
+    potentialFailureMechanism: ["Planar", "Wedge", "Toppling", "Circular", "Multiple mechanisms"], failureHistory: ["Recent", "Active"], orientation: ["Daylight / unfavourable"],
+    looseMaterials: ["Yes", "Hanging block"], wallDamage: ["Yes", "Severe"], crestBackbreak: ["Yes", "Severe"], hardToe: ["Yes", "Severe"], structuralPlanesVisible: ["Yes"], analysis: ["Accelerating", "Critical"], bermCondition: ["Poor", "No berm"],
+  };
+  const watchValues: Partial<Record<FieldName, string[]>> = {
+    faceMoistureCondition: ["Wet"], ponding: ["Minor ponding"], drainage: ["Partial"], potentialFailureMechanism: ["No failure"], failureHistory: ["Old", "Minor"], orientation: ["Neutral"],
+    looseMaterials: ["Minor"], wallDamage: ["Minor"], crestBackbreak: ["Minor"], hardToe: ["Minor"], structuralPlanesVisible: ["Minor"], analysis: ["Increasing"], bermCondition: ["Fair", "Adequate"],
+  };
+  if (criticalValues[field]?.includes(value)) return "critical";
+  if (watchValues[field]?.includes(value)) return "watch";
+  if (["Dry", "Damp", "No water", "Good", "No failure", "Favourable / stable", "No", "Stable / normal", "Scaled", "Complete / high", "Available / complete"].includes(value)) return "favorable";
+  return "neutral";
+}
+
+function riskClasses(risk: FieldRisk) {
+  return ({
+    favorable: "border-emerald-300 bg-emerald-50/60 focus:border-emerald-500 focus:ring-emerald-500/20",
+    watch: "border-amber-300 bg-amber-50/70 focus:border-amber-500 focus:ring-amber-500/20",
+    critical: "border-red-300 bg-red-50/70 focus:border-red-600 focus:ring-red-600/20",
+    neutral: "border-slate-200 bg-slate-50/70 focus:border-[#d71920] focus:ring-[#d71920]/20",
+  })[risk];
+}
+
+function RiskTag({ risk }: { risk: FieldRisk }) {
+  if (risk === "neutral") return null;
+  const labels = { favorable: "Favorable", watch: "Watch", critical: "Critical" } as const;
+  const colors = { favorable: "text-emerald-700", watch: "text-amber-700", critical: "text-red-700" } as const;
+  return <span className={`ml-auto text-[9px] font-bold uppercase tracking-[0.1em] ${colors[risk]}`}>{labels[risk]}</span>;
+}
+
 function Field({ form, field, label, numeric, setField, className = "" }: { form: FormState; field: FieldName; label: string; numeric?: boolean; setField: (field: FieldName, value: string) => void; className?: string }) {
+  const risk = fieldRisk(field, form[field]);
   return <div className={className}>
-    <Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</Label>
-    <Input type={numeric ? "number" : "text"} className="mt-1.5 h-10 rounded-lg border-slate-200 bg-slate-50/70 text-sm shadow-none transition-colors focus:border-[#d71920] focus:bg-white focus:ring-[#d71920]/20" value={form[field]} onChange={event => setField(field, event.target.value)} />
+    <Label className="flex text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}<RiskTag risk={risk} /></Label>
+    <Input type={numeric ? "number" : "text"} className={`mt-1.5 h-10 rounded-lg text-sm shadow-none transition-colors ${riskClasses(risk)}`} value={form[field]} onChange={event => setField(field, event.target.value)} />
   </div>;
 }
 
 function SelectField({ form, field, label, options, setField, className = "" }: { form: FormState; field: FieldName; label: string; options: string[]; setField: (field: FieldName, value: string) => void; className?: string }) {
+  const risk = fieldRisk(field, form[field]);
   return <div className={className}>
-    <Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</Label>
-    <select className="mt-1.5 flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50/70 px-3 text-sm shadow-none transition-colors focus:border-[#d71920] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#d71920]/20" value={form[field]} onChange={event => setField(field, event.target.value)}>
+    <Label className="flex text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}<RiskTag risk={risk} /></Label>
+    <select className={`mt-1.5 flex h-10 w-full rounded-lg border px-3 text-sm shadow-none transition-colors focus:bg-white focus:outline-none focus:ring-2 ${riskClasses(risk)}`} value={form[field]} onChange={event => setField(field, event.target.value)}>
       <option value="">Select…</option>
       {options.map(option => <option key={option} value={option}>{option}</option>)}
     </select>
@@ -165,6 +206,14 @@ export default function WallRiskClassification() {
       <MetricCard label="High / critical" value={String(summary.alerts)} detail="Records requiring attention" icon={TriangleAlert} tone={summary.alerts ? "red" : "slate"} />
       <MetricCard label="Current workflow" value={rating ? "Scored" : "Draft"} detail={rating ? `${rating.riskClass} · ${rating.overallScore.toFixed(2)} / 10` : "Complete fields and rate the wall"} icon={Activity} tone={rating ? "amber" : "slate"} />
       <MetricCard label="Risk scale" value="0–10" detail="Weighted category assessment" icon={Gauge} />
+    </div>
+
+    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+      <span className="mr-1 text-slate-700">Field condition guide</span>
+      <span className="flex items-center gap-1.5 text-emerald-700"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Favorable</span>
+      <span className="flex items-center gap-1.5 text-amber-700"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />Watch</span>
+      <span className="flex items-center gap-1.5 text-red-700"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />Critical</span>
+      <span className="ml-auto font-normal normal-case tracking-normal text-slate-400">Colors update as values are entered.</span>
     </div>
 
     <div className="mt-8 grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(380px,0.85fr)]">
