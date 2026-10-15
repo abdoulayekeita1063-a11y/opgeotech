@@ -7,13 +7,16 @@ import {
   Droplets,
   FileDown,
   Gauge,
+  ImagePlus,
   Layers3,
   MapPinned,
   Save,
   ShieldAlert,
   Trash2,
   TriangleAlert,
+  Upload,
   Waves,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,7 @@ const blankForm = {
 type FormState = typeof blankForm;
 type FieldName = keyof FormState;
 type Rating = { overallScore: number; riskLevel: string; riskClass: string; riskColour: string; actionPriority: string; recommendations: string[]; dataCompleteness: number; categoryScores: Array<{ category: string; score: number; weight: number; contribution: number; basis: string[] }>; method: string };
+type WallPhoto = { name: string; dataUrl: string };
 
 const ratingRows = [
   ["0–<2", "Very low risk", "Cyan", "Notify people in working area and treat ASAP."],
@@ -146,7 +150,7 @@ function MetricCard({ label, value, detail, icon: Icon, tone = "slate" }: { labe
   return <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"><div className="flex items-center justify-between"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneClass}`}><Icon className="h-4 w-4" /></span><span className="text-2xl font-black tracking-tight text-slate-900">{value}</span></div><div className="mt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{label}</div><div className="mt-1 text-xs text-slate-400">{detail}</div></div>;
 }
 
-function exportWallRiskPdf(form: FormState, rating: Rating) {
+function exportWallRiskPdf(form: FormState, rating: Rating, photo: WallPhoto | null) {
   const valueRows: Array<[string, string]> = [
     ["Pit / wall", form.wallName], ["Phase", form.pitPhase], ["Area", form.area], ["Operation", form.operation], ["Inspector", form.inspectorName], ["Start bench", form.startBench], ["End bench", form.endBench], ["Date", form.inspectionDate],
     ["Berm width", form.bermWidth], ["Slope height", form.slopeHeight], ["Slope angle", form.slopeAngle], ["Month-to-date rainfall", form.monthToDateRainfall], ["Face moisture", form.faceMoistureCondition], ["Ponding", form.ponding], ["Drainage", form.drainage],
@@ -158,18 +162,29 @@ function exportWallRiskPdf(form: FormState, rating: Rating) {
   const table = (headers: string[], rows: unknown[][]) => `<table><thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(String(value ?? "—"))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const completedRows = valueRows.filter(([, value]) => value.trim()).map(([label, value]) => [label, value]);
   const categoryRows = rating.categoryScores.map(item => [item.category, item.score.toFixed(2), `${Math.round(item.weight * 100)}%`, item.contribution.toFixed(2), item.basis.join("; ")]);
-  const body = `<h1>Wall Risk Classification — Inspection Sheet</h1><h2>Inspection details and observations</h2>${table(["Field", "Recorded value"], completedRows)}<h2>Category ratings</h2>${table(["Category", "Rating / 10", "Weight", "Contribution", "Basis"], categoryRows)}<h2>Overall Risk Rating</h2>${table(["Score", "Class", "Colour", "Action"], [[rating.overallScore.toFixed(2), rating.riskClass, rating.riskColour, rating.actionPriority]])}<h2>Recommendations</h2><ul>${rating.recommendations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p><strong>Data completeness:</strong> ${rating.dataCompleteness}%</p><p><strong>Method:</strong> ${escapeHtml(rating.method)}</p>`;
+  const photoHtml = photo ? `<h2>Slope photograph</h2><figure><img src="${photo.dataUrl}" alt="${escapeHtml(photo.name)}" /><figcaption>${escapeHtml(photo.name)}</figcaption></figure>` : "";
+  const body = `<h1>Wall Risk Classification — Inspection Sheet</h1>${photoHtml}<h2>Inspection details and observations</h2>${table(["Field", "Recorded value"], completedRows)}<h2>Category ratings</h2>${table(["Category", "Rating / 10", "Weight", "Contribution", "Basis"], categoryRows)}<h2>Overall Risk Rating</h2>${table(["Score", "Class", "Colour", "Action"], [[rating.overallScore.toFixed(2), rating.riskClass, rating.riskColour, rating.actionPriority]])}<h2>Recommendations</h2><ul>${rating.recommendations.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p><strong>Data completeness:</strong> ${rating.dataCompleteness}%</p><p><strong>Method:</strong> ${escapeHtml(rating.method)}</p>`;
   exportRecordAsPdf(`${form.wallName || "Wall"} — Risk Inspection`, body);
 }
 
 export default function WallRiskClassification() {
   const [form, setForm] = useState<FormState>(blankForm);
   const [rating, setRating] = useState<Rating | null>(null);
+  const [wallPhoto, setWallPhoto] = useState<WallPhoto | null>(null);
   const records = trpc.monitoring.list.useQuery();
   const utils = trpc.useUtils();
   const create = trpc.monitoring.create.useMutation({ onSuccess: response => { setRating(response.risk as Rating); utils.monitoring.list.invalidate(); toast.success("Wall rating saved"); }, onError: error => toast.error(error.message) });
   const remove = trpc.monitoring.delete.useMutation({ onSuccess: () => utils.monitoring.list.invalidate(), onError: error => toast.error(error.message) });
   const setField = (field: FieldName, value: string) => setForm(previous => ({ ...previous, [field]: value }));
+  const handleWallPhoto = (file?: File) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return toast.error("Please select a JPEG, PNG or WebP slope photo");
+    if (file.size > 12 * 1024 * 1024) return toast.error("Slope photo must be smaller than 12 MB");
+    const reader = new FileReader();
+    reader.onload = () => setWallPhoto({ name: file.name, dataUrl: String(reader.result) });
+    reader.onerror = () => toast.error("Could not read the slope photo");
+    reader.readAsDataURL(file);
+  };
   const score = (category: string) => rating?.categoryScores.find(item => item.category === category)?.score;
   const summary = useMemo(() => { const rows = records.data ?? []; return { total: rows.length, alerts: rows.filter(row => ["High", "Critical"].includes(row.riskLevel)).length }; }, [records.data]);
   const save = () => {
@@ -198,6 +213,13 @@ export default function WallRiskClassification() {
         <Field form={form} field="startBench" label="Start bench" setField={setField} />
         <Field form={form} field="endBench" label="End bench" setField={setField} />
         <SelectField form={form} field="status" label="Record status" options={["Active", "Monitored", "Remediated", "Closed"]} setField={setField} className="sm:col-span-2 xl:col-span-3" />
+      </div>
+      <div className="border-t border-slate-100 bg-slate-50/45 px-5 py-4 xl:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#d71920]/10 text-[#b3131a]"><ImagePlus className="h-4 w-4" /></span><div><div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#b3131a]">Slope photograph</div><p className="mt-1 text-xs text-slate-500">Attach one site photo to support the inspection record and PDF export.</p></div></div>
+          <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-[#d71920] hover:text-[#b3131a]"><Upload className="mr-2 h-3.5 w-3.5" />{wallPhoto ? "Replace photo" : "Add slope photo"}<Input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => { handleWallPhoto(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+        </div>
+        {wallPhoto && <div className="relative mt-4 max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-slate-900"><img src={wallPhoto.dataUrl} alt={wallPhoto.name} className="max-h-72 w-full object-contain" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-slate-950/75 px-3 py-2 text-xs text-white"><span className="truncate">{wallPhoto.name}</span><button type="button" className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 font-semibold text-white/80 hover:bg-white/10 hover:text-white" onClick={() => setWallPhoto(null)}><X className="h-3.5 w-3.5" />Remove</button></div></div>}
       </div>
     </section>
 
@@ -243,7 +265,7 @@ export default function WallRiskClassification() {
           </div>
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d71920]/10 text-[#b3131a]"><ShieldAlert className="h-4 w-4" /></span><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b3131a]">Decision support</div><h2 className="mt-0.5 text-base font-bold text-slate-900">Overall risk rating</h2></div></div><div className="space-y-4 p-5"><RatingBadge rating={rating} />{rating && <Button variant="outline" className="h-10 w-full rounded-lg border-slate-300 text-sm font-semibold hover:border-slate-900 hover:bg-slate-50" onClick={() => exportWallRiskPdf(form, rating)}><FileDown className="mr-2 h-4 w-4" />Export completed inspection PDF</Button>}<div><Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recommendation</Label><Textarea className="mt-1.5 rounded-lg border-slate-200 bg-slate-50/70 text-sm shadow-none focus:border-[#d71920] focus:ring-[#d71920]/20" rows={4} readOnly value={rating ? `${rating.actionPriority}\n${rating.recommendations.join(" ")}` : ""} placeholder="The recommended action will appear after scoring." /></div><Button className="h-12 w-full rounded-lg bg-[#d71920] text-sm font-bold uppercase tracking-[0.08em] text-white shadow-lg shadow-red-900/10 transition-all hover:bg-[#b3131a] hover:shadow-red-900/20 active:scale-[0.98]" disabled={create.isPending} onClick={save}><Save className="mr-2 h-4 w-4" />{create.isPending ? "Rating…" : "Rate and save wall inspection"}</Button></div></section>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d71920]/10 text-[#b3131a]"><ShieldAlert className="h-4 w-4" /></span><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b3131a]">Decision support</div><h2 className="mt-0.5 text-base font-bold text-slate-900">Overall risk rating</h2></div></div><div className="space-y-4 p-5"><RatingBadge rating={rating} />{rating && <Button variant="outline" className="h-10 w-full rounded-lg border-slate-300 text-sm font-semibold hover:border-slate-900 hover:bg-slate-50" onClick={() => exportWallRiskPdf(form, rating, wallPhoto)}><FileDown className="mr-2 h-4 w-4" />Export completed inspection PDF</Button>}<div><Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recommendation</Label><Textarea className="mt-1.5 rounded-lg border-slate-200 bg-slate-50/70 text-sm shadow-none focus:border-[#d71920] focus:ring-[#d71920]/20" rows={4} readOnly value={rating ? `${rating.actionPriority}\n${rating.recommendations.join(" ")}` : ""} placeholder="The recommended action will appear after scoring." /></div><Button className="h-12 w-full rounded-lg bg-[#d71920] text-sm font-bold uppercase tracking-[0.08em] text-white shadow-lg shadow-red-900/10 transition-all hover:bg-[#b3131a] hover:shadow-red-900/20 active:scale-[0.98]" disabled={create.isPending} onClick={save}><Save className="mr-2 h-4 w-4" />{create.isPending ? "Rating…" : "Rate and save wall inspection"}</Button></div></section>
       </div>
     </div>
 
