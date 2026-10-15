@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Droplets,
   FileDown,
+  FileText,
   Gauge,
   ImagePlus,
   Layers3,
@@ -167,9 +168,25 @@ function exportWallRiskPdf(form: FormState, rating: Rating, photo: WallPhoto | n
   exportRecordAsPdf(`${form.wallName || "Wall"} — Risk Inspection`, body);
 }
 
+function buildWallRiskReport(form: FormState, rating: Rating) {
+  const observations = [
+    form.slopeAngle && `Slope angle: ${form.slopeAngle}°`, form.factorOfSafety && `Factor of safety: ${form.factorOfSafety}`,
+    form.probabilityOfFailure && `Probability of failure: ${form.probabilityOfFailure}%`, form.faceMoistureCondition && `Face moisture: ${form.faceMoistureCondition}`,
+    form.potentialFailureMechanism && `Potential failure mechanism: ${form.potentialFailureMechanism}`, form.wallDamage && `Wall damage: ${form.wallDamage}`,
+    form.analysis && `Monitoring analysis: ${form.analysis}`,
+  ].filter(Boolean).join("\n");
+  return `WALL RISK CLASSIFICATION REPORT\n\nWall: ${form.wallName || "Not recorded"}\nInspection date: ${form.inspectionDate || "Not recorded"}\nInspector: ${form.inspectorName || "Not recorded"}\n\nEXECUTIVE SUMMARY\nOverall risk: ${rating.riskClass} (${rating.overallScore.toFixed(2)} / 10)\nData completeness: ${rating.dataCompleteness}%\nRequired action: ${rating.actionPriority}\n\nKEY OBSERVATIONS\n${observations || "No critical observations recorded."}\n\nRECOMMENDATIONS\n${rating.recommendations.map(item => `• ${item}`).join("\n")}\n\nMETHOD\n${rating.method}`;
+}
+
+function exportGeneratedWallRiskReport(form: FormState, report: string) {
+  const body = report.split("\n").map(line => line.trim() ? `<p>${escapeHtml(line)}</p>` : "<br />").join("");
+  exportRecordAsPdf(`${form.wallName || "Wall"} — Risk Report`, `<h1>Wall Risk Classification Report</h1>${body}`);
+}
+
 export default function WallRiskClassification() {
   const [form, setForm] = useState<FormState>(blankForm);
   const [rating, setRating] = useState<Rating | null>(null);
+  const [generatedReport, setGeneratedReport] = useState<string | null>(null);
   const [wallPhoto, setWallPhoto] = useState<WallPhoto | null>(null);
   const records = trpc.monitoring.list.useQuery();
   const utils = trpc.useUtils();
@@ -187,8 +204,14 @@ export default function WallRiskClassification() {
   };
   const score = (category: string) => rating?.categoryScores.find(item => item.category === category)?.score;
   const summary = useMemo(() => { const rows = records.data ?? []; return { total: rows.length, alerts: rows.filter(row => ["High", "Critical"].includes(row.riskLevel)).length }; }, [records.data]);
+  const generateReport = () => {
+    if (!rating) return toast.error("Rate and save the wall inspection before generating a report");
+    setGeneratedReport(buildWallRiskReport(form, rating));
+    toast.success("Report generated");
+  };
   const save = () => {
     if (!form.wallName.trim()) return toast.error("Pit / wall name is required");
+    setGeneratedReport(null);
     const numericFields = ["bermWidth", "slopeHeight", "slopeAngle", "monthToDateRainfall", "rockMassRating", "jointSets", "factorOfSafety", "probabilityOfFailure", "cumulativeDisplacement", "velocity"] as const;
     const numeric = Object.fromEntries(numericFields.map(field => [field, toNumber(form[field])]));
     create.mutate({ ...form, ...numeric, zone: form.zone || undefined, status: form.status as "Active" | "Monitored" | "Remediated" | "Closed", pitPhase: form.pitPhase || undefined, area: form.area || undefined, operation: form.operation || undefined, inspectorName: form.inspectorName || undefined, startBench: form.startBench || undefined, endBench: form.endBench || undefined, inspectionDate: form.inspectionDate || undefined, notes: form.notes || undefined } as unknown as Parameters<typeof create.mutate>[0]);
@@ -265,7 +288,8 @@ export default function WallRiskClassification() {
           </div>
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d71920]/10 text-[#b3131a]"><ShieldAlert className="h-4 w-4" /></span><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b3131a]">Decision support</div><h2 className="mt-0.5 text-base font-bold text-slate-900">Overall risk rating</h2></div></div><div className="space-y-4 p-5"><RatingBadge rating={rating} />{rating && <Button variant="outline" className="h-10 w-full rounded-lg border-slate-300 text-sm font-semibold hover:border-slate-900 hover:bg-slate-50" onClick={() => exportWallRiskPdf(form, rating, wallPhoto)}><FileDown className="mr-2 h-4 w-4" />Export completed inspection PDF</Button>}<div><Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recommendation</Label><Textarea className="mt-1.5 rounded-lg border-slate-200 bg-slate-50/70 text-sm shadow-none focus:border-[#d71920] focus:ring-[#d71920]/20" rows={4} readOnly value={rating ? `${rating.actionPriority}\n${rating.recommendations.join(" ")}` : ""} placeholder="The recommended action will appear after scoring." /></div><Button className="h-12 w-full rounded-lg bg-[#d71920] text-sm font-bold uppercase tracking-[0.08em] text-white shadow-lg shadow-red-900/10 transition-all hover:bg-[#b3131a] hover:shadow-red-900/20 active:scale-[0.98]" disabled={create.isPending} onClick={save}><Save className="mr-2 h-4 w-4" />{create.isPending ? "Rating…" : "Rate and save wall inspection"}</Button></div></section>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]"><div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#d71920]/10 text-[#b3131a]"><ShieldAlert className="h-4 w-4" /></span><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#b3131a]">Decision support</div><h2 className="mt-0.5 text-base font-bold text-slate-900">Overall risk rating</h2></div></div><div className="space-y-4 p-5"><RatingBadge rating={rating} />{rating && <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Button variant="outline" className="h-10 rounded-lg border-slate-300 text-sm font-semibold hover:border-slate-900 hover:bg-slate-50" onClick={() => exportWallRiskPdf(form, rating, wallPhoto)}><FileDown className="mr-2 h-4 w-4" />Export inspection PDF</Button><Button variant="outline" className="h-10 rounded-lg border-[#d71920]/40 text-sm font-semibold text-[#b3131a] hover:border-[#d71920] hover:bg-red-50" onClick={generateReport}><FileText className="mr-2 h-4 w-4" />Generate report</Button></div>}<div><Label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recommendation</Label><Textarea className="mt-1.5 rounded-lg border-slate-200 bg-slate-50/70 text-sm shadow-none focus:border-[#d71920] focus:ring-[#d71920]/20" rows={4} readOnly value={rating ? `${rating.actionPriority}\n${rating.recommendations.join(" ")}` : ""} placeholder="The recommended action will appear after scoring." /></div><Button className="h-12 w-full rounded-lg bg-[#d71920] text-sm font-bold uppercase tracking-[0.08em] text-white shadow-lg shadow-red-900/10 transition-all hover:bg-[#b3131a] hover:shadow-red-900/20 active:scale-[0.98]" disabled={create.isPending} onClick={save}><Save className="mr-2 h-4 w-4" />{create.isPending ? "Rating…" : "Rate and save wall inspection"}</Button></div></section>
+        {generatedReport && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-[0_14px_40px_rgba(15,23,42,0.12)]"><div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-red-300" /><h2 className="text-sm font-bold">Generated report</h2></div><Button variant="outline" className="h-8 rounded-lg border-white/25 bg-transparent px-3 text-xs text-white hover:bg-white/10" onClick={() => exportGeneratedWallRiskReport(form, generatedReport)}><FileDown className="mr-1.5 h-3.5 w-3.5" />Export report PDF</Button></div><pre className="max-h-[420px] overflow-auto whitespace-pre-wrap p-5 font-mono text-[11px] leading-6 text-slate-200">{generatedReport}</pre></section>}
       </div>
     </div>
 
