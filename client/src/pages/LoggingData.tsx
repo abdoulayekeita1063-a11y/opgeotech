@@ -40,7 +40,7 @@ const holeColumns = [
 ] as const;
 const columns = [...holeColumns, ...sourceColumns, ...derivedColumns] as readonly Column[];
 const rockMassColumns = [
-  ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"], ["rqdPercent", "RQD (%)"],
+  ["holeId", "Hole ID"], ["from", "From"], ["to", "To"], ["stratigraphy", "Stratigraphy"], ["recovery", "Recovery (m)"], ["rqd", "RQD (>100 mm)"], ["rqdPercent", "RQD (%)"],
   ["fractureCount", "Fracture Count"], ["infillThickness", "Infill Thickness"], ["microRoughness", "Roughness profile"], ["ucs", "UCS (MPa)"], ["waterCondition", "Water Condition (0–15)"],
   ["jointSpacing", "Joint Spacing (m)"], ["jrc", "JRC"], ["roughnessState", "Surface state"], ["rmr", "RMR"],
 ] as readonly Column[];
