@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { Download, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
+import { Download, Loader2, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,6 +182,7 @@ export default function LoggingData() {
   const [comments, setComments] = useState("");
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
   const [showRmrAlertsOnly, setShowRmrAlertsOnly] = useState(false);
+  const [holeIdSearch, setHoleIdSearch] = useState("");
   const [fillDrag, setFillDrag] = useState<{ key: string; value: string; startRow: number } | null>(null);
   const rowsHistory = useRef<Row[][]>([]);
   const logs = trpc.logging.list.useQuery();
@@ -196,7 +197,12 @@ export default function LoggingData() {
   });
   const validationErrors = orientationErrors(rows);
   const alertRowCount = rows.filter(row => ["Poor", "Very poor"].includes(getRmrQuality(valueFor(row, "rmr"))?.label ?? "")).length;
-  const displayedRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => !showRmrAlertsOnly || ["Poor", "Very poor"].includes(getRmrQuality(valueFor(row, "rmr"))?.label ?? ""));
+  const normalizedHoleIdSearch = holeIdSearch.trim().toLowerCase();
+  const displayedRows = rows.map((row, index) => ({ row, index })).filter(({ row }) => {
+    const matchesHoleId = !normalizedHoleIdSearch || (row.holeId ?? "").toLowerCase().includes(normalizedHoleIdSearch);
+    const matchesRmr = !showRmrAlertsOnly || ["Poor", "Very poor"].includes(getRmrQuality(valueFor(row, "rmr"))?.label ?? "");
+    return matchesHoleId && matchesRmr;
+  });
 
   const updateRow = (index: number, key: string, value: string) => setRows(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row));
   const commitRows = (updater: (current: Row[]) => Row[]) => setRows(current => { rowsHistory.current.push(current.map(row => ({ ...row }))); return updater(current); });
@@ -386,7 +392,7 @@ export default function LoggingData() {
         <Button className="rounded-none" disabled={save.isPending} onClick={saveWorkbook}>{save.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Save logging data</Button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap gap-2"><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => commitRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2"><SectionLabel>Rock mass classification</SectionLabel><div className="flex flex-wrap items-center justify-end gap-2"><div className="relative"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={holeIdSearch} onChange={event => setHoleIdSearch(event.target.value)} placeholder="Search Hole ID..." aria-label="Search by Hole ID" className="h-9 w-52 rounded-none border-foreground pl-8 pr-8 text-xs" />{holeIdSearch && <button type="button" aria-label="Clear Hole ID search" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setHoleIdSearch("")}><X className="h-4 w-4" /></button>}</div><Button variant={showRmrAlertsOnly ? "default" : "outline"} className="rounded-none border-foreground" onClick={() => setShowRmrAlertsOnly(current => !current)}>{showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}{alertRowCount > 0 ? ` (${alertRowCount})` : ""}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={copyOrientationToAll}>Copy hole orientation to all rows</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => commitRows(current => [...current, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add interval</Button></div></div>
       <p className="text-[10px] text-muted-foreground font-mono mb-2">Excel-style editing: Ctrl+C copies a cell, Ctrl+V replaces the active cell or pastes a table range, Ctrl+D fills down, and Ctrl+Z undoes the last table operation. Drag the ↓ handle in one column only, then release where you want the fill to stop.</p>
       {renderIntervalTable(rockMassColumns)}
       <div className="mt-6 mb-2"><SectionLabel>Discontinuity data</SectionLabel></div>
