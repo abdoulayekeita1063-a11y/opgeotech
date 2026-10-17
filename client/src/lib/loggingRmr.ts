@@ -85,7 +85,12 @@ function ratingJointNature(roughness: number): number {
   return 0;
 }
 
-function ratingWaterCondition(waterCondition: number): number {
+function ratingWaterCondition(waterConditionText: string | undefined): number | null {
+  const normalized = (waterConditionText ?? "").trim().toLowerCase();
+  if (normalized === "dry") return 15;
+  if (normalized === "wet") return 0;
+  const waterCondition = parseLoggingNumber(waterConditionText);
+  if (waterCondition === null) return null;
   if (waterCondition >= 10) return 10;
   if (waterCondition >= 7) return 7;
   if (waterCondition >= 4) return 4;
@@ -95,8 +100,9 @@ function ratingWaterCondition(waterCondition: number): number {
 /**
  * Calculates Bieniawski RMR from the fields available in an interval row.
  * Roughness is selected from the supplied surface descriptions and mapped to the supplied joint-nature
- * notes (25 / 20 / 12 / 6 / 0). Water condition is entered on a 0–15 scale
- * and mapped to the supplied water ratings (10 / 7 / 4 / 0).
+ * notes (25 / 20 / 12 / 6 / 0). Water condition accepts Dry/Wet labels:
+ * Dry contributes 15 points and Wet contributes 0 points. Legacy numeric
+ * values remain supported and continue to map to 10 / 7 / 4 / 0.
  */
 export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
@@ -104,12 +110,15 @@ export function calculateLoggingRmr(row: Record<string, string>): string {
   const spacing = parseLoggingNumber(row.jointSpacing);
   const roughnessProfile = getRoughnessProfile(row.roughness);
   const roughness = roughnessProfile ? 1 : parseLoggingNumber(row.roughness);
-  const waterCondition = parseLoggingNumber(row.waterCondition);
+  const waterConditionText = row.waterCondition;
+  const waterCondition = ratingWaterCondition(waterConditionText);
+  const normalizedWaterCondition = (waterConditionText ?? "").trim().toLowerCase();
+  const numericWaterCondition = parseLoggingNumber(waterConditionText);
   if ([ucs, rqd, spacing, roughness, waterCondition].some(value => value === null)) return "";
-  if (ucs! < 0 || rqd! < 0 || rqd! > 100 || spacing! < 0 || roughness! < 0 || roughness! > 6 || waterCondition! < 0 || waterCondition! > 15) return "";
+  if (ucs! < 0 || rqd! < 0 || rqd! > 100 || spacing! < 0 || roughness! < 0 || roughness! > 6 || (!['dry', 'wet'].includes(normalizedWaterCondition) && (numericWaterCondition! < 0 || numericWaterCondition! > 15))) return "";
 
   const conditionRating = roughnessProfile?.rmrScore ?? ratingJointNature(roughness!);
-  const groundwaterRating = ratingWaterCondition(waterCondition!);
+  const groundwaterRating = waterCondition!;
   const score = Math.max(0, Math.min(100, ratingUcs(ucs!) + ratingRqd(rqd!) + ratingSpacing(spacing!) + conditionRating + groundwaterRating));
   return (Math.round(score * 10) / 10).toFixed(1);
 }

@@ -323,6 +323,14 @@ export async function insertStructuresBulk(values: (typeof structures.$inferInse
   await db.insert(structures).values(values);
   return values.length;
 }
+export async function replaceStructuresBulk(userId: number, values: (typeof structures.$inferInsert)[]) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.delete(structures).where(eq(structures.userId, userId));
+    if (values.length) await tx.insert(structures).values(values);
+    return values.length;
+  });
+}
 export async function listStructures(userId: number) {
   const db = await requireDb();
   return db

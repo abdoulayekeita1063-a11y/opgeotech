@@ -67,7 +67,7 @@ export default function StructuralMapping() {
 
   const importCsv = trpc.mapping.importCsv.useMutation({
     onSuccess: r => {
-      toast.success(`${r.count} structures imported`);
+      toast.success(`${r.count} structures imported — previous mapping data replaced`);
       utils.mapping.list.invalidate();
     },
     onError: e => toast.error(e.message),
@@ -376,6 +376,9 @@ export default function StructuralMapping() {
               Template
             </Button>
           </div>
+          <p className="mt-2 border-l-4 border-primary bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            CSV replacement import: valid rows from the selected file replace all previously recorded structures. The old data is never mixed with the new file.
+          </p>
         </div>
 
         {/* stereonet + list */}

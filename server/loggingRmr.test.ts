@@ -19,6 +19,13 @@ describe("Logging Data rock-mass calculations", () => {
     })).toBe("84.0");
   });
 
+  it("adds 15 RMR points for Dry and 0 points for Wet", () => {
+    const dry = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "5", waterCondition: "Dry" });
+    const wet = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "5", waterCondition: "Wet" });
+    expect(dry).toBe("89.0");
+    expect(wet).toBe("74.0");
+  });
+
   it("returns a blank RMR when required inputs are incomplete or out of range", () => {
     expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "", roughness: "5", waterCondition: "12" })).toBe("");
     expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "1", roughness: "7", waterCondition: "12" })).toBe("");

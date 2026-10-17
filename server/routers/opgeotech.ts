@@ -278,7 +278,8 @@ export const mappingRouter = router({
   importCsv: protectedProcedure
     .input(z.object({ rows: z.array(z.object(structureShape)).min(1).max(2000) }))
     .mutation(async ({ ctx, input }) => {
-      const count = await db.insertStructuresBulk(
+      const count = await db.replaceStructuresBulk(
+        ctx.user.id,
         input.rows.map(r => ({
           userId: ctx.user.id,
           structureId: r.structureId ?? null,
