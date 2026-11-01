@@ -23,6 +23,8 @@ export interface BenchInput {
   bermWidth: number;
   materialLayer?: string;
   strengthModel?: StrengthModelInput;
+  unitWeight?: number;
+  waterCondition?: StabilityInput["waterCondition"];
 }
 
 export interface HoekBrownInput {
@@ -33,7 +35,7 @@ export interface HoekBrownInput {
 }
 
 export type StrengthModelInput =
-  | { type: "mohr-coulomb" }
+  | { type: "mohr-coulomb"; cohesion?: number; frictionAngle?: number }
   | ({ type: "hoek-brown" } & HoekBrownInput);
 
 export interface StabilityResult {
@@ -48,7 +50,15 @@ export interface StabilityResult {
   equivalentCohesion: number;
   equivalentFrictionAngle: number;
   profile: { totalHeight: number; totalWidth: number; benchCount: number };
-  benchStrengths: Array<{ materialLayer?: string; model: "Mohr–Coulomb" | "Hoek–Brown"; cohesion: number; frictionAngle: number }>;
+  benchStrengths: Array<{
+    materialLayer?: string;
+    model: "Mohr–Coulomb" | "Hoek–Brown";
+    cohesion: number;
+    frictionAngle: number;
+    unitWeight: number;
+    waterCondition: StabilityInput["waterCondition"];
+    ru: number;
+  }>;
 }
 
 const DEG = Math.PI / 180;
@@ -57,6 +67,16 @@ type ResolvedStrength = {
   cohesion: number;
   frictionAngle: number;
   label: "Mohr–Coulomb" | "Hoek–Brown";
+};
+
+type BenchRange = {
+  startX: number;
+  endX: number;
+  materialLayer?: string;
+  strength: ResolvedStrength;
+  unitWeight: number;
+  waterCondition: StabilityInput["waterCondition"];
+  ru: number;
 };
 
 /** Pore pressure ratio ru based on groundwater condition */
@@ -78,6 +98,7 @@ interface Slice {
   width: number; // b (m)
   cohesion: number;
   frictionAngle: number;
+  ru: number;
 }
 
 /**
@@ -89,13 +110,13 @@ function profileFromInput(input: StabilityInput): {
   totalHeight: number;
   totalWidth: number;
   benchCount: number;
-  benchRanges: Array<{ startX: number; endX: number; materialLayer?: string; strength: ResolvedStrength }>;
+  benchRanges: BenchRange[];
 } {
-  const benches = input.benches?.length
+  const benches: BenchInput[] = input.benches?.length
     ? input.benches
     : [{ height: input.slopeHeight, angle: input.slopeAngle, bermWidth: 0 }];
   const points = [{ x: 0, y: 0 }];
-  const benchRanges: Array<{ startX: number; endX: number; materialLayer?: string; strength: ResolvedStrength }> = [];
+  const benchRanges: BenchRange[] = [];
   let x = 0;
   let y = 0;
   for (const bench of benches) {
@@ -110,10 +131,22 @@ function profileFromInput(input: StabilityInput): {
       startX,
       endX: x,
       materialLayer: bench.materialLayer,
-      strength: resolveStrength({ ...input, strengthModel: bench.strengthModel ?? input.strengthModel }),
+      strength: resolveStrength({
+        ...input,
+        strengthModel: bench.strengthModel ?? input.strengthModel,
+      }),
+      unitWeight: bench.unitWeight ?? input.unitWeight,
+      waterCondition: bench.waterCondition ?? input.waterCondition,
+      ru: ruFromWater(bench.waterCondition ?? input.waterCondition),
     });
   }
-  return { points, totalHeight: y, totalWidth: x, benchCount: benches.length, benchRanges };
+  return {
+    points,
+    totalHeight: y,
+    totalWidth: x,
+    benchCount: benches.length,
+    benchRanges,
+  };
 }
 
 function groundY(x: number, profile: Array<{ x: number; y: number }>): number {
@@ -139,7 +172,7 @@ function buildSlices(
   xc: number,
   yc: number,
   R: number,
-  nSlices = 50,
+  nSlices = 50
 ): Slice[] | null {
   const profile = profileFromInput(input);
   const H = profile.totalHeight;
@@ -198,8 +231,16 @@ function buildSlices(
     const h = yTop - yBase;
     if (h < 0) return null;
     const alpha = Math.asin(dx / R); // inclinaison de la base
-    const W = input.unitWeight * h * b;
-    const benchRange = profile.benchRanges.find(range => xm >= range.startX && xm <= range.endX);
+    // Preserve the existing vertical bench-domain assignment. Extend the toe/crest
+    // domain outside the profile so its bench properties also apply to those slices.
+    const benchRange =
+      profile.benchRanges.find(
+        range => xm >= range.startX && xm <= range.endX
+      ) ??
+      (xm < 0
+        ? profile.benchRanges[0]
+        : profile.benchRanges[profile.benchRanges.length - 1]);
+    const W = (benchRange?.unitWeight ?? input.unitWeight) * h * b;
     const strength = benchRange?.strength ?? resolveStrength(input);
     slices.push({
       weight: W,
@@ -208,6 +249,7 @@ function buildSlices(
       width: b,
       cohesion: strength.cohesion,
       frictionAngle: strength.frictionAngle,
+      ru: benchRange?.ru ?? ruFromWater(input.waterCondition),
     });
   }
   return slices;
@@ -215,14 +257,13 @@ function buildSlices(
 
 /** FS by the Fellenius method (ordinary method of slices), with ru */
 function fsFellenius(input: StabilityInput, slices: Slice[]): number {
-  const ru = ruFromWater(input.waterCondition);
   let num = 0;
   let den = 0;
   for (const s of slices) {
     const phi = s.frictionAngle * DEG;
     const c = s.cohesion;
     const N = s.weight * Math.cos(s.alpha);
-    const U = ru * s.weight; // simplified pore force u·l ≈ ru·W
+    const U = s.ru * s.weight; // simplified pore force u·l ≈ ru·W
     num += c * s.baseLength + (N - U * Math.cos(s.alpha)) * Math.tan(phi);
     den += s.weight * Math.sin(s.alpha);
   }
@@ -232,7 +273,6 @@ function fsFellenius(input: StabilityInput, slices: Slice[]): number {
 
 /** FS by the simplified Bishop method (iterative), with ru */
 function fsBishop(input: StabilityInput, slices: Slice[]): number {
-  const ru = ruFromWater(input.waterCondition);
   let FS = 1.2;
   for (let iter = 0; iter < 100; iter++) {
     let num = 0;
@@ -243,7 +283,7 @@ function fsBishop(input: StabilityInput, slices: Slice[]): number {
       const mAlpha =
         Math.cos(s.alpha) + (Math.sin(s.alpha) * Math.tan(phi)) / FS;
       num +=
-        (c * s.width + (s.weight - ru * s.weight) * Math.tan(phi)) / mAlpha;
+        (c * s.width + (s.weight - s.ru * s.weight) * Math.tan(phi)) / mAlpha;
       den += s.weight * Math.sin(s.alpha);
     }
     if (den <= 0) return Infinity;
@@ -256,7 +296,11 @@ function fsBishop(input: StabilityInput, slices: Slice[]): number {
 
 function resolveStrength(input: StabilityInput): ResolvedStrength {
   if (input.strengthModel?.type !== "hoek-brown") {
-    return { cohesion: input.cohesion, frictionAngle: input.frictionAngle, label: "Mohr–Coulomb" };
+    return {
+      cohesion: input.strengthModel?.cohesion ?? input.cohesion,
+      frictionAngle: input.strengthModel?.frictionAngle ?? input.frictionAngle,
+      label: "Mohr–Coulomb",
+    };
   }
   const hb = input.strengthModel;
   const sigmaCi = Math.max(0.1, hb.sigmaCi);
@@ -268,11 +312,15 @@ function resolveStrength(input: StabilityInput): ResolvedStrength {
   const a = 0.5 + (Math.exp(-gsi / 15) - Math.exp(-20 / 3)) / 6;
   const sigma3 = Math.max(0.01, sigmaCi * 0.1);
   const sigma1AtZero = sigmaCi * Math.pow(s, a);
-  const sigma1AtConfinement = sigma3 + sigmaCi * Math.pow(mb * sigma3 / sigmaCi + s, a);
+  const sigma1AtConfinement =
+    sigma3 + sigmaCi * Math.pow((mb * sigma3) / sigmaCi + s, a);
   const slope = Math.max(1, (sigma1AtConfinement - sigma1AtZero) / sigma3);
   const sinPhi = Math.max(0, Math.min(0.98, (slope - 1) / (slope + 1)));
   const phi = Math.asin(sinPhi);
-  const cohesion = Math.max(0, sigma1AtZero * (1 - sinPhi) / (2 * Math.cos(phi)));
+  const cohesion = Math.max(
+    0,
+    (sigma1AtZero * (1 - sinPhi)) / (2 * Math.cos(phi))
+  );
   return {
     cohesion: Math.round(cohesion * 100) / 100,
     frictionAngle: Math.round((phi / DEG) * 100) / 100,
@@ -301,6 +349,7 @@ export function computeStability(input: StabilityInput): StabilityResult {
     xc: number;
     yc: number;
     R: number;
+    ru: number;
   } | null = null;
 
   // Search grid of centers above the slope
@@ -320,7 +369,18 @@ export function computeStability(input: StabilityInput): StabilityResult {
         if (!Number.isFinite(fsF) || !Number.isFinite(fsB)) continue;
         if (fsF <= 0 || fsB <= 0) continue;
         if (!best || fsB < best.fsB) {
-          best = { fsF, fsB, xc, yc, R };
+          const totalWeight = slices.reduce(
+            (sum, slice) => sum + slice.weight,
+            0
+          );
+          const effectiveRu =
+            totalWeight > 0
+              ? slices.reduce(
+                  (sum, slice) => sum + slice.ru * slice.weight,
+                  0
+                ) / totalWeight
+              : 0;
+          best = { fsF, fsB, xc, yc, R, ru: effectiveRu };
         }
       }
     }
@@ -328,7 +388,7 @@ export function computeStability(input: StabilityInput): StabilityResult {
 
   if (!best) {
     throw new Error(
-      "Unable to find a valid failure surface for this geometry. Please check the input parameters.",
+      "Unable to find a valid failure surface for this geometry. Please check the input parameters."
     );
   }
 
@@ -353,16 +413,20 @@ export function computeStability(input: StabilityInput): StabilityResult {
     model: range.strength.label,
     cohesion: range.strength.cohesion,
     frictionAngle: range.strength.frictionAngle,
+    unitWeight: range.unitWeight,
+    waterCondition: range.waterCondition,
+    ru: range.ru,
   }));
   const models = new Set(benchStrengths.map(bench => bench.model));
-  const resultStrengthModel: StabilityResult["strengthModel"] = models.size > 1
-    ? "Mixed"
-    : (benchStrengths[0]?.model ?? strength.label);
+  const resultStrengthModel: StabilityResult["strengthModel"] =
+    models.size > 1 ? "Mixed" : (benchStrengths[0]?.model ?? strength.label);
   const averageCohesion = benchStrengths.length
-    ? benchStrengths.reduce((sum, bench) => sum + bench.cohesion, 0) / benchStrengths.length
+    ? benchStrengths.reduce((sum, bench) => sum + bench.cohesion, 0) /
+      benchStrengths.length
     : strength.cohesion;
   const averageFrictionAngle = benchStrengths.length
-    ? benchStrengths.reduce((sum, bench) => sum + bench.frictionAngle, 0) / benchStrengths.length
+    ? benchStrengths.reduce((sum, bench) => sum + bench.frictionAngle, 0) /
+      benchStrengths.length
     : strength.frictionAngle;
 
   return {
@@ -373,7 +437,7 @@ export function computeStability(input: StabilityInput): StabilityResult {
       yc: Math.round(best.yc * 100) / 100,
       radius: Math.round(best.R * 100) / 100,
     },
-    ru: ruFromWater(input.waterCondition),
+    ru: Math.round(best.ru * 10000) / 10000,
     slices: 50,
     interpretation,
     status,

@@ -39,9 +39,11 @@ export const stabilityRouter = router({
           height: z.number().positive().max(500),
           angle: z.number().min(10).max(85),
           bermWidth: z.number().min(0).max(200),
+          unitWeight: z.number().min(10).max(35).optional(),
+          waterCondition: z.enum(["dry", "partial", "saturated"]).optional(),
           materialLayer: z.string().max(255).optional(),
           strengthModel: z.discriminatedUnion("type", [
-            z.object({ type: z.literal("mohr-coulomb") }),
+            z.object({ type: z.literal("mohr-coulomb"), cohesion: z.number().min(0).max(1000).optional(), frictionAngle: z.number().min(0).max(60).optional() }),
             z.object({
               type: z.literal("hoek-brown"),
               sigmaCi: z.number().positive().max(1000),
@@ -52,7 +54,7 @@ export const stabilityRouter = router({
           ]).optional(),
         })).min(1).max(50).optional(),
         strengthModel: z.discriminatedUnion("type", [
-          z.object({ type: z.literal("mohr-coulomb") }),
+          z.object({ type: z.literal("mohr-coulomb"), cohesion: z.number().min(0).max(1000).optional(), frictionAngle: z.number().min(0).max(60).optional() }),
           z.object({
             type: z.literal("hoek-brown"),
             sigmaCi: z.number().positive().max(1000),
