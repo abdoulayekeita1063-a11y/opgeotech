@@ -352,67 +352,6 @@ export default function LoggingStatistics({
           </tbody>
         </table>
       </div>
-      <div className="space-y-2 border-t border-border p-5 text-xs leading-relaxed text-muted-foreground">
-        <p>
-          <strong className="text-foreground">
-            Source: Rock mass classification.
-          </strong>{" "}
-          UCS, RQD (%), Joint Spacing (m) and JRC use the same cell values as
-          the table above. Statistics update immediately after edits, imports
-          and workbook loading.
-        </p>
-        <p>
-          <strong className="text-foreground">LW = length weighted.</strong>{" "}
-          Average = Σ(table value × interval length) / Σ(valid interval
-          lengths), with interval length = To − From. Depths are used only to
-          weight the averages. Missing or invalid values are excluded separately
-          for each property; “—” means no valid data.
-        </p>
-        <p>
-          <strong className="text-foreground">
-            RQD (%) = RQD length ÷ Recovery length × 100.
-          </strong>{" "}
-          Both lengths are in metres. Statistics uses the corrected interval
-          percentages, not old imported percentages or RQD lengths as
-          percentages. The average remains length-weighted; invalid or zero
-          recovery and RQD greater than Recovery are excluded.
-        </p>
-        <p>
-          <strong className="text-foreground">Water: Dry = 15; Wet = 0.</strong>{" "}
-          The Water column is the length-weighted average of the same water
-          ratings used in Rock mass classification. Legacy numerical water
-          entries keep their existing rating mapping.
-        </p>
-        <p>
-          <strong className="text-foreground">
-            RMR uses the same logging scales.
-          </strong>{" "}
-          RMR = rating of average UCS + rating of average RQD (%) + rating of
-          average Joint spacing + length-weighted roughness rating +
-          length-weighted water rating. Roughness profiles use the same scores
-          as the table above; averaged JRC is not reclassified. RMR is not the
-          average of interval RMR values.
-        </p>
-        <p>
-          This is a roughness-based RMR estimate from available summary
-          properties, without orientation adjustment or a complete
-          discontinuity-condition assessment. RMR remains blank when a required
-          component has no valid data. Review data coverage where properties
-          come from different subsets of intervals.
-        </p>
-        {statistics.excludedIntervals > 0 && (
-          <p className="font-medium text-amber-800">
-            Some rock mass rows were excluded because From / To depths are
-            incomplete or invalid, negative, or To ≤ From.
-          </p>
-        )}
-        {statistics.unspecifiedIntervals > 0 && (
-          <p>
-            Rows with valid depths but no stratigraphy are grouped under
-            “Unspecified”.
-          </p>
-        )}
-      </div>
     </section>
   );
 }

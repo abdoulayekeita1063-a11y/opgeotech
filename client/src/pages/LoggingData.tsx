@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import LoggingStatistics from "@/components/LoggingStatistics";
 import { trpc } from "@/lib/trpc";
@@ -391,6 +392,7 @@ function orientationErrors(rows: Row[]) {
 export default function LoggingData() {
   const rockMassFileRef = useRef<HTMLInputElement>(null);
   const discontinuityFileRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState("rock");
   const [metadata, setMetadata] = useState<Metadata>(emptyMetadata);
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [comments, setComments] = useState("");
@@ -431,19 +433,20 @@ export default function LoggingData() {
     )
   ).length;
   const normalizedHoleIdSearch = holeIdSearch.trim().toLowerCase();
-  const displayedRows = rows
+  const holeIdRows = rows
     .map((row, index) => ({ row, index }))
-    .filter(({ row }) => {
-      const matchesHoleId =
+    .filter(
+      ({ row }) =>
         !normalizedHoleIdSearch ||
-        (row.holeId ?? "").toLowerCase().includes(normalizedHoleIdSearch);
-      const matchesRmr =
-        !showRmrAlertsOnly ||
-        ["Poor", "Very poor"].includes(
-          getRmrQuality(valueFor(row, "rmr"))?.label ?? ""
-        );
-      return matchesHoleId && matchesRmr;
-    });
+        (row.holeId ?? "").toLowerCase().includes(normalizedHoleIdSearch)
+    );
+  const displayedRows = holeIdRows.filter(
+    ({ row }) =>
+      !showRmrAlertsOnly ||
+      ["Poor", "Very poor"].includes(
+        getRmrQuality(valueFor(row, "rmr"))?.label ?? ""
+      )
+  );
 
   const updateRow = (index: number, key: string, value: string) =>
     setRows(current =>
@@ -633,6 +636,7 @@ export default function LoggingData() {
         });
       });
       setSelectedLogId(null);
+      setActiveTab(section);
       toast.success(
         `Imported ${imported.length} ${section === "rock" ? "rock mass classification" : "discontinuity data"} interval${imported.length === 1 ? "" : "s"}`
       );
@@ -929,13 +933,23 @@ export default function LoggingData() {
     }
   };
 
-  const renderIntervalTable = (tableColumns: readonly Column[]) => (
+  const renderIntervalTable = (
+    tableColumns: readonly Column[],
+    visibleRows = displayedRows
+  ) => (
     <div
       className="border border-foreground overflow-auto max-h-[680px]"
       onMouseUp={() => setFillDrag(null)}
       onMouseLeave={() => setFillDrag(null)}
     >
-      <table className="text-xs font-mono min-w-[1200px] w-full">
+      <table
+        className="text-xs font-mono min-w-[1200px] w-full"
+        aria-label={
+          tableColumns === rockMassColumns
+            ? "Rock mass classification table"
+            : "Discontinuity data table"
+        }
+      >
         <thead className="bg-secondary sticky top-0 z-20 shadow-[0_2px_0_rgba(15,23,42,0.2)]">
           <tr>
             {tableColumns.map(([key, label]) => (
@@ -950,8 +964,11 @@ export default function LoggingData() {
           </tr>
         </thead>
         <tbody>
-          {displayedRows.map(({ row, index }) => {
-            const rmrQuality = getRmrQuality(valueFor(row, "rmr"));
+          {visibleRows.map(({ row, index }) => {
+            const rmrQuality =
+              tableColumns === rockMassColumns
+                ? getRmrQuality(valueFor(row, "rmr"))
+                : null;
             return (
               <tr
                 key={index}
@@ -1141,6 +1158,37 @@ export default function LoggingData() {
     </div>
   );
 
+  const renderHoleIdSearch = () => (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        value={holeIdSearch}
+        onChange={event => setHoleIdSearch(event.target.value)}
+        placeholder="Search Hole ID..."
+        aria-label="Search by Hole ID"
+        className="h-9 w-52 rounded-none border-foreground pl-8 pr-8 text-xs"
+      />
+      {holeIdSearch && (
+        <button
+          type="button"
+          aria-label="Clear Hole ID search"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          onClick={() => setHoleIdSearch("")}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+  const renderSpreadsheetHelp = () => (
+    <p className="text-[10px] text-muted-foreground font-mono mb-2">
+      Excel-style editing: Ctrl+C copies a cell, Ctrl+V replaces the active cell
+      or pastes a table range, Ctrl+D fills down, and Ctrl+Z undoes the last
+      table operation. Drag the ↓ handle in one column only, then release where
+      you want the fill to stop.
+    </p>
+  );
+
   return (
     <div onKeyDown={handleUndoShortcut}>
       <ModuleHeader
@@ -1174,20 +1222,6 @@ export default function LoggingData() {
         <Button
           variant="outline"
           className="rounded-none border-foreground"
-          onClick={() => rockMassFileRef.current?.click()}
-        >
-          <Upload className="h-4 w-4 mr-2" /> Import Rock mass Excel
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-none border-foreground"
-          onClick={() => discontinuityFileRef.current?.click()}
-        >
-          <Upload className="h-4 w-4 mr-2" /> Import Discontinuity Excel
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-none border-foreground"
           onClick={exportWorkbook}
         >
           <Download className="h-4 w-4 mr-2" /> Export Excel
@@ -1195,11 +1229,10 @@ export default function LoggingData() {
         <Button
           variant="outline"
           className="rounded-none border-foreground"
-          onClick={() =>
-            document
-              .getElementById("logging-statistics")
-              ?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
+          onClick={() => {
+            setActiveTab("statistics");
+            setFillDrag(null);
+          }}
         >
           <BarChart3 className="h-4 w-4 mr-2" />
           Statistics
@@ -1218,90 +1251,157 @@ export default function LoggingData() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <SectionLabel>Rock mass classification</SectionLabel>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={holeIdSearch}
-              onChange={event => setHoleIdSearch(event.target.value)}
-              placeholder="Search Hole ID..."
-              aria-label="Search by Hole ID"
-              className="h-9 w-52 rounded-none border-foreground pl-8 pr-8 text-xs"
-            />
-            {holeIdSearch && (
-              <button
-                type="button"
-                aria-label="Clear Hole ID search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setHoleIdSearch("")}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <Button
-            variant={showRmrAlertsOnly ? "default" : "outline"}
-            className="rounded-none border-foreground"
-            onClick={() => setShowRmrAlertsOnly(current => !current)}
-          >
-            {showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}
-            {alertRowCount > 0 ? ` (${alertRowCount})` : ""}
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-none border-foreground"
-            onClick={copyOrientationToAll}
-          >
-            Copy hole orientation to all rows
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-none border-foreground"
-            onClick={() => commitRows(current => [...current, emptyRow()])}
-          >
-            <Plus className="h-4 w-4 mr-1" /> Add interval
-          </Button>
-        </div>
-      </div>
-      <p className="text-[10px] text-muted-foreground font-mono mb-2">
-        Excel-style editing: Ctrl+C copies a cell, Ctrl+V replaces the active
-        cell or pastes a table range, Ctrl+D fills down, and Ctrl+Z undoes the
-        last table operation. Drag the ↓ handle in one column only, then release
-        where you want the fill to stop.
-      </p>
-      <p className="mb-2 text-xs text-muted-foreground">
-        RQD (%) = RQD (&gt;100 mm) length ÷ Recovery length × 100. Enter both
-        lengths in metres; the percentage is calculated automatically. Recovery
-        must be positive and RQD cannot exceed Recovery.
-      </p>
-      {renderIntervalTable(rockMassColumns)}
-      <div className="mt-6 mb-2">
-        <SectionLabel>Discontinuity data</SectionLabel>
-      </div>
-      {renderIntervalTable(discontinuityColumns)}
-      <div
-        className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider"
-        aria-label="RMR quality legend"
+      <Tabs
+        value={activeTab}
+        onValueChange={value => {
+          setActiveTab(value);
+          setFillDrag(null);
+        }}
+        className="gap-0"
       >
-        <span className="font-semibold mr-1">RMR quality alert:</span>
-        <span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">
-          81–100 Very good
-        </span>
-        <span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">
-          61–80 Good
-        </span>
-        <span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">
-          41–60 Fair
-        </span>
-        <span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">
-          21–40 Poor
-        </span>
-        <span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">
-          0–20 Very poor
-        </span>
-      </div>
+        <TabsList
+          aria-label="Logging Data sections"
+          className="grid h-auto w-full grid-cols-1 rounded-none border border-foreground bg-background p-0 sm:grid-cols-3"
+        >
+          <TabsTrigger
+            value="rock"
+            className="h-auto rounded-none px-4 py-3 whitespace-normal data-[state=active]:bg-foreground data-[state=active]:text-background"
+          >
+            Rock mass classification
+          </TabsTrigger>
+          <TabsTrigger
+            value="discontinuity"
+            className="h-auto rounded-none px-4 py-3 whitespace-normal data-[state=active]:bg-foreground data-[state=active]:text-background"
+          >
+            Discontinuity data
+          </TabsTrigger>
+          <TabsTrigger
+            value="statistics"
+            className="h-auto rounded-none px-4 py-3 whitespace-normal data-[state=active]:bg-foreground data-[state=active]:text-background"
+          >
+            <BarChart3 className="mr-1 h-4 w-4" />
+            Statistics
+          </TabsTrigger>
+        </TabsList>
+        <p className="mt-2 text-xs text-muted-foreground">
+          One section at a time. Switching tabs keeps your current workbook and
+          unsaved edits.
+        </p>
+
+        <TabsContent value="rock" className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <SectionLabel>Rock mass classification</SectionLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              {renderHoleIdSearch()}
+              <Button
+                variant="outline"
+                className="rounded-none border-foreground"
+                onClick={() => rockMassFileRef.current?.click()}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Rock mass Excel
+              </Button>
+              <Button
+                variant={showRmrAlertsOnly ? "default" : "outline"}
+                className="rounded-none border-foreground"
+                onClick={() => setShowRmrAlertsOnly(current => !current)}
+              >
+                {showRmrAlertsOnly ? "Show all intervals" : "RMR alerts only"}
+                {alertRowCount > 0 ? ` (${alertRowCount})` : ""}
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-none border-foreground"
+                onClick={() => commitRows(current => [...current, emptyRow()])}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add interval
+              </Button>
+            </div>
+          </div>
+          {renderSpreadsheetHelp()}
+          <p className="mb-2 text-xs text-muted-foreground">
+            RQD (%) = RQD (&gt;100 mm) length ÷ Recovery length × 100. Enter
+            both lengths in metres; the percentage is calculated automatically.
+            Recovery must be positive and RQD cannot exceed Recovery.
+          </p>
+          {renderIntervalTable(rockMassColumns)}
+          <div
+            className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider"
+            aria-label="RMR quality legend"
+          >
+            <span className="font-semibold mr-1">RMR quality alert:</span>
+            <span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">
+              81–100 Very good
+            </span>
+            <span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">
+              61–80 Good
+            </span>
+            <span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">
+              41–60 Fair
+            </span>
+            <span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">
+              21–40 Poor
+            </span>
+            <span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">
+              0–20 Very poor
+            </span>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="discontinuity" className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <SectionLabel>Discontinuity data</SectionLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              {renderHoleIdSearch()}
+              <Button
+                variant="outline"
+                className="rounded-none border-foreground"
+                onClick={() => discontinuityFileRef.current?.click()}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Discontinuity Excel
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-none border-foreground"
+                onClick={copyOrientationToAll}
+              >
+                Copy hole orientation to all rows
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-none border-foreground"
+                onClick={() => commitRows(current => [...current, emptyRow()])}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add discontinuity
+              </Button>
+            </div>
+          </div>
+          {renderSpreadsheetHelp()}
+          <p className="mb-2 text-xs text-muted-foreground">
+            Enter Hole ID, Hole Dip, Hole Azimuth and Alpha/Beta measurements to
+            calculate Dip and Dip Direction. The rock-mass RMR alert filter does
+            not hide discontinuity records.
+          </p>
+          {renderIntervalTable(discontinuityColumns, holeIdRows)}
+        </TabsContent>
+
+        <TabsContent
+          value="statistics"
+          forceMount
+          className="mt-0 data-[state=inactive]:hidden"
+        >
+          <LoggingStatistics
+            rows={rows.map(statisticsRow)}
+            visibleRows={displayedRows.map(({ row }) => statisticsRow(row))}
+            hasFilters={Boolean(normalizedHoleIdSearch || showRmrAlertsOnly)}
+            fileName={metadata.holeNo || metadata.projectName || "OPGeotech"}
+          />
+        </TabsContent>
+      </Tabs>
+
       {validationErrors.length > 0 && (
         <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono">
           <strong>Orientation validation:</strong>{" "}
@@ -1309,15 +1409,18 @@ export default function LoggingData() {
           {validationErrors.length > 3
             ? ` (+${validationErrors.length - 3} more)`
             : ""}
+          {activeTab !== "discontinuity" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-2 mt-2 rounded-none border-destructive"
+              onClick={() => setActiveTab("discontinuity")}
+            >
+              Open Discontinuity data
+            </Button>
+          )}
         </div>
       )}
-
-      <LoggingStatistics
-        rows={rows.map(statisticsRow)}
-        visibleRows={displayedRows.map(({ row }) => statisticsRow(row))}
-        hasFilters={Boolean(normalizedHoleIdSearch || showRmrAlertsOnly)}
-        fileName={metadata.holeNo || metadata.projectName || "OPGeotech"}
-      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2">
