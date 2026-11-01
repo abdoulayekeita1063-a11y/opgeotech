@@ -140,7 +140,7 @@ function valueFor(row: Row, key: string) {
 
 // Statistics consumes exactly the same values as the Rock mass classification cells.
 function statisticsRow(row: Row): Row {
-  return { ...row, ucs: valueFor(row, "ucs"), rqdPercent: valueFor(row, "rqdPercent"), jointSpacing: valueFor(row, "jointSpacing"), jrc: valueFor(row, "jrc") };
+  return { ...row, ucs: valueFor(row, "ucs"), rqdPercent: valueFor(row, "rqdPercent"), jointSpacing: valueFor(row, "jointSpacing"), jrc: valueFor(row, "jrc"), microRoughness: valueFor(row, "microRoughness"), waterCondition: valueFor(row, "waterCondition") };
 }
 
 const strictAnglePattern = /^[+-]?\d+(?:\.\d+)?\s*°?$/;

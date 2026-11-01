@@ -1,6 +1,19 @@
+import {
+  calculateLoggingRmrScore,
+  getLoggingRoughnessRating,
+  getLoggingWaterRating,
+  getRoughnessProfile,
+} from "./loggingRmr";
+
 export type LoggingStatisticsInput = Record<string, string | undefined>;
-export type LoggingMetric = "ucs" | "rqd" | "spacing" | "jrc";
-export const loggingMetrics: LoggingMetric[] = ["ucs", "rqd", "spacing", "jrc"];
+export type LoggingMetric = "ucs" | "rqd" | "spacing" | "jrc" | "water";
+export const loggingMetrics: LoggingMetric[] = [
+  "ucs",
+  "rqd",
+  "spacing",
+  "jrc",
+  "water",
+];
 
 export type WeightedMetric = {
   average: number | null;
@@ -12,6 +25,8 @@ export type StratigraphyStatistics = {
   loggedLength: number;
   intervalCount: number;
   metrics: Record<LoggingMetric, WeightedMetric>;
+  roughnessRating: WeightedMetric;
+  rmr: number | null;
 };
 
 type Accumulator = {
@@ -22,6 +37,7 @@ type Accumulator = {
     LoggingMetric,
     { sum: number; length: number; count: number }
   >;
+  roughnessRating: { sum: number; length: number; count: number };
 };
 
 function numberOrNull(value: string | undefined): number | null {
@@ -43,7 +59,9 @@ function accumulator(stratigraphy: string): Accumulator {
       rqd: { sum: 0, length: 0, count: 0 },
       spacing: { sum: 0, length: 0, count: 0 },
       jrc: { sum: 0, length: 0, count: 0 },
+      water: { sum: 0, length: 0, count: 0 },
     },
+    roughnessRating: { sum: 0, length: 0, count: 0 },
   };
 }
 
@@ -61,11 +79,27 @@ function finish(group: Accumulator): StratigraphyStatistics {
       ];
     })
   ) as Record<LoggingMetric, WeightedMetric>;
+  const roughnessRating: WeightedMetric = {
+    average:
+      group.roughnessRating.length > 0
+        ? group.roughnessRating.sum / group.roughnessRating.length
+        : null,
+    validLength: group.roughnessRating.length,
+    validIntervals: group.roughnessRating.count,
+  };
   return {
     stratigraphy: group.stratigraphy,
     loggedLength: group.loggedLength,
     intervalCount: group.intervalCount,
     metrics,
+    roughnessRating,
+    rmr: calculateLoggingRmrScore({
+      ucs: metrics.ucs.average,
+      rqd: metrics.rqd.average,
+      spacing: metrics.spacing.average,
+      roughnessRating: roughnessRating.average,
+      waterRating: metrics.water.average,
+    }),
   };
 }
 
@@ -75,6 +109,10 @@ function finish(group: Accumulator): StratigraphyStatistics {
  * The caller supplies its displayed jointSpacing and jrc values; do not derive
  * different values here from fracture count or roughness profiles.
  * The total is calculated from intervals, not from rounded group averages.
+ * Water and roughness descriptions are converted to their existing logging RMR
+ * ratings before length weighting (Dry=15, Wet=0; profile scores unchanged).
+ * Summary RMR applies the existing UCS/RQD/spacing bands to their averages and
+ * adds the weighted roughness and water ratings. It is not an average of row RMRs.
  */
 export function calculateLoggingStatistics(
   rows: readonly LoggingStatisticsInput[]
@@ -116,11 +154,24 @@ export function calculateLoggingStatistics(
     const rqd = numberOrNull(row.rqdPercent);
     const spacing = numberOrNull(row.jointSpacing);
     const jrc = numberOrNull(row.jrc);
+    const waterText = (row.waterCondition ?? "").trim().toLowerCase();
+    const validWater =
+      ["dry", "wet"].includes(waterText) ||
+      numberOrNull(row.waterCondition) !== null;
+    const water = validWater ? getLoggingWaterRating(row.waterCondition) : null;
+    const roughnessText = row.microRoughness;
+    const validRoughness =
+      Boolean(getRoughnessProfile(roughnessText)) ||
+      numberOrNull(roughnessText) !== null;
+    const roughness = validRoughness
+      ? getLoggingRoughnessRating(roughnessText)
+      : null;
     const values: Record<LoggingMetric, number | null> = {
       ucs: ucs !== null && ucs >= 0 ? ucs : null,
       rqd: rqd !== null && rqd >= 0 && rqd <= 100 ? rqd : null,
       spacing: spacing !== null && spacing >= 0 ? spacing : null,
       jrc: jrc !== null && jrc >= 0 && jrc <= 20 ? jrc : null,
+      water,
     };
     for (const target of [group, total]) {
       target.loggedLength += length;
@@ -131,6 +182,11 @@ export function calculateLoggingStatistics(
         target.metrics[metric].sum += value * length;
         target.metrics[metric].length += length;
         target.metrics[metric].count++;
+      }
+      if (roughness !== null) {
+        target.roughnessRating.sum += roughness * length;
+        target.roughnessRating.length += length;
+        target.roughnessRating.count++;
       }
     }
   }

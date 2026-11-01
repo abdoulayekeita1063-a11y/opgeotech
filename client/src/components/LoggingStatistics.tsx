@@ -4,6 +4,7 @@ import { BarChart3, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ModuleHeader";
+import { getRmrQuality } from "@/lib/loggingRmr";
 import {
   calculateLoggingStatistics,
   loggingMetrics,
@@ -20,6 +21,7 @@ const metricLabels: Record<
   rqd: { label: "RQD", unit: "%", decimals: 1 },
   spacing: { label: "Joint spacing", unit: "m", decimals: 3 },
   jrc: { label: "Joint roughness", unit: "JRC", decimals: 1 },
+  water: { label: "Water", unit: "RMR points, 0–15", decimals: 1 },
 };
 const formatted = (value: number | null, decimals = 1) =>
   value === null ? "—" : value.toFixed(decimals);
@@ -58,28 +60,39 @@ export default function LoggingStatistics({
         key =>
           `Average LW ${metricLabels[key].label} (${metricLabels[key].unit})`
       ),
+      "RMR (from summary properties)",
     ];
     const matrix = [
       header,
       ...summaryRows.map(row => [
         row.stratigraphy,
         ...loggingMetrics.map(key => row.metrics[key].average),
+        row.rmr,
       ]),
     ];
     const sheet = XLSX.utils.aoa_to_sheet(matrix);
-    sheet["!cols"] = [{ wch: 26 }, ...loggingMetrics.map(() => ({ wch: 27 }))];
+    sheet["!cols"] = [
+      { wch: 26 },
+      ...loggingMetrics.map(() => ({ wch: 27 })),
+      { wch: 32 },
+    ];
     summaryRows.forEach((_, index) => {
       loggingMetrics.forEach((key, metricIndex) => {
         const cell =
           sheet[XLSX.utils.encode_cell({ r: index + 1, c: metricIndex + 1 })];
         if (cell?.t === "n") cell.z = key === "spacing" ? "0.000" : "0.0";
       });
+      const rmrCell =
+        sheet[
+          XLSX.utils.encode_cell({ r: index + 1, c: loggingMetrics.length + 1 })
+        ];
+      if (rmrCell?.t === "n") rmrCell.z = "0.0";
     });
     const coverage = XLSX.utils.aoa_to_sheet([
       ["Scope", scope],
       [
         "Source",
-        "Values displayed in the Rock mass classification table: UCS (MPa), RQD (%), Joint Spacing (m), JRC.",
+        "Values displayed in Rock mass classification: UCS (MPa), RQD (%), Joint Spacing (m), JRC, roughness profile and water condition.",
       ],
       [
         "Method",
@@ -103,6 +116,22 @@ export default function LoggingStatistics({
         "Uses the JRC value displayed in Rock mass classification; no separate conversion in Statistics.",
       ],
       [
+        "Water",
+        "Average LW of the existing logging water ratings. Dry = 15; Wet = 0. Legacy numeric entries retain the same 10 / 7 / 4 / 0 rating mapping as Rock mass classification.",
+      ],
+      [
+        "RMR",
+        "Existing logging ratings of average UCS, average RQD (%) and average Joint spacing + average LW roughness rating + average LW water rating, clamped to 0–100 and rounded to 0.1. This is not an average of interval RMR values.",
+      ],
+      [
+        "Roughness rating",
+        "Each source roughness profile uses the same RMR score as Rock mass classification before length weighting. Averaged JRC is not reclassified. Numeric legacy roughness uses the existing logging scale.",
+      ],
+      [
+        "RMR limitations",
+        "Roughness-based estimate using available summary properties; no joint-orientation adjustment and no complete persistence, aperture, filling or weathering assessment. Per-property valid-data coverage may differ.",
+      ],
+      [
         "Missing data",
         "Excluded separately from each metric denominator, not replaced with zero. Valid zero values remain included.",
       ],
@@ -110,6 +139,19 @@ export default function LoggingStatistics({
         "Unspecified stratigraphy",
         "Valid rows with a blank stratigraphy appear under Unspecified.",
       ],
+      [],
+      [
+        "Rock type / Stratigraphy",
+        "Average LW roughness RMR score",
+        "Roughness valid data coverage (%)",
+      ],
+      ...summaryRows.map(row => [
+        row.stratigraphy,
+        row.roughnessRating.average,
+        row.loggedLength
+          ? (row.roughnessRating.validLength / row.loggedLength) * 100
+          : 0,
+      ]),
       [],
       ["Rock type / Stratigraphy", "Metric", "Valid data coverage (%)"],
       ...summaryRows.flatMap(row =>
@@ -155,6 +197,40 @@ export default function LoggingStatistics({
           )}
         </td>
       ))}
+      <td
+        className="px-4 py-3 text-right font-mono tabular-nums"
+        title={`RMR calculated from summary properties. Roughness RMR contribution: ${formatted(row.roughnessRating.average)}; water contribution: ${formatted(row.metrics.water.average)}. Same ratings as Rock mass classification; Dry=15 and Wet=0.`}
+      >
+        {row.rmr === null ? (
+          "—"
+        ) : (
+          <span
+            className={`inline-block border px-2 py-1 font-semibold ${getRmrQuality(String(row.rmr))?.cellClass ?? ""}`}
+          >
+            {formatted(row.rmr)}
+          </span>
+        )}
+        {row.rmr !== null && (
+          <span className="mt-1 block text-[10px] font-normal text-slate-600">
+            {getRmrQuality(String(row.rmr))?.label}
+          </span>
+        )}
+        {showCoverage && (
+          <span className="mt-1 block text-[10px] font-normal text-slate-500">
+            {formatted(
+              Math.min(
+                ...(["ucs", "rqd", "spacing", "water"] as LoggingMetric[]).map(
+                  key => coveragePercent(row, key)
+                ),
+                row.loggedLength
+                  ? (row.roughnessRating.validLength / row.loggedLength) * 100
+                  : 0
+              )
+            )}
+            % min. component coverage
+          </span>
+        )}
+      </td>
     </tr>
   );
 
@@ -223,7 +299,7 @@ export default function LoggingStatistics({
       </p>
       <div className="overflow-x-auto">
         <table
-          className="w-full min-w-[650px] text-sm text-slate-900"
+          className="w-full min-w-[900px] text-sm text-slate-900"
           aria-label="Length-weighted statistics table"
         >
           <thead className="border-y-2 border-sky-700 bg-slate-100">
@@ -243,6 +319,12 @@ export default function LoggingStatistics({
                   </span>
                 </th>
               ))}
+              <th scope="col" className="px-4 py-4 text-right">
+                RMR
+                <span className="block text-xs font-normal text-slate-600">
+                  From summary<span className="block">(0–100)</span>
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -254,7 +336,7 @@ export default function LoggingStatistics({
             ) : (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="px-6 py-10 text-center text-muted-foreground"
                 >
                   {filtered
@@ -281,6 +363,29 @@ export default function LoggingStatistics({
           lengths), with interval length = To − From. Depths are used only to
           weight the averages. Missing or invalid values are excluded separately
           for each property; “—” means no valid data.
+        </p>
+        <p>
+          <strong className="text-foreground">Water: Dry = 15; Wet = 0.</strong>{" "}
+          The Water column is the length-weighted average of the same water
+          ratings used in Rock mass classification. Legacy numerical water
+          entries keep their existing rating mapping.
+        </p>
+        <p>
+          <strong className="text-foreground">
+            RMR uses the same logging scales.
+          </strong>{" "}
+          RMR = rating of average UCS + rating of average RQD (%) + rating of
+          average Joint spacing + length-weighted roughness rating +
+          length-weighted water rating. Roughness profiles use the same scores
+          as the table above; averaged JRC is not reclassified. RMR is not the
+          average of interval RMR values.
+        </p>
+        <p>
+          This is a roughness-based RMR estimate from available summary
+          properties, without orientation adjustment or a complete
+          discontinuity-condition assessment. RMR remains blank when a required
+          component has no valid data. Review data coverage where properties
+          come from different subsets of intervals.
         </p>
         {statistics.excludedIntervals > 0 && (
           <p className="font-medium text-amber-800">
