@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
 import LoggingStatistics from "@/components/LoggingStatistics";
+import PersistentHorizontalScroll from "@/components/PersistentHorizontalScroll";
 import { trpc } from "@/lib/trpc";
 import {
   calculateJointSpacing,
@@ -937,8 +938,12 @@ export default function LoggingData() {
     tableColumns: readonly Column[],
     visibleRows = displayedRows
   ) => (
-    <div
-      className="border border-foreground overflow-auto max-h-[680px]"
+    <PersistentHorizontalScroll
+      label={
+        tableColumns === rockMassColumns
+          ? "Rock mass classification"
+          : "Discontinuity data"
+      }
       onMouseUp={() => setFillDrag(null)}
       onMouseLeave={() => setFillDrag(null)}
     >
@@ -1155,7 +1160,7 @@ export default function LoggingData() {
           })}
         </tbody>
       </table>
-    </div>
+    </PersistentHorizontalScroll>
   );
 
   const renderHoleIdSearch = () => (

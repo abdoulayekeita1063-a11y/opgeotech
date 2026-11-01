@@ -4,6 +4,7 @@ import { BarChart3, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SectionLabel } from "@/components/ModuleHeader";
+import PersistentHorizontalScroll from "@/components/PersistentHorizontalScroll";
 import { getRmrQuality } from "@/lib/loggingRmr";
 import {
   calculateLoggingStatistics,
@@ -301,7 +302,7 @@ export default function LoggingStatistics({
           ? "Active table filters are included in these averages."
           : "Table filters do not change this summary unless explicitly applied."}
       </p>
-      <div className="overflow-x-auto">
+      <PersistentHorizontalScroll label="Statistics">
         <table
           className="w-full min-w-[900px] text-sm text-slate-900"
           aria-label="Length-weighted statistics table"
@@ -351,7 +352,7 @@ export default function LoggingStatistics({
             )}
           </tbody>
         </table>
-      </div>
+      </PersistentHorizontalScroll>
     </section>
   );
 }
