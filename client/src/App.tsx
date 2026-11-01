@@ -22,6 +22,7 @@ import Download from "./pages/Download";
 import Drilling from "./pages/Drilling";
 import LoggingData from "./pages/LoggingData";
 import AISlopeAnalysis from "./pages/AISlopeAnalysis";
+import Piezometer from "./pages/Piezometer";
 
 function LegacyRedirect({ to }: { to: string }) {
   useEffect(() => { window.location.replace(to); }, [to]);
@@ -48,6 +49,7 @@ function Router() {
         <Route path={"/kinematics"} component={KinematicAnalysis} />
         <Route path={"/wall-risk-classification"} component={WallRiskClassification} />
         <Route path={"/monitoring"} component={Monitoring} />
+        <Route path={"/piezometer"} component={Piezometer} />
         <Route path={"/radar-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
         <Route path={"/radar-failure-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
         <Route path={"/archive"} component={Archive} />

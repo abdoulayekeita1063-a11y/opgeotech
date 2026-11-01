@@ -38,6 +38,7 @@ import {
   ShieldAlert,
   ScanLine,
   Triangle,
+  Waves,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -57,6 +58,7 @@ const menuItems = [
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
   { icon: ShieldAlert, label: "Wall Risk Classification", path: "/wall-risk-classification" },
   { icon: Activity, label: "Monitoring", path: "/monitoring" },
+  { icon: Waves, label: "Piezometer", path: "/piezometer" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];

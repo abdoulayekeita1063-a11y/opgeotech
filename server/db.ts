@@ -13,6 +13,7 @@ import {
   monitoringRadarReadings,
   monitoringProjects,
   monitoringRecords,
+  piezometers,
   radarMonitoringRows,
   rockClassifications,
   stabilityCalcs,
@@ -342,6 +343,23 @@ export async function listStructures(userId: number) {
 export async function deleteStructure(id: number, userId: number) {
   const db = await requireDb();
   await db.delete(structures).where(and(eq(structures.id, id), eq(structures.userId, userId)));
+}
+
+// Piezometer measurements
+export async function insertPiezometer(values: typeof piezometers.$inferInsert) {
+  const db = await requireDb();
+  const [res] = await db.insert(piezometers).values(values);
+  return Number(res.insertId);
+}
+
+export async function listPiezometers(userId: number) {
+  const db = await requireDb();
+  return db.select().from(piezometers).where(eq(piezometers.userId, userId)).orderBy(piezometers.easting, piezometers.northing);
+}
+
+export async function deletePiezometer(id: number, userId: number) {
+  const db = await requireDb();
+  await db.delete(piezometers).where(and(eq(piezometers.id, id), eq(piezometers.userId, userId)));
 }
 
 // Kinematic analyses

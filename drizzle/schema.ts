@@ -204,6 +204,20 @@ export const structures = mysqlTable("structures", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/** Piezometer readings used to derive and export the piezometric line. */
+export const piezometers = mysqlTable("piezometers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  easting: double("easting").notNull(),
+  northing: double("northing").notNull(),
+  elevation: double("elevation").notNull(),
+  depth: double("depth").notNull(),
+  waterLevel: double("waterLevel").notNull(),
+  piezometricElevation: double("piezometricElevation").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 /** Kinematic analysis runs with Barton-Bandis strength and block FS results. */
 export const kinematicAnalyses = mysqlTable("kinematic_analyses", {
   id: int("id").autoincrement().primaryKey(),
@@ -226,6 +240,7 @@ export type DxfPlan = typeof dxfPlans.$inferSelect;
 export type Drillhole = typeof drillholes.$inferSelect;
 export type DrillholeLog = typeof drillholeLogs.$inferSelect;
 export type Structure = typeof structures.$inferSelect;
+export type Piezometer = typeof piezometers.$inferSelect;
 export type KinematicAnalysis = typeof kinematicAnalyses.$inferSelect;
 
 

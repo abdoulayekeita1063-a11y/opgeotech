@@ -309,6 +309,40 @@ export const mappingRouter = router({
   }),
 });
 
+// ── Piezometer module ──────────────────────────────────────────────────
+
+const piezometerShape = {
+  name: z.string().min(1).max(128),
+  easting: z.number().finite(),
+  northing: z.number().finite(),
+  elevation: z.number().finite(),
+  depth: z.number().nonnegative().max(10000),
+  waterLevel: z.number().nonnegative().max(10000),
+};
+
+export const piezometerRouter = router({
+  create: protectedProcedure.input(z.object(piezometerShape)).mutation(async ({ ctx, input }) => {
+    const id = await db.insertPiezometer({
+      userId: ctx.user.id,
+      name: input.name,
+      easting: input.easting,
+      northing: input.northing,
+      elevation: input.elevation,
+      depth: input.depth,
+      waterLevel: input.waterLevel,
+      piezometricElevation: input.elevation - input.waterLevel,
+    });
+    return { id };
+  }),
+
+  list: protectedProcedure.query(({ ctx }) => db.listPiezometers(ctx.user.id)),
+
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+    await db.deletePiezometer(input.id, ctx.user.id);
+    return { success: true } as const;
+  }),
+});
+
 // ── Kinematic Analysis module ────────────────────────────────────────
 
 export const kinematicsRouter = router({
