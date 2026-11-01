@@ -43,13 +43,16 @@ function renderLoggingData() {
 }
 
 function tabElements(markup: string) {
-  return markup.match(/<button\b[^>]*\brole="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  return (
+    markup.match(/<button\b[^>]*\brole="tab"[^>]*>[\s\S]*?<\/button>/g) ?? []
+  );
 }
 
 function activeTabPanel(markup: string) {
-  const openingPanel = /<div\b(?=[^>]*\brole="tabpanel")(?=[^>]*\bdata-state="active")[^>]*>/g.exec(
-    markup
-  );
+  const openingPanel =
+    /<div\b(?=[^>]*\brole="tabpanel")(?=[^>]*\bdata-state="active")[^>]*>/g.exec(
+      markup
+    );
   if (!openingPanel || openingPanel.index === undefined) {
     throw new Error("Expected an active tab panel in the rendered markup");
   }
@@ -77,8 +80,20 @@ describe("Logging Data tabs", () => {
       "Discontinuity data",
       "Statistics",
     ]);
-    expect(tabs.filter(tab => tab.includes('aria-selected="true"'))).toHaveLength(1);
+    expect(
+      tabs.filter(tab => tab.includes('aria-selected="true"'))
+    ).toHaveLength(1);
     expect(tabs[0]).toContain('aria-selected="true"');
+  });
+
+  it("keeps Statistics only as a tab, without a duplicate toolbar button", () => {
+    const markup = renderLoggingData();
+    const buttons = markup.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
+    const statisticsButtons = buttons.filter(
+      button => button.replace(/<[^>]+>/g, "").trim() === "Statistics"
+    );
+    expect(statisticsButtons).toHaveLength(1);
+    expect(statisticsButtons[0]).toContain('role="tab"');
   });
 
   it("renders only the rock mass table in the active default panel", () => {

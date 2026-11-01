@@ -1227,17 +1227,6 @@ export default function LoggingData() {
           <Download className="h-4 w-4 mr-2" /> Export Excel
         </Button>
         <Button
-          variant="outline"
-          className="rounded-none border-foreground"
-          onClick={() => {
-            setActiveTab("statistics");
-            setFillDrag(null);
-          }}
-        >
-          <BarChart3 className="h-4 w-4 mr-2" />
-          Statistics
-        </Button>
-        <Button
           className="rounded-none"
           disabled={save.isPending}
           onClick={saveWorkbook}
