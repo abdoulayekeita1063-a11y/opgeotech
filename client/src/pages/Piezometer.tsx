@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Plus, Trash2, Waves } from "lucide-react";
+import { Download, Plus, Trash2, Waves, LineChart } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,7 @@ function exportPiezometricDxf(rows: Array<{ name: string; easting: number; north
 
 function ProfileChart({ rows }: { rows: Array<{ name: string; easting: number; northing: number; piezometricElevation: number }> }) {
   const ordered = useMemo(() => [...rows].sort((a, b) => a.easting - b.easting || a.northing - b.northing), [rows]);
-  if (!ordered.length) return <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">Add piezometer readings to draw the line.</div>;
+  if (!ordered.length) return <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">Add all readings, then click “Draw piezometric line”.</div>;
   const width = 900;
   const height = 330;
   const pad = { left: 64, right: 28, top: 28, bottom: 54 };
@@ -81,18 +81,20 @@ function ProfileChart({ rows }: { rows: Array<{ name: string; easting: number; n
 
 export default function Piezometer() {
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [lineDrawn, setLineDrawn] = useState(false);
   const rowsQuery = trpc.piezometer.list.useQuery();
   const utils = trpc.useUtils();
   const create = trpc.piezometer.create.useMutation({
-    onSuccess: async () => { await utils.piezometer.list.invalidate(); setForm(emptyForm); toast.success("Piezometer reading saved"); },
+    onSuccess: async () => { await utils.piezometer.list.invalidate(); setForm(emptyForm); setLineDrawn(false); toast.success("Piezometer reading saved. Add the remaining points, then draw the line."); },
     onError: error => toast.error(error.message),
   });
   const remove = trpc.piezometer.delete.useMutation({
-    onSuccess: async () => { await utils.piezometer.list.invalidate(); toast.success("Piezometer reading deleted"); },
+    onSuccess: async () => { await utils.piezometer.list.invalidate(); setLineDrawn(false); toast.success("Piezometer reading deleted. Draw the line again when all points are ready."); },
     onError: error => toast.error(error.message),
   });
   const rows = rowsQuery.data ?? [];
   const chartRows = rows.map(row => ({ name: row.name, easting: row.easting, northing: row.northing, piezometricElevation: row.piezometricElevation }));
+  const plottedRows = lineDrawn ? chartRows : [];
   const setField = (field: keyof FormState, value: string) => setForm(previous => ({ ...previous, [field]: value }));
   const save = () => {
     const numeric = { easting: numberValue(form.easting), northing: numberValue(form.northing), elevation: numberValue(form.elevation), depth: numberValue(form.depth), waterLevel: numberValue(form.waterLevel) };
@@ -114,8 +116,8 @@ export default function Piezometer() {
           </div>
         </section>
         <section className="border border-foreground bg-white p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><SectionLabel>Piezometric line</SectionLabel><p className="mt-2 text-xs text-muted-foreground">The line connects readings in Easting order. Each vertex is exported with Easting, Northing and piezometric elevation as DXF X, Y and Z.</p></div><Button variant="outline" className="rounded-none border-foreground" onClick={() => exportPiezometricDxf(chartRows)} disabled={rows.length < 2}><Download className="mr-2 h-4 w-4" />Export line DXF</Button></div>
-          <div className="mt-5 border border-slate-200 bg-slate-50/40 p-2"><ProfileChart rows={chartRows} /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><SectionLabel>Piezometric line</SectionLabel><p className="mt-2 text-xs text-muted-foreground">Add all piezometers and their water levels first. Then draw one line through the complete dataset in Easting order.</p></div><div className="flex flex-wrap gap-2"><Button className="rounded-none" onClick={() => { setLineDrawn(true); toast.success(`Piezometric line drawn through ${rows.length} piezometers`); }} disabled={rows.length < 2}><LineChart className="mr-2 h-4 w-4" />{lineDrawn ? "Redraw line" : "Draw piezometric line"}</Button><Button variant="outline" className="rounded-none border-foreground" onClick={() => exportPiezometricDxf(chartRows)} disabled={!lineDrawn || rows.length < 2}><Download className="mr-2 h-4 w-4" />Export line DXF</Button></div></div>
+          <div className="mt-5 border border-slate-200 bg-slate-50/40 p-2"><ProfileChart rows={plottedRows} /></div>
         </section>
       </div>
       <section className="mt-6 border border-foreground bg-background">
