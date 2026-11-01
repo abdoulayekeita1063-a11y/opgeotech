@@ -427,6 +427,15 @@ export async function insertRadarMonitoringRows(values: (typeof radarMonitoringR
   return values.length;
 }
 
+export async function replaceProjectRadarMonitoringRows(userId: number, projectId: number, values: (typeof radarMonitoringRows.$inferInsert)[]) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, projectId)));
+    if (values.length) await tx.insert(radarMonitoringRows).values(values);
+    return values.length;
+  });
+}
+
 export async function listRadarMonitoringRows(userId: number, monitoringRecordId: number) {
   const db = await requireDb();
   return db

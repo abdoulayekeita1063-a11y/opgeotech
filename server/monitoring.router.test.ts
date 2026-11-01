@@ -15,6 +15,7 @@ vi.mock("./db", () => ({
   getMonitoringProject: vi.fn(async (id: number) => state.projects.find(project => project.id === id)),
   deleteMonitoringProject: vi.fn(),
   insertRadarMonitoringRows: vi.fn(async (rows: any[]) => { state.summaryRows.push(...rows.map((row, index) => ({ ...row, id: index + 1, createdAt: new Date() }))); return rows.length; }),
+  replaceProjectRadarMonitoringRows: vi.fn(async (_userId: number, projectId: number, rows: any[]) => { state.summaryRows = state.summaryRows.filter(row => row.projectId !== projectId); state.summaryRows.push(...rows.map((row, index) => ({ ...row, id: index + 1, createdAt: new Date() }))); return rows.length; }),
   listProjectRadarMonitoringRows: vi.fn(async () => state.summaryRows),
   insertMonitoringRecord: vi.fn(),
   listMonitoringRecords: vi.fn(async () => []),
@@ -76,9 +77,24 @@ describe("monitoring radar import contract", () => {
     const analysis = await caller.monitoring.analyzeProjectRadarSummary({ projectId: project.id });
 
     expect(projects).toHaveLength(1);
-    expect(imported).toEqual({ count: 3 });
+    expect(imported).toEqual({ count: 3, mode: "replace" });
     expect(rows).toHaveLength(3);
     expect(rows.every(row => row.projectId === project.id)).toBe(true);
     expect(analysis.risk).toBe("High");
+  });
+
+  it("can append new workbook rows or replace the project dataset", async () => {
+    const caller = appRouter.createCaller(context());
+    const project = await caller.monitoring.createProject({ name: "Import mode test" });
+    const row = (day: number) => ({ measuredAt: day * 86_400_000, pit: "Fekola", window: "East", displacementAverageMm: day, velocityAverageMmPerDay: day });
+
+    await caller.monitoring.importProjectRadarSummary({ projectId: project.id, rows: [row(1)] });
+    await caller.monitoring.importProjectRadarSummary({ projectId: project.id, importMode: "append", rows: [row(2)] });
+    expect(await caller.monitoring.projectSummaryRows({ projectId: project.id })).toHaveLength(2);
+
+    await caller.monitoring.importProjectRadarSummary({ projectId: project.id, importMode: "replace", rows: [row(3)] });
+    const rows = await caller.monitoring.projectSummaryRows({ projectId: project.id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.measuredAt).toBe(3 * 86_400_000);
   });
 });

@@ -539,6 +539,7 @@ export const monitoringRouter = router({
     .input(z.object({
       projectId: z.number(),
       source: z.string().max(255).optional(),
+      importMode: z.enum(["replace", "append"]).default("replace"),
       rows: z.array(z.object({
         measuredAt: z.number().positive(),
         pit: z.string().min(1).max(128),
@@ -555,7 +556,7 @@ export const monitoringRouter = router({
     .mutation(async ({ ctx, input }) => {
       const project = await db.getMonitoringProject(input.projectId);
       if (!project || project.userId !== ctx.user.id) throw new Error("Monitoring project not found");
-      const count = await db.insertRadarMonitoringRows(input.rows.map(row => ({
+      const mappedRows = input.rows.map(row => ({
         userId: ctx.user.id,
         projectId: input.projectId,
         monitoringRecordId: null,
@@ -570,8 +571,11 @@ export const monitoringRouter = router({
         velocityAverageMmPerDay: row.velocityAverageMmPerDay ?? null,
         observations: row.observations ?? null,
         source: input.source ?? null,
-      })));
-      return { count };
+      }));
+      const count = input.importMode === "replace"
+        ? await db.replaceProjectRadarMonitoringRows(ctx.user.id, input.projectId, mappedRows)
+        : await db.insertRadarMonitoringRows(mappedRows);
+      return { count, mode: input.importMode };
     }),
 
   projectSummaryRows: protectedProcedure

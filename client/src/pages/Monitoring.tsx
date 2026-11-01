@@ -34,6 +34,7 @@ export default function Monitoring() {
   const [projectId, setProjectId] = useState<number | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: "", site: "", description: "" });
+  const [importMode, setImportMode] = useState<"replace" | "append">("replace");
   const [activeTab, setActiveTab] = useState(() => window.location.hash === "#report" ? "report" : "data");
   const projects = trpc.monitoring.projects.useQuery();
   const rowsQuery = trpc.monitoring.projectSummaryRows.useQuery({ projectId: projectId ?? 0 }, { enabled: projectId !== null });
@@ -51,7 +52,7 @@ export default function Monitoring() {
   const importSummary = trpc.monitoring.importProjectRadarSummary.useMutation({
     onSuccess: async result => {
       await utils.monitoring.projectSummaryRows.invalidate();
-      toast.success(`${result.count} Excel monitoring rows imported`);
+      toast.success(`${result.count} Excel monitoring rows imported${result.mode === "replace" ? " — previous data replaced" : " — previous data kept"}`);
     },
     onError: error => toast.error(error.message),
   });
@@ -72,7 +73,7 @@ export default function Monitoring() {
     if (!file || projectId === null) return;
     try {
       const imported = parseRadarWorkbook(await file.arrayBuffer());
-      importSummary.mutate({ projectId, source: file.name, rows: imported });
+      importSummary.mutate({ projectId, source: file.name, importMode, rows: imported });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to read the Excel workbook");
     }
@@ -87,10 +88,12 @@ export default function Monitoring() {
           <TabsTrigger value="report" className="rounded-none px-6 py-3 data-[state=active]:bg-[#d71920] data-[state=active]:text-white">Report</TabsTrigger>
         </TabsList>
         <TabsContent value="data" className="mt-0">
-      <div className="flex flex-wrap gap-3 mt-7">
+      <div className="flex flex-wrap items-end gap-3 mt-7">
         <Button variant="outline" className="rounded-none" onClick={downloadTemplate}><Download className="h-4 w-4 mr-2" /> Download Excel template</Button>
+        <div className="min-w-64"><Label className="swiss-label text-[10px]">When importing a new file</Label><Select value={importMode} onValueChange={value => setImportMode(value as "replace" | "append")}><SelectTrigger className="mt-1 rounded-none border-foreground"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="replace">Replace existing data</SelectItem><SelectItem value="append">Keep existing data and add</SelectItem></SelectContent></Select></div>
         <label className="inline-flex"><input className="sr-only" type="file" accept=".xlsx,.xls" disabled={projectId === null || importSummary.isPending} onChange={event => { void handleImport(event.target.files?.[0]); event.currentTarget.value = ""; }} /><span className={`inline-flex items-center justify-center rounded-none bg-primary px-4 py-2 text-sm font-bold text-primary-foreground cursor-pointer ${projectId === null ? "opacity-50 pointer-events-none" : ""}`}><Upload className="h-4 w-4 mr-2" /> {importSummary.isPending ? "Importing..." : "Import Excel workbook"}</span></label>
       </div>
+      <p className="mt-2 max-w-3xl border-l-4 border-primary bg-primary/5 px-3 py-2 text-xs text-muted-foreground">Replace removes all radar rows currently stored in the selected project before saving the new workbook. Keep existing data adds the new rows without deleting the previous import.</p>
       <div className="border-t-2 border-foreground mt-8 pt-4 max-w-3xl">
         <SectionLabel>Monitoring dataset</SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
