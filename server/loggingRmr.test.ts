@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { calculateJointSpacing, calculateLoggingRmr, getRmrQuality, getRoughnessProfile, roughnessCodes } from "../client/src/lib/loggingRmr";
+import {
+  calculateJointSpacing,
+  calculateLoggingRmr,
+  getRmrQuality,
+  getRoughnessProfile,
+  roughnessCodes,
+} from "../client/src/lib/loggingRmr";
+
+const base = {
+  ucs: "120",
+  recovery: "2",
+  rqd: "1.6",
+  rqdPercent: "99",
+  jointSpacing: "1.000",
+  roughness: "5",
+  waterCondition: "12",
+};
 
 describe("Logging Data rock-mass calculations", () => {
   it("calculates joint spacing as interval length divided by fracture count", () => {
@@ -8,28 +24,27 @@ describe("Logging Data rock-mass calculations", () => {
     expect(calculateJointSpacing("22", "10", "4")).toBe("");
   });
 
-  it("calculates RMR from UCS, RQD, joint spacing, roughness and water condition", () => {
-    expect(calculateLoggingRmr({
-      ucs: "120",
-      rqdPercent: "80",
-      rqd: "10",
-      jointSpacing: "1.000",
-      roughness: "5",
-      waterCondition: "12",
-    })).toBe("84.0");
+  it("calculates RMR from recovery-based RQD (%), UCS, spacing, roughness and water", () => {
+    expect(calculateLoggingRmr(base)).toBe("84.0");
   });
 
   it("adds 15 RMR points for Dry and 0 points for Wet", () => {
-    const dry = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "5", waterCondition: "Dry" });
-    const wet = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "5", waterCondition: "Wet" });
-    expect(dry).toBe("89.0");
-    expect(wet).toBe("74.0");
+    expect(calculateLoggingRmr({ ...base, waterCondition: "Dry" })).toBe(
+      "89.0"
+    );
+    expect(calculateLoggingRmr({ ...base, waterCondition: "Wet" })).toBe(
+      "74.0"
+    );
   });
 
-  it("returns a blank RMR when required inputs are incomplete or out of range", () => {
-    expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "", roughness: "5", waterCondition: "12" })).toBe("");
-    expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "1", roughness: "7", waterCondition: "12" })).toBe("");
-    expect(calculateLoggingRmr({ ucs: "120", rqd: "80", jointSpacing: "1", roughness: "5", waterCondition: "16" })).toBe("");
+  it("returns blank RMR for incomplete or invalid sources instead of using a stored percent", () => {
+    expect(calculateLoggingRmr({ ...base, jointSpacing: "" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, roughness: "7" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, waterCondition: "16" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, recovery: "0" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, recovery: "" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, rqd: "2.1" })).toBe("");
+    expect(calculateLoggingRmr({ ...base, rqd: "" })).toBe("");
   });
 
   it("classifies RMR bands and marks low-quality intervals with alert colours", () => {
@@ -41,21 +56,33 @@ describe("Logging Data rock-mass calculations", () => {
     expect(getRmrQuality("")).toBeNull();
   });
 
-  it("uses RQD (%) when both RQD fields are present", () => {
-    const withHighPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", rqd: "10", jointSpacing: "1", roughness: "5", waterCondition: "12" });
-    const withLowPercent = calculateLoggingRmr({ ucs: "120", rqdPercent: "10", rqd: "80", jointSpacing: "1", roughness: "5", waterCondition: "12" });
-    expect(withHighPercent).toBe("84.0");
-    expect(withLowPercent).toBe("70.0");
+  it("uses the calculated percentage even when an old imported percent contradicts it", () => {
+    expect(calculateLoggingRmr({ ...base, rqd: "1.6", rqdPercent: "10" })).toBe(
+      "84.0"
+    );
+    expect(calculateLoggingRmr({ ...base, rqd: "0.2", rqdPercent: "80" })).toBe(
+      "70.0"
+    );
   });
 
-  it("accepts the requested roughness labels in the RMR calculation", () => {
-    const polished = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Planar polished", waterCondition: "12" });
-    const irregular = calculateLoggingRmr({ ucs: "120", rqdPercent: "80", jointSpacing: "1", roughness: "Stepped Irregular", waterCondition: "12" });
-    expect(polished).toBe("70.0");
-    expect(irregular).toBe("89.0");
-    expect(getRoughnessProfile("Undulating Smooth")).toEqual({ jrc: 11, state: "Very rough", rmrScore: 25 });
+  it("preserves the requested roughness profiles and their RMR scores", () => {
+    expect(calculateLoggingRmr({ ...base, roughness: "Planar polished" })).toBe(
+      "70.0"
+    );
+    expect(
+      calculateLoggingRmr({ ...base, roughness: "Stepped Irregular" })
+    ).toBe("89.0");
+    expect(getRoughnessProfile("Undulating Smooth")).toEqual({
+      jrc: 11,
+      state: "Very rough",
+      rmrScore: 25,
+    });
     expect(roughnessCodes["Undulating Smooth"]).toBe("US");
-    expect(getRoughnessProfile("Planar rough")).toEqual({ jrc: 2.5, state: "Rough", rmrScore: 20 });
+    expect(getRoughnessProfile("Planar rough")).toEqual({
+      jrc: 2.5,
+      state: "Rough",
+      rmrScore: 20,
+    });
     expect(roughnessCodes["Planar rough"]).toBe("PR");
   });
 });

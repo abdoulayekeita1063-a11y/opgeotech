@@ -80,7 +80,9 @@ export default function LoggingStatistics({
       loggingMetrics.forEach((key, metricIndex) => {
         const cell =
           sheet[XLSX.utils.encode_cell({ r: index + 1, c: metricIndex + 1 })];
-        if (cell?.t === "n") cell.z = key === "spacing" ? "0.000" : "0.0";
+        if (cell?.t === "n")
+          cell.z =
+            key === "rqd" ? '0.0"%"' : key === "spacing" ? "0.000" : "0.0";
       });
       const rmrCell =
         sheet[
@@ -104,7 +106,7 @@ export default function LoggingStatistics({
       ],
       [
         "RQD",
-        "Uses the RQD (%) column, not the RQD (>100 mm) column. Valid values: 0–100%.",
+        "RQD (%) = RQD (>100 mm) length (m) / Recovery length (m) × 100 for each interval, then length-weighted by To − From. Imported/stored percentages are not used. Zero recovery, negative/missing lengths or RQD > Recovery are excluded. Excel cells store 0–100 percentage points and show the % symbol without multiplying the value again.",
       ],
       ["UCS", "Uses the UCS (MPa) column. Negative values are excluded."],
       [
@@ -188,8 +190,10 @@ export default function LoggingStatistics({
           key={key}
           className="px-4 py-3 text-right font-mono tabular-nums"
           title={`${formatted(coveragePercent(row, key))}% valid data coverage`}
+          data-metric={key}
         >
           {formatted(row.metrics[key].average, metricLabels[key].decimals)}
+          {key === "rqd" && row.metrics[key].average !== null ? "%" : ""}
           {showCoverage && (
             <span className="mt-1 block text-[10px] font-normal text-slate-500">
               {formatted(coveragePercent(row, key))}% coverage
@@ -363,6 +367,15 @@ export default function LoggingStatistics({
           lengths), with interval length = To − From. Depths are used only to
           weight the averages. Missing or invalid values are excluded separately
           for each property; “—” means no valid data.
+        </p>
+        <p>
+          <strong className="text-foreground">
+            RQD (%) = RQD length ÷ Recovery length × 100.
+          </strong>{" "}
+          Both lengths are in metres. Statistics uses the corrected interval
+          percentages, not old imported percentages or RQD lengths as
+          percentages. The average remains length-weighted; invalid or zero
+          recovery and RQD greater than Recovery are excluded.
         </p>
         <p>
           <strong className="text-foreground">Water: Dry = 15; Wet = 0.</strong>{" "}

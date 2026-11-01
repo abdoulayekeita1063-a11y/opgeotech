@@ -1,3 +1,5 @@
+import { calculateRqdPercentage } from "./loggingRqd";
+
 export function parseLoggingNumber(value: string | undefined): number | null {
   const parsed = Number.parseFloat((value ?? "").replace(/[^0-9.+-]/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
@@ -198,7 +200,7 @@ export function calculateLoggingRmrScore({
  */
 export function calculateLoggingRmr(row: Record<string, string>): string {
   const ucs = parseLoggingNumber(row.ucs);
-  const rqd = parseLoggingNumber(row.rqdPercent ?? row.rqd);
+  const rqd = calculateRqdPercentage(row.rqd, row.recovery);
   const spacing = parseLoggingNumber(row.jointSpacing);
   const score = calculateLoggingRmrScore({
     ucs,

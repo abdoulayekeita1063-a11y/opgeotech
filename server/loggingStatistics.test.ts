@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { calculateLoggingStatistics } from "../client/src/lib/loggingStatistics";
 
-// Controlled cell-value fixtures only; never seeded into user workbooks or the database.
+// Controlled source-cell fixtures only; never seeded into user workbooks or the database.
 describe("Logging statistics by stratigraphy", () => {
-  it("uses interval-length weighting for the four Rock mass classification values", () => {
+  it("uses interval-length weighting and recovery-based RQD percentages", () => {
     const result = calculateLoggingStatistics([
       {
         stratigraphy: "LAT",
         from: "0",
         to: "2",
         ucs: "10",
-        rqdPercent: "20",
+        recovery: "2",
+        rqd: "0.4",
+        rqdPercent: "99",
         jointSpacing: "0.500",
         jrc: "0.5",
       },
@@ -19,7 +21,9 @@ describe("Logging statistics by stratigraphy", () => {
         from: "2",
         to: "10",
         ucs: "100",
-        rqdPercent: "80",
+        recovery: "8",
+        rqd: "6.4",
+        rqdPercent: "1",
         jointSpacing: "2.000",
         jrc: "20.0",
       },
@@ -96,7 +100,8 @@ describe("Logging statistics by stratigraphy", () => {
         from: "0",
         to: "2",
         ucs: "0",
-        rqdPercent: "0",
+        recovery: "2",
+        rqd: "0",
         jointSpacing: "",
         jrc: "",
       },
@@ -105,7 +110,8 @@ describe("Logging statistics by stratigraphy", () => {
         from: "2",
         to: "10",
         ucs: "",
-        rqdPercent: "80",
+        recovery: "8",
+        rqd: "6.4",
         jointSpacing: "2",
         jrc: "2.5",
       },
@@ -132,10 +138,17 @@ describe("Logging statistics by stratigraphy", () => {
     });
   });
 
-  it("uses RQD (%) only and not the recovered RQD >100 mm length", () => {
+  it("calculates RQD (%) from its source lengths and never falls back to a stored percent", () => {
     const result = calculateLoggingStatistics([
-      { stratigraphy: "LAT", from: "0", to: "2", rqd: "1.5", rqdPercent: "75" },
-      { stratigraphy: "LAT", from: "2", to: "10", rqd: "5" },
+      {
+        stratigraphy: "LAT",
+        from: "0",
+        to: "2",
+        recovery: "2",
+        rqd: "1.5",
+        rqdPercent: "1",
+      },
+      { stratigraphy: "LAT", from: "2", to: "10", rqd: "5", rqdPercent: "99" },
     ]);
     expect(result.total.metrics.rqd).toEqual({
       average: 75,
@@ -164,6 +177,8 @@ describe("Logging statistics by stratigraphy", () => {
       {
         from: "0",
         to: "2",
+        recovery: "2",
+        rqd: "2.1",
         rqdPercent: "101",
         ucs: "-1",
         jointSpacing: "-2",
@@ -215,7 +230,8 @@ describe("Logging statistics by stratigraphy", () => {
         stratigraphy: "LAT",
         from: "0",
         to: "1,5",
-        rqdPercent: "45,5",
+        recovery: "1,5",
+        rqd: "0,6825",
         ucs: "12,5",
         jointSpacing: "0,5",
         jrc: "2,5",
@@ -224,7 +240,9 @@ describe("Logging statistics by stratigraphy", () => {
         stratigraphy: "SAP",
         from: "0",
         to: "1",
-        rqdPercent: "45abc",
+        recovery: "1",
+        rqd: "0.45abc",
+        rqdPercent: "45",
         ucs: "<10",
         jointSpacing: "3x",
         jrc: "rough",
@@ -232,7 +250,7 @@ describe("Logging statistics by stratigraphy", () => {
     ]);
     expect(result.groups[0].loggedLength).toBe(1.5);
     expect(result.groups[0].metrics.ucs.average).toBe(12.5);
-    expect(result.groups[0].metrics.rqd.average).toBe(45.5);
+    expect(result.groups[0].metrics.rqd.average).toBeCloseTo(45.5);
     expect(result.groups[0].metrics.spacing.average).toBe(0.5);
     expect(result.groups[1].metrics.ucs.average).toBeNull();
     expect(result.groups[1].metrics.rqd.average).toBeNull();
@@ -245,6 +263,7 @@ describe("Logging statistics by stratigraphy", () => {
     expect(result.total.loggedLength).toBe(0);
     expect(result.total.intervalCount).toBe(0);
     expect(result.total.metrics.ucs.average).toBeNull();
+    expect(result.total.rmr).toBeNull();
     expect(result.excludedIntervals).toBe(0);
   });
 });

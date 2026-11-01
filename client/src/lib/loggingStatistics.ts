@@ -4,6 +4,7 @@ import {
   getLoggingWaterRating,
   getRoughnessProfile,
 } from "./loggingRmr";
+import { calculateRqdPercentage } from "./loggingRqd";
 
 export type LoggingStatisticsInput = Record<string, string | undefined>;
 export type LoggingMetric = "ucs" | "rqd" | "spacing" | "jrc" | "water";
@@ -104,7 +105,8 @@ function finish(group: Accumulator): StratigraphyStatistics {
 }
 
 /** Length weighted mean = sum(value * (To - From)) / sum(valid metric lengths).
- * RQD uses the percentage column, never the recovered >100 mm length column.
+ * RQD (%) = RQD (>100 mm) length / Recovery length × 100, then length weighted.
+ * Never use a stale imported/stored percentage or mistake the source length for %.
  * All four properties are read directly from Rock mass classification cell values.
  * The caller supplies its displayed jointSpacing and jrc values; do not derive
  * different values here from fracture count or roughness profiles.
@@ -151,7 +153,7 @@ export function calculateLoggingStatistics(
     if (!groups.has(key)) groups.set(key, accumulator(label));
     const group = groups.get(key)!;
     const ucs = numberOrNull(row.ucs);
-    const rqd = numberOrNull(row.rqdPercent);
+    const rqd = calculateRqdPercentage(row.rqd, row.recovery);
     const spacing = numberOrNull(row.jointSpacing);
     const jrc = numberOrNull(row.jrc);
     const waterText = (row.waterCondition ?? "").trim().toLowerCase();
