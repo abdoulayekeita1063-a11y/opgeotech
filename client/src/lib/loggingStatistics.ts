@@ -1,5 +1,3 @@
-import { getRoughnessProfile } from "./loggingRmr";
-
 export type LoggingStatisticsInput = Record<string, string | undefined>;
 export type LoggingMetric = "ucs" | "rqd" | "spacing" | "jrc";
 export const loggingMetrics: LoggingMetric[] = ["ucs", "rqd", "spacing", "jrc"];
@@ -73,8 +71,9 @@ function finish(group: Accumulator): StratigraphyStatistics {
 
 /** Length weighted mean = sum(value * (To - From)) / sum(valid metric lengths).
  * RQD uses the percentage column, never the recovered >100 mm length column.
- * Spacing uses the same interval-length / fracture-count rule as Logging Data,
- * without rounding intermediate values. JRC comes from the existing profile map.
+ * All four properties are read directly from Rock mass classification cell values.
+ * The caller supplies its displayed jointSpacing and jrc values; do not derive
+ * different values here from fracture count or roughness profiles.
  * The total is calculated from intervals, not from rounded group averages.
  */
 export function calculateLoggingStatistics(
@@ -96,6 +95,8 @@ export function calculateLoggingStatistics(
       "microRoughness",
       "recovery",
       "rqd",
+      "jointSpacing",
+      "jrc",
     ].some(key => Boolean(row[key]?.trim()));
     if (!isRockInterval) continue; // Ignore blank rows and discontinuity-only records.
     const from = numberOrNull(row.from);
@@ -113,15 +114,13 @@ export function calculateLoggingStatistics(
     const group = groups.get(key)!;
     const ucs = numberOrNull(row.ucs);
     const rqd = numberOrNull(row.rqdPercent);
-    const fractureCount = numberOrNull(row.fractureCount);
+    const spacing = numberOrNull(row.jointSpacing);
+    const jrc = numberOrNull(row.jrc);
     const values: Record<LoggingMetric, number | null> = {
       ucs: ucs !== null && ucs >= 0 ? ucs : null,
       rqd: rqd !== null && rqd >= 0 && rqd <= 100 ? rqd : null,
-      spacing:
-        fractureCount !== null && fractureCount > 0
-          ? length / fractureCount
-          : null,
-      jrc: getRoughnessProfile(row.microRoughness)?.jrc ?? null,
+      spacing: spacing !== null && spacing >= 0 ? spacing : null,
+      jrc: jrc !== null && jrc >= 0 && jrc <= 20 ? jrc : null,
     };
     for (const target of [group, total]) {
       target.loggedLength += length;

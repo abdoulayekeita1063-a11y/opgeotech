@@ -44,14 +44,16 @@ export default function LoggingStatistics({
   );
   const summaryRows = [statistics.total, ...statistics.groups];
   const scope = filtered
-    ? "Filtered intervals in the current workbook"
-    : "All intervals in the current workbook";
+    ? "Filtered Rock mass classification rows"
+    : "All Rock mass classification rows in the current workbook";
+  const coveragePercent = (row: StratigraphyStatistics, key: LoggingMetric) =>
+    row.loggedLength
+      ? (row.metrics[key].validLength / row.loggedLength) * 100
+      : 0;
 
   const exportStatistics = () => {
     const header = [
       "Rock type / Stratigraphy",
-      "Logged drill (m)",
-      "No. of logged intervals",
       ...loggingMetrics.map(
         key =>
           `Average LW ${metricLabels[key].label} (${metricLabels[key].unit})`
@@ -61,81 +63,64 @@ export default function LoggingStatistics({
       header,
       ...summaryRows.map(row => [
         row.stratigraphy,
-        row.loggedLength,
-        row.intervalCount,
         ...loggingMetrics.map(key => row.metrics[key].average),
       ]),
     ];
     const sheet = XLSX.utils.aoa_to_sheet(matrix);
-    sheet["!cols"] = [
-      { wch: 26 },
-      { wch: 20 },
-      { wch: 24 },
-      ...loggingMetrics.map(() => ({ wch: 27 })),
-    ];
+    sheet["!cols"] = [{ wch: 26 }, ...loggingMetrics.map(() => ({ wch: 27 }))];
     summaryRows.forEach((_, index) => {
-      [1, 2, 3, 4, 5, 6].forEach(column => {
-        const cell = sheet[XLSX.utils.encode_cell({ r: index + 1, c: column })];
-        if (cell?.t === "n")
-          cell.z = column === 2 ? "0" : column === 5 ? "0.000" : "0.0";
+      loggingMetrics.forEach((key, metricIndex) => {
+        const cell =
+          sheet[XLSX.utils.encode_cell({ r: index + 1, c: metricIndex + 1 })];
+        if (cell?.t === "n") cell.z = key === "spacing" ? "0.000" : "0.0";
       });
     });
     const coverage = XLSX.utils.aoa_to_sheet([
       ["Scope", scope],
       [
+        "Source",
+        "Values displayed in the Rock mass classification table: UCS (MPa), RQD (%), Joint Spacing (m), JRC.",
+      ],
+      [
         "Method",
-        "Average LW = SUM(value × interval length) / SUM(interval lengths with a valid value)",
+        "Average LW = SUM(table value × interval length) / SUM(interval lengths with a valid table value)",
       ],
       [
         "Interval length",
-        "To − From (m). Missing or invalid depths and non-positive lengths are excluded.",
+        "To − From (m), used only as an internal weight. Missing or invalid depths and non-positive lengths are excluded.",
       ],
-      ["RQD", "Uses RQD (%) only, not RQD (>100 mm). Valid values: 0–100%."],
-      ["UCS", "Uses UCS (MPa). Negative values are excluded."],
+      [
+        "RQD",
+        "Uses the RQD (%) column, not the RQD (>100 mm) column. Valid values: 0–100%.",
+      ],
+      ["UCS", "Uses the UCS (MPa) column. Negative values are excluded."],
       [
         "Joint spacing",
-        "(To − From) / Fracture Count. Requires a positive fracture count.",
+        "Uses the Joint Spacing (m) value displayed in Rock mass classification; no separate recalculation in Statistics.",
       ],
       [
         "Joint roughness",
-        "JRC assigned to the roughness profile by the existing OPGeotech logging reference.",
+        "Uses the JRC value displayed in Rock mass classification; no separate conversion in Statistics.",
       ],
       [
         "Missing data",
-        "Excluded separately from each metric denominator, not replaced with zero. Zero RQD and UCS remain valid.",
+        "Excluded separately from each metric denominator, not replaced with zero. Valid zero values remain included.",
       ],
       [
         "Unspecified stratigraphy",
-        "Valid intervals with a blank stratigraphy appear under Unspecified.",
+        "Valid rows with a blank stratigraphy appear under Unspecified.",
       ],
-      ["Excluded intervals", statistics.excludedIntervals],
       [],
-      [
-        "Rock type / Stratigraphy",
-        "Metric",
-        "Valid logged length (m)",
-        "Valid intervals",
-        "Length coverage (%)",
-      ],
+      ["Rock type / Stratigraphy", "Metric", "Valid data coverage (%)"],
       ...summaryRows.flatMap(row =>
         loggingMetrics.map(key => [
           row.stratigraphy,
           metricLabels[key].label,
-          row.metrics[key].validLength,
-          row.metrics[key].validIntervals,
-          row.loggedLength
-            ? (row.metrics[key].validLength / row.loggedLength) * 100
-            : 0,
+          coveragePercent(row, key),
         ])
       ),
     ]);
-    coverage["!cols"] = [
-      { wch: 28 },
-      { wch: 100 },
-      { wch: 26 },
-      { wch: 20 },
-      { wch: 24 },
-    ];
+    coverage["!cols"] = [{ wch: 28 }, { wch: 100 }, { wch: 28 }];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Statistics");
     XLSX.utils.book_append_sheet(workbook, coverage, "Method and coverage");
@@ -156,30 +141,20 @@ export default function LoggingStatistics({
       <th scope="row" className="px-4 py-3 text-left font-semibold">
         {row.stratigraphy}
       </th>
-      <td className="px-4 py-3 text-right font-mono tabular-nums">
-        {formatted(row.loggedLength)}
-      </td>
-      <td className="px-4 py-3 text-right font-mono tabular-nums">
-        {row.intervalCount}
-      </td>
-      {loggingMetrics.map(key => {
-        const metric = row.metrics[key];
-        return (
-          <td
-            key={key}
-            className="px-4 py-3 text-right font-mono tabular-nums"
-            title={`${metric.validIntervals} valid intervals covering ${metric.validLength.toFixed(2)} m of ${row.loggedLength.toFixed(2)} m`}
-          >
-            {formatted(metric.average, metricLabels[key].decimals)}
-            {showCoverage && (
-              <span className="mt-1 block text-[10px] font-normal text-slate-500">
-                {formatted(metric.validLength)} m · {metric.validIntervals}{" "}
-                intervals
-              </span>
-            )}
-          </td>
-        );
-      })}
+      {loggingMetrics.map(key => (
+        <td
+          key={key}
+          className="px-4 py-3 text-right font-mono tabular-nums"
+          title={`${formatted(coveragePercent(row, key))}% valid data coverage`}
+        >
+          {formatted(row.metrics[key].average, metricLabels[key].decimals)}
+          {showCoverage && (
+            <span className="mt-1 block text-[10px] font-normal text-slate-500">
+              {formatted(coveragePercent(row, key))}% coverage
+            </span>
+          )}
+        </td>
+      ))}
     </tr>
   );
 
@@ -199,8 +174,8 @@ export default function LoggingStatistics({
             Stratigraphy summary
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Length-weighted rock mass properties, grouped by the Stratigraphy
-            column.
+            Length-weighted averages using values from the Rock mass
+            classification table.
           </p>
         </div>
         <Button
@@ -215,11 +190,7 @@ export default function LoggingStatistics({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/30 px-5 py-3 text-xs">
         <p>
-          <strong>{statistics.groups.length}</strong> stratigraphies{" "}
-          <span className="mx-2 text-muted-foreground">/</span>
-          <strong>{statistics.total.intervalCount}</strong> intervals{" "}
-          <span className="mx-2 text-muted-foreground">/</span>
-          <strong>{formatted(statistics.total.loggedLength)} m</strong> logged
+          <strong>{statistics.groups.length}</strong> stratigraphies
         </p>
         <div className="flex flex-wrap items-center gap-4">
           {hasFilters && (
@@ -252,7 +223,7 @@ export default function LoggingStatistics({
       </p>
       <div className="overflow-x-auto">
         <table
-          className="w-full min-w-[950px] text-sm text-slate-900"
+          className="w-full min-w-[650px] text-sm text-slate-900"
           aria-label="Length-weighted statistics table"
         >
           <thead className="border-y-2 border-sky-700 bg-slate-100">
@@ -262,15 +233,6 @@ export default function LoggingStatistics({
                 <span className="block text-xs font-normal text-slate-600">
                   Stratigraphy
                 </span>
-              </th>
-              <th scope="col" className="px-4 py-4 text-right">
-                Logged drill
-                <span className="block text-xs font-normal text-slate-600">
-                  (m)
-                </span>
-              </th>
-              <th scope="col" className="px-4 py-4 text-right">
-                No. of logged<span className="block">intervals</span>
               </th>
               {loggingMetrics.map(key => (
                 <th key={key} scope="col" className="px-4 py-4 text-right">
@@ -292,12 +254,12 @@ export default function LoggingStatistics({
             ) : (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={5}
                   className="px-6 py-10 text-center text-muted-foreground"
                 >
                   {filtered
-                    ? "No valid rock mass intervals match the selected filters."
-                    : "Enter or import rock mass intervals with valid From and To depths to calculate statistics."}
+                    ? "No valid rock mass rows match the selected filters."
+                    : "Enter or import data into Rock mass classification with valid From and To depths to calculate statistics."}
                 </td>
               </tr>
             )}
@@ -306,28 +268,30 @@ export default function LoggingStatistics({
       </div>
       <div className="space-y-2 border-t border-border p-5 text-xs leading-relaxed text-muted-foreground">
         <p>
-          <strong className="text-foreground">LW = length weighted.</strong>{" "}
-          Average = Σ(value × interval length) / Σ(valid interval lengths), with
-          interval length = To − From. Missing or invalid values are excluded
-          separately for each property; “—” means no valid data.
+          <strong className="text-foreground">
+            Source: Rock mass classification.
+          </strong>{" "}
+          UCS, RQD (%), Joint Spacing (m) and JRC use the same cell values as
+          the table above. Statistics update immediately after edits, imports
+          and workbook loading.
         </p>
         <p>
-          RQD uses the <strong>RQD (%)</strong> column. Joint spacing is
-          calculated from interval length / fracture count. Joint roughness is
-          expressed as <strong>JRC</strong> from the existing roughness
-          profiles. Statistics update immediately after edits, imports and
-          workbook loading.
+          <strong className="text-foreground">LW = length weighted.</strong>{" "}
+          Average = Σ(table value × interval length) / Σ(valid interval
+          lengths), with interval length = To − From. Depths are used only to
+          weight the averages. Missing or invalid values are excluded separately
+          for each property; “—” means no valid data.
         </p>
         {statistics.excludedIntervals > 0 && (
           <p className="font-medium text-amber-800">
-            {statistics.excludedIntervals} rock mass row(s) excluded: incomplete
-            or invalid From / To depths, negative depth, or To ≤ From.
+            Some rock mass rows were excluded because From / To depths are
+            incomplete or invalid, negative, or To ≤ From.
           </p>
         )}
         {statistics.unspecifiedIntervals > 0 && (
           <p>
-            {statistics.unspecifiedIntervals} valid interval(s) have no
-            stratigraphy and are grouped under “Unspecified”.
+            Rows with valid depths but no stratigraphy are grouped under
+            “Unspecified”.
           </p>
         )}
       </div>

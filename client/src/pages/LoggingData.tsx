@@ -138,6 +138,11 @@ function valueFor(row: Row, key: string) {
   return row[key] ?? "";
 }
 
+// Statistics consumes exactly the same values as the Rock mass classification cells.
+function statisticsRow(row: Row): Row {
+  return { ...row, ucs: valueFor(row, "ucs"), rqdPercent: valueFor(row, "rqdPercent"), jointSpacing: valueFor(row, "jointSpacing"), jrc: valueFor(row, "jrc") };
+}
+
 const strictAnglePattern = /^[+-]?\d+(?:\.\d+)?\s*°?$/;
 function validateAngleText(value: string, label: string, min: number, max: number) {
   const trimmed = value.trim();
@@ -402,7 +407,7 @@ export default function LoggingData() {
       <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-mono uppercase tracking-wider" aria-label="RMR quality legend"><span className="font-semibold mr-1">RMR quality alert:</span><span className="px-2 py-1 bg-emerald-100 text-emerald-950 border border-emerald-500">81–100 Very good</span><span className="px-2 py-1 bg-green-100 text-green-950 border border-green-500">61–80 Good</span><span className="px-2 py-1 bg-amber-100 text-amber-950 border border-amber-500">41–60 Fair</span><span className="px-2 py-1 bg-orange-200 text-orange-950 border border-orange-600">21–40 Poor</span><span className="px-2 py-1 bg-red-200 text-red-950 border border-red-700 font-bold">0–20 Very poor</span></div>
       {validationErrors.length > 0 && <div className="mt-3 border border-destructive bg-destructive/5 p-3 text-xs text-destructive font-mono"><strong>Orientation validation:</strong> {validationErrors.slice(0, 3).join(" ")}{validationErrors.length > 3 ? ` (+${validationErrors.length - 3} more)` : ""}</div>}
 
-      <LoggingStatistics rows={rows} visibleRows={displayedRows.map(({ row }) => row)} hasFilters={Boolean(normalizedHoleIdSearch || showRmrAlertsOnly)} fileName={metadata.holeNo || metadata.projectName || "OPGeotech"} />
+      <LoggingStatistics rows={rows.map(statisticsRow)} visibleRows={displayedRows.map(({ row }) => statisticsRow(row))} hasFilters={Boolean(normalizedHoleIdSearch || showRmrAlertsOnly)} fileName={metadata.holeNo || metadata.projectName || "OPGeotech"} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2"><Label className="swiss-label text-[10px]">Comments / sample selection information</Label><Textarea className="rounded-none border-foreground mt-1 min-h-24" value={comments} onChange={event => setComments(event.target.value)} /></div>
