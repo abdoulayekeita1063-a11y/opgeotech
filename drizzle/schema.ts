@@ -363,3 +363,19 @@ export const failureRecords = mysqlTable("failure_records", {
 
 export type FailureRecord = typeof failureRecords.$inferSelect;
 export type InsertFailureRecord = typeof failureRecords.$inferInsert;
+
+/** Berm Monitoring: parsed survey geometry and reproducible compliance snapshots.
+ * Raw DXF bytes are never stored in the database.
+ */
+export const bermComparisons = mysqlTable("berm_comparisons", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  bermId: varchar("bermId", { length: 128 }).notNull(),
+  pit: varchar("pit", { length: 128 }).notNull(),
+  bench: varchar("bench", { length: 128 }).notNull(),
+  status: varchar("status", { length: 32 }).$type<import("../shared/berm/types").BermStatus>().notNull(),
+  surveyDateMs: double("surveyDateMs"),
+  input: json("input").$type<import("../shared/berm/types").BermAnalysisInput>().notNull(),
+  result: json("result").$type<import("../shared/berm/types").BermAnalysisResult>().notNull(),
+  createdAtMs: double("createdAtMs").notNull(),
+});

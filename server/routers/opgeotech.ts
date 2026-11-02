@@ -4,6 +4,7 @@
  */
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import * as db from "../db";
 import { protectedProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
@@ -18,8 +19,14 @@ import { invokeLLM } from "../_core/llm";
 const slopePointSchema = {
   type: "object",
   properties: {
-    x: { type: "number", description: "Normalized image x coordinate from 0 to 1" },
-    y: { type: "number", description: "Normalized image y coordinate from 0 to 1, top to bottom" },
+    x: {
+      type: "number",
+      description: "Normalized image x coordinate from 0 to 1",
+    },
+    y: {
+      type: "number",
+      description: "Normalized image y coordinate from 0 to 1, top to bottom",
+    },
   },
   required: ["x", "y"],
   additionalProperties: false,
@@ -27,20 +34,35 @@ const slopePointSchema = {
 
 export const aiSlopeRouter = router({
   analyzePhoto: protectedProcedure
-    .input(z.object({ imageDataUrl: z.string().regex(/^data:image\/(jpeg|jpg|png|webp);base64,/i).max(14_000_000), edgeDensity: z.number().min(0).max(1).optional() }))
+    .input(
+      z.object({
+        imageDataUrl: z
+          .string()
+          .regex(/^data:image\/(jpeg|jpg|png|webp);base64,/i)
+          .max(14_000_000),
+        edgeDensity: z.number().min(0).max(1).optional(),
+      })
+    )
     .mutation(async ({ input }) => {
       const response = await invokeLLM({
         model: "gemini-3-flash-preview",
         messages: [
           {
             role: "system",
-            content: "You are a geotechnical computer-vision assistant. Analyze an open-pit slope photograph conservatively. Detect visible crest, toe, slope face, berms and boundaries. Return normalized image coordinates, not a guessed angle. Choose one representative straight face segment between a crest point and toe point. Use perspective cues when visible, but clearly mark uncertainty. This is a preliminary photo estimate, never a survey-grade measurement.",
+            content:
+              "You are a geotechnical computer-vision assistant. Analyze an open-pit slope photograph conservatively. Detect visible crest, toe, slope face, berms and boundaries. Return normalized image coordinates, not a guessed angle. Choose one representative straight face segment between a crest point and toe point. Use perspective cues when visible, but clearly mark uncertainty. This is a preliminary photo estimate, never a survey-grade measurement.",
           },
           {
             role: "user",
             content: [
-              { type: "text", text: `Analyze this open-pit slope image. Identify the most representative visible slope face and its crest/toe endpoints. Coordinates must be normalized between 0 and 1. A deterministic browser edge-map pre-check returned ${(input.edgeDensity ?? 0).toFixed(3)}; use it as supporting evidence only, not as a substitute for visual segmentation.` },
-              { type: "image_url", image_url: { url: input.imageDataUrl, detail: "high" } },
+              {
+                type: "text",
+                text: `Analyze this open-pit slope image. Identify the most representative visible slope face and its crest/toe endpoints. Coordinates must be normalized between 0 and 1. A deterministic browser edge-map pre-check returned ${(input.edgeDensity ?? 0).toFixed(3)}; use it as supporting evidence only, not as a substitute for visual segmentation.`,
+              },
+              {
+                type: "image_url",
+                image_url: { url: input.imageDataUrl, detail: "high" },
+              },
             ],
           },
         ],
@@ -54,15 +76,47 @@ export const aiSlopeRouter = router({
               properties: {
                 crest: slopePointSchema,
                 toe: slopePointSchema,
-                face: { type: "array", items: slopePointSchema, minItems: 2, maxItems: 24 },
-                berms: { type: "array", items: { type: "array", items: slopePointSchema, minItems: 2, maxItems: 12 }, maxItems: 12 },
-                visibleBoundaries: { type: "array", items: slopePointSchema, maxItems: 48 },
+                face: {
+                  type: "array",
+                  items: slopePointSchema,
+                  minItems: 2,
+                  maxItems: 24,
+                },
+                berms: {
+                  type: "array",
+                  items: {
+                    type: "array",
+                    items: slopePointSchema,
+                    minItems: 2,
+                    maxItems: 12,
+                  },
+                  maxItems: 12,
+                },
+                visibleBoundaries: {
+                  type: "array",
+                  items: slopePointSchema,
+                  maxItems: 48,
+                },
                 representativeSegment: { type: "string" },
                 perspectiveCorrectionApplied: { type: "boolean" },
                 confidence: { type: "number", minimum: 0, maximum: 100 },
-                limitations: { type: "array", items: { type: "string" }, maxItems: 8 },
+                limitations: {
+                  type: "array",
+                  items: { type: "string" },
+                  maxItems: 8,
+                },
               },
-              required: ["crest", "toe", "face", "berms", "visibleBoundaries", "representativeSegment", "perspectiveCorrectionApplied", "confidence", "limitations"],
+              required: [
+                "crest",
+                "toe",
+                "face",
+                "berms",
+                "visibleBoundaries",
+                "representativeSegment",
+                "perspectiveCorrectionApplied",
+                "confidence",
+                "limitations",
+              ],
               additionalProperties: false,
             },
           },
@@ -70,14 +124,25 @@ export const aiSlopeRouter = router({
         max_tokens: 3000,
       });
 
-      const firstChoice = Array.isArray(response.choices) ? response.choices[0] : undefined;
+      const firstChoice = Array.isArray(response.choices)
+        ? response.choices[0]
+        : undefined;
       if (!firstChoice?.message) {
-        throw new Error("The vision model did not return an analysis. Please try again with a clear JPEG or PNG photo.");
+        throw new Error(
+          "The vision model did not return an analysis. Please try again with a clear JPEG or PNG photo."
+        );
       }
       const content = firstChoice.message.content;
-      const json = typeof content === "string" ? content : content?.map(part => part.type === "text" ? part.text : "").join("") ?? "";
+      const json =
+        typeof content === "string"
+          ? content
+          : (content
+              ?.map(part => (part.type === "text" ? part.text : ""))
+              .join("") ?? "");
       if (!json.trim()) {
-        throw new Error("The vision model returned an empty analysis. Please try a clearer photo showing the crest and toe.");
+        throw new Error(
+          "The vision model returned an empty analysis. Please try a clearer photo showing the crest and toe."
+        );
       }
       let parsed: {
         crest: { x: number; y: number };
@@ -93,19 +158,46 @@ export const aiSlopeRouter = router({
       try {
         parsed = JSON.parse(json) as typeof parsed;
       } catch {
-        throw new Error("The vision service did not return valid slope geometry. Try a clearer JPEG or PNG showing the complete crest and toe.");
+        throw new Error(
+          "The vision service did not return valid slope geometry. Try a clearer JPEG or PNG showing the complete crest and toe."
+        );
       }
-      const points = [parsed.crest, parsed.toe, ...parsed.face, ...parsed.visibleBoundaries].filter(point => Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1);
-      if (points.length < 2) throw new Error("The visible slope geometry could not be identified reliably.");
+      const points = [
+        parsed.crest,
+        parsed.toe,
+        ...parsed.face,
+        ...parsed.visibleBoundaries,
+      ].filter(
+        point =>
+          Number.isFinite(point.x) &&
+          Number.isFinite(point.y) &&
+          point.x >= 0 &&
+          point.x <= 1 &&
+          point.y >= 0 &&
+          point.y <= 1
+      );
+      if (points.length < 2)
+        throw new Error(
+          "The visible slope geometry could not be identified reliably."
+        );
       const dx = Math.abs(parsed.toe.x - parsed.crest.x);
       const dy = Math.abs(parsed.toe.y - parsed.crest.y);
-      const angle = Math.atan2(dy, Math.max(dx, 0.0001)) * 180 / Math.PI;
+      const angle = (Math.atan2(dy, Math.max(dx, 0.0001)) * 180) / Math.PI;
       return {
         estimatedFaceAngle: Number(angle.toFixed(1)),
         confidence: Math.round(Math.max(0, Math.min(100, parsed.confidence))),
         geometry: parsed,
-        method: ["edge-map pre-check", "AI segmentation", "crest/toe detection", "pixel geometry", parsed.perspectiveCorrectionApplied ? "perspective correction" : "perspective review"],
-        disclaimer: "Photo-based estimate only. Verify with survey, drone photogrammetry, LiDAR or field measurements before geotechnical design or decisions.",
+        method: [
+          "edge-map pre-check",
+          "AI segmentation",
+          "crest/toe detection",
+          "pixel geometry",
+          parsed.perspectiveCorrectionApplied
+            ? "perspective correction"
+            : "perspective review",
+        ],
+        disclaimer:
+          "Photo-based estimate only. Verify with survey, drone photogrammetry, LiDAR or field measurements before geotechnical design or decisions.",
       };
     }),
 });
@@ -129,7 +221,11 @@ export const drillholeRouter = router({
       const geometry = parseDxf(content);
 
       const key = `dxf/${ctx.user.id}/${nanoid(10)}-${input.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const { key: fileKey, url } = await storagePut(key, buffer, "application/dxf");
+      const { key: fileKey, url } = await storagePut(
+        key,
+        buffer,
+        "application/dxf"
+      );
 
       const id = await db.insertDxfPlan({
         userId: ctx.user.id,
@@ -139,16 +235,29 @@ export const drillholeRouter = router({
         geometryJson: JSON.stringify(geometry),
         entityCount: geometry.entityCount,
       });
-      return { id, name: input.name, entityCount: geometry.entityCount, layers: geometry.layers, bounds: geometry.bounds, layerBounds: geometry.layerBounds, geometry };
+      return {
+        id,
+        name: input.name,
+        entityCount: geometry.entityCount,
+        layers: geometry.layers,
+        bounds: geometry.bounds,
+        layerBounds: geometry.layerBounds,
+        geometry,
+      };
     }),
 
-  listPlans: protectedProcedure.query(({ ctx }) => db.listDxfPlans(ctx.user.id)),
+  listPlans: protectedProcedure.query(({ ctx }) =>
+    db.listDxfPlans(ctx.user.id)
+  ),
 
-  getPlan: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
-    const plan = await db.getDxfPlan(input.id);
-    if (!plan || plan.userId !== ctx.user.id) throw new Error("Plan not found");
-    return plan;
-  }),
+  getPlan: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const plan = await db.getDxfPlan(input.id);
+      if (!plan || plan.userId !== ctx.user.id)
+        throw new Error("Plan not found");
+      return plan;
+    }),
 
   deletePlan: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -189,14 +298,16 @@ export const drillholeRouter = router({
       return { id };
     }),
 
-  listHoles: protectedProcedure.query(({ ctx }) => db.listDrillholes(ctx.user.id)),
+  listHoles: protectedProcedure.query(({ ctx }) =>
+    db.listDrillholes(ctx.user.id)
+  ),
 
   deleteHole: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       await db.deleteDrillhole(input.id, ctx.user.id);
       return { success: true } as const;
-  }),
+    }),
 });
 
 const loggingMetadata = z.record(z.string(), z.string().max(500));
@@ -212,12 +323,14 @@ export const loggingRouter = router({
     }));
   }),
   save: protectedProcedure
-    .input(z.object({
-      holeId: z.string().min(1).max(64),
-      metadata: loggingMetadata,
-      rows: z.array(loggingRow).max(500),
-      comments: z.string().max(5000).optional(),
-    }))
+    .input(
+      z.object({
+        holeId: z.string().min(1).max(64),
+        metadata: loggingMetadata,
+        rows: z.array(loggingRow).max(500),
+        comments: z.string().max(5000).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const id = await db.replaceDrillholeLog({
         userId: ctx.user.id,
@@ -228,10 +341,12 @@ export const loggingRouter = router({
       });
       return { id };
     }),
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    await db.deleteDrillholeLog(input.id, ctx.user.id);
-    return { success: true } as const;
-  }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteDrillholeLog(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
 });
 
 // ── Structural Mapping module ────────────────────────────────────────
@@ -254,29 +369,33 @@ const structureShape = {
 };
 
 export const mappingRouter = router({
-  create: protectedProcedure.input(z.object(structureShape)).mutation(async ({ ctx, input }) => {
-    const id = await db.insertStructure({
-      userId: ctx.user.id,
-      structureId: input.structureId ?? null,
-      zone: input.zone ?? null,
-      structureType: input.structureType,
-      dip: input.dip,
-      dipDirection: input.dipDirection,
-      easting: input.easting ?? null,
-      northing: input.northing ?? null,
-      elevation: input.elevation ?? null,
-      persistence: input.persistence ?? null,
-      alteration: input.alteration ?? null,
-      infill: input.infill ?? null,
-      roughness: input.roughness ?? null,
-      jrc: input.jrc ?? null,
-      notes: input.notes ?? null,
-    });
-    return { id };
-  }),
+  create: protectedProcedure
+    .input(z.object(structureShape))
+    .mutation(async ({ ctx, input }) => {
+      const id = await db.insertStructure({
+        userId: ctx.user.id,
+        structureId: input.structureId ?? null,
+        zone: input.zone ?? null,
+        structureType: input.structureType,
+        dip: input.dip,
+        dipDirection: input.dipDirection,
+        easting: input.easting ?? null,
+        northing: input.northing ?? null,
+        elevation: input.elevation ?? null,
+        persistence: input.persistence ?? null,
+        alteration: input.alteration ?? null,
+        infill: input.infill ?? null,
+        roughness: input.roughness ?? null,
+        jrc: input.jrc ?? null,
+        notes: input.notes ?? null,
+      });
+      return { id };
+    }),
 
   importCsv: protectedProcedure
-    .input(z.object({ rows: z.array(z.object(structureShape)).min(1).max(2000) }))
+    .input(
+      z.object({ rows: z.array(z.object(structureShape)).min(1).max(2000) })
+    )
     .mutation(async ({ ctx, input }) => {
       const count = await db.replaceStructuresBulk(
         ctx.user.id,
@@ -303,10 +422,12 @@ export const mappingRouter = router({
 
   list: protectedProcedure.query(({ ctx }) => db.listStructures(ctx.user.id)),
 
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    await db.deleteStructure(input.id, ctx.user.id);
-    return { success: true } as const;
-  }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteStructure(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
 });
 
 // ── Piezometer module ──────────────────────────────────────────────────
@@ -321,26 +442,62 @@ const piezometerShape = {
 };
 
 export const piezometerRouter = router({
-  create: protectedProcedure.input(z.object(piezometerShape)).mutation(async ({ ctx, input }) => {
-    const id = await db.insertPiezometer({
-      userId: ctx.user.id,
-      name: input.name,
-      easting: input.easting,
-      northing: input.northing,
-      elevation: input.elevation,
-      depth: input.depth,
-      waterLevel: input.waterLevel,
-      piezometricElevation: input.elevation - input.waterLevel,
-    });
-    return { id };
-  }),
+  create: protectedProcedure
+    .input(z.object(piezometerShape))
+    .mutation(async ({ ctx, input }) => {
+      const id = await db.insertPiezometer({
+        userId: ctx.user.id,
+        name: input.name,
+        easting: input.easting,
+        northing: input.northing,
+        elevation: input.elevation,
+        depth: input.depth,
+        waterLevel: input.waterLevel,
+        piezometricElevation: input.elevation - input.waterLevel,
+      });
+      return { id };
+    }),
 
   list: protectedProcedure.query(({ ctx }) => db.listPiezometers(ctx.user.id)),
 
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-    await db.deletePiezometer(input.id, ctx.user.id);
-    return { success: true } as const;
-  }),
+  updateWaterLevel: protectedProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        waterLevel: z.number().finite().nonnegative().max(10000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rows = await db.listPiezometers(ctx.user.id);
+      const piezometer = rows.find(row => row.id === input.id);
+      if (!piezometer)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Piezometer not found",
+        });
+      if (input.waterLevel > piezometer.depth) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Water level depth cannot exceed the installed piezometer depth",
+        });
+      }
+      const piezometricElevation = piezometer.elevation - input.waterLevel;
+      await db.updatePiezometerWaterLevel(
+        input.id,
+        ctx.user.id,
+        input.waterLevel,
+        piezometricElevation
+      );
+      return { success: true as const, piezometricElevation };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deletePiezometer(input.id, ctx.user.id);
+      return { success: true } as const;
+    }),
 });
 
 // ── Kinematic Analysis module ────────────────────────────────────────
@@ -404,19 +561,28 @@ export const kinematicsRouter = router({
       return { id, result };
     }),
 
-  list: protectedProcedure.query(({ ctx }) => db.listKinematicAnalyses(ctx.user.id)),
+  list: protectedProcedure.query(({ ctx }) =>
+    db.listKinematicAnalyses(ctx.user.id)
+  ),
 
-  get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
-    const rec = await db.getKinematicAnalysis(input.id);
-    if (!rec || rec.userId !== ctx.user.id) throw new Error("Analysis not found");
-    return rec;
-  }),
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const rec = await db.getKinematicAnalysis(input.id);
+      if (!rec || rec.userId !== ctx.user.id)
+        throw new Error("Analysis not found");
+      return rec;
+    }),
 });
-
 
 // ── Standalone Monitoring module ───────────────────────────────────────
 
-const monitoringStatuses = ["Active", "Monitored", "Remediated", "Closed"] as const;
+const monitoringStatuses = [
+  "Active",
+  "Monitored",
+  "Remediated",
+  "Closed",
+] as const;
 const monitoringRiskLevels = ["Low", "Moderate", "High", "Critical"] as const;
 
 const wallRiskInspectionShape = {
@@ -528,13 +694,18 @@ export const monitoringRouter = router({
       return { id, risk: wallRisk };
     }),
 
-  list: protectedProcedure.query(({ ctx }) => db.listMonitoringRecords(ctx.user.id)),
+  list: protectedProcedure.query(({ ctx }) =>
+    db.listMonitoringRecords(ctx.user.id)
+  ),
 
-  get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
-    const record = await db.getMonitoringRecord(input.id);
-    if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-    return record;
-  }),
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const record = await db.getMonitoringRecord(input.id);
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      return record;
+    }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -544,11 +715,13 @@ export const monitoringRouter = router({
     }),
 
   createProject: protectedProcedure
-    .input(z.object({
-      name: z.string().min(1).max(255),
-      site: z.string().max(255).optional(),
-      description: z.string().max(4000).optional(),
-    }))
+    .input(
+      z.object({
+        name: z.string().min(1).max(255),
+        site: z.string().max(255).optional(),
+        description: z.string().max(4000).optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => ({
       id: await db.createMonitoringProject({
         userId: ctx.user.id,
@@ -558,38 +731,49 @@ export const monitoringRouter = router({
       }),
     })),
 
-  projects: protectedProcedure.query(({ ctx }) => db.listMonitoringProjects(ctx.user.id)),
+  projects: protectedProcedure.query(({ ctx }) =>
+    db.listMonitoringProjects(ctx.user.id)
+  ),
 
   deleteProject: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const project = await db.getMonitoringProject(input.id);
-      if (!project || project.userId !== ctx.user.id) throw new Error("Monitoring project not found");
+      if (!project || project.userId !== ctx.user.id)
+        throw new Error("Monitoring project not found");
       await db.deleteMonitoringProject(input.id, ctx.user.id);
       return { success: true } as const;
     }),
 
   importProjectRadarSummary: protectedProcedure
-    .input(z.object({
-      projectId: z.number(),
-      source: z.string().max(255).optional(),
-      importMode: z.enum(["replace", "append"]).default("replace"),
-      rows: z.array(z.object({
-        measuredAt: z.number().positive(),
-        pit: z.string().min(1).max(128),
-        window: z.string().min(1).max(128),
-        displacementMaxMm: z.number().nullable().optional(),
-        displacementMinMm: z.number().nullable().optional(),
-        displacementAverageMm: z.number().nullable().optional(),
-        velocityMaxMmPerDay: z.number().nullable().optional(),
-        velocityMinMmPerDay: z.number().nullable().optional(),
-        velocityAverageMmPerDay: z.number().nullable().optional(),
-        observations: z.string().max(2000).nullable().optional(),
-      })).min(1).max(10000),
-    }))
+    .input(
+      z.object({
+        projectId: z.number(),
+        source: z.string().max(255).optional(),
+        importMode: z.enum(["replace", "append"]).default("replace"),
+        rows: z
+          .array(
+            z.object({
+              measuredAt: z.number().positive(),
+              pit: z.string().min(1).max(128),
+              window: z.string().min(1).max(128),
+              displacementMaxMm: z.number().nullable().optional(),
+              displacementMinMm: z.number().nullable().optional(),
+              displacementAverageMm: z.number().nullable().optional(),
+              velocityMaxMmPerDay: z.number().nullable().optional(),
+              velocityMinMmPerDay: z.number().nullable().optional(),
+              velocityAverageMmPerDay: z.number().nullable().optional(),
+              observations: z.string().max(2000).nullable().optional(),
+            })
+          )
+          .min(1)
+          .max(10000),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const project = await db.getMonitoringProject(input.projectId);
-      if (!project || project.userId !== ctx.user.id) throw new Error("Monitoring project not found");
+      if (!project || project.userId !== ctx.user.id)
+        throw new Error("Monitoring project not found");
       const mappedRows = input.rows.map(row => ({
         userId: ctx.user.id,
         projectId: input.projectId,
@@ -606,9 +790,14 @@ export const monitoringRouter = router({
         observations: row.observations ?? null,
         source: input.source ?? null,
       }));
-      const count = input.importMode === "replace"
-        ? await db.replaceProjectRadarMonitoringRows(ctx.user.id, input.projectId, mappedRows)
-        : await db.insertRadarMonitoringRows(mappedRows);
+      const count =
+        input.importMode === "replace"
+          ? await db.replaceProjectRadarMonitoringRows(
+              ctx.user.id,
+              input.projectId,
+              mappedRows
+            )
+          : await db.insertRadarMonitoringRows(mappedRows);
       return { count, mode: input.importMode };
     }),
 
@@ -616,59 +805,93 @@ export const monitoringRouter = router({
     .input(z.object({ projectId: z.number() }))
     .query(async ({ ctx, input }) => {
       const project = await db.getMonitoringProject(input.projectId);
-      if (!project || project.userId !== ctx.user.id) throw new Error("Monitoring project not found");
+      if (!project || project.userId !== ctx.user.id)
+        throw new Error("Monitoring project not found");
       return db.listProjectRadarMonitoringRows(ctx.user.id, input.projectId);
     }),
 
   analyzeProjectRadarSummary: protectedProcedure
-    .input(z.object({
-      projectId: z.number(),
-      window: z.string().optional(),
-      moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
-      highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
-      criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
-    }))
+    .input(
+      z.object({
+        projectId: z.number(),
+        window: z.string().optional(),
+        moderateVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
+        highVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
+        criticalVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const project = await db.getMonitoringProject(input.projectId);
-      if (!project || project.userId !== ctx.user.id) throw new Error("Monitoring project not found");
-      const stored = await db.listProjectRadarMonitoringRows(ctx.user.id, input.projectId);
-      const selected = input.window ? stored.filter(row => row.window === input.window) : stored;
-      if (!selected.length) throw new Error("No Excel radar monitoring rows found");
-      return analyzeRadarTrend(selected.map(row => ({
-        radarPointId: `${row.pit} / ${row.window}`,
-        measuredAt: row.measuredAt,
-        displacementMm: row.displacementAverageMm ?? row.displacementMaxMm ?? 0,
-        velocityMmPerDay: row.velocityAverageMmPerDay ?? row.velocityMaxMmPerDay,
-      })), {
-        moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
-        highVelocityMmPerDay: input.highVelocityMmPerDay,
-        criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
-      });
+      if (!project || project.userId !== ctx.user.id)
+        throw new Error("Monitoring project not found");
+      const stored = await db.listProjectRadarMonitoringRows(
+        ctx.user.id,
+        input.projectId
+      );
+      const selected = input.window
+        ? stored.filter(row => row.window === input.window)
+        : stored;
+      if (!selected.length)
+        throw new Error("No Excel radar monitoring rows found");
+      return analyzeRadarTrend(
+        selected.map(row => ({
+          radarPointId: `${row.pit} / ${row.window}`,
+          measuredAt: row.measuredAt,
+          displacementMm:
+            row.displacementAverageMm ?? row.displacementMaxMm ?? 0,
+          velocityMmPerDay:
+            row.velocityAverageMmPerDay ?? row.velocityMaxMmPerDay,
+        })),
+        {
+          moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
+          highVelocityMmPerDay: input.highVelocityMmPerDay,
+          criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
+        }
+      );
     }),
 
   importRadar: protectedProcedure
-    .input(z.object({
-      monitoringRecordId: z.number(),
-      source: z.string().max(128).optional(),
-      readings: z.array(z.object({
-        radarPointId: z.string().min(1).max(128),
-        measuredAt: z.number().positive(),
-        displacementMm: z.number(),
-        velocityMmPerDay: z.number().nullable().optional(),
-      })).min(1).max(10000),
-    }))
+    .input(
+      z.object({
+        monitoringRecordId: z.number(),
+        source: z.string().max(128).optional(),
+        readings: z
+          .array(
+            z.object({
+              radarPointId: z.string().min(1).max(128),
+              measuredAt: z.number().positive(),
+              displacementMm: z.number(),
+              velocityMmPerDay: z.number().nullable().optional(),
+            })
+          )
+          .min(1)
+          .max(10000),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-      const count = await db.insertMonitoringRadarReadings(input.readings.map(reading => ({
-        userId: ctx.user.id,
-        monitoringRecordId: input.monitoringRecordId,
-        radarPointId: reading.radarPointId,
-        measuredAt: reading.measuredAt,
-        displacementMm: reading.displacementMm,
-        velocityMmPerDay: reading.velocityMmPerDay ?? null,
-        source: input.source ?? null,
-      })));
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      const count = await db.insertMonitoringRadarReadings(
+        input.readings.map(reading => ({
+          userId: ctx.user.id,
+          monitoringRecordId: input.monitoringRecordId,
+          radarPointId: reading.radarPointId,
+          measuredAt: reading.measuredAt,
+          displacementMm: reading.displacementMm,
+          velocityMmPerDay: reading.velocityMmPerDay ?? null,
+          source: input.source ?? null,
+        }))
+      );
       return { count };
     }),
 
@@ -676,45 +899,59 @@ export const monitoringRouter = router({
     .input(z.object({ monitoringRecordId: z.number() }))
     .query(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-      return db.listMonitoringRadarReadings(ctx.user.id, input.monitoringRecordId);
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      return db.listMonitoringRadarReadings(
+        ctx.user.id,
+        input.monitoringRecordId
+      );
     }),
 
   importRadarSummary: protectedProcedure
-    .input(z.object({
-      monitoringRecordId: z.number(),
-      source: z.string().max(255).optional(),
-      rows: z.array(z.object({
-        measuredAt: z.number().positive(),
-        pit: z.string().min(1).max(128),
-        window: z.string().min(1).max(128),
-        displacementMaxMm: z.number().nullable().optional(),
-        displacementMinMm: z.number().nullable().optional(),
-        displacementAverageMm: z.number().nullable().optional(),
-        velocityMaxMmPerDay: z.number().nullable().optional(),
-        velocityMinMmPerDay: z.number().nullable().optional(),
-        velocityAverageMmPerDay: z.number().nullable().optional(),
-        observations: z.string().max(2000).nullable().optional(),
-      })).min(1).max(10000),
-    }))
+    .input(
+      z.object({
+        monitoringRecordId: z.number(),
+        source: z.string().max(255).optional(),
+        rows: z
+          .array(
+            z.object({
+              measuredAt: z.number().positive(),
+              pit: z.string().min(1).max(128),
+              window: z.string().min(1).max(128),
+              displacementMaxMm: z.number().nullable().optional(),
+              displacementMinMm: z.number().nullable().optional(),
+              displacementAverageMm: z.number().nullable().optional(),
+              velocityMaxMmPerDay: z.number().nullable().optional(),
+              velocityMinMmPerDay: z.number().nullable().optional(),
+              velocityAverageMmPerDay: z.number().nullable().optional(),
+              observations: z.string().max(2000).nullable().optional(),
+            })
+          )
+          .min(1)
+          .max(10000),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-      const count = await db.insertRadarMonitoringRows(input.rows.map(row => ({
-        userId: ctx.user.id,
-        monitoringRecordId: input.monitoringRecordId,
-        measuredAt: row.measuredAt,
-        pit: row.pit,
-        window: row.window,
-        displacementMaxMm: row.displacementMaxMm ?? null,
-        displacementMinMm: row.displacementMinMm ?? null,
-        displacementAverageMm: row.displacementAverageMm ?? null,
-        velocityMaxMmPerDay: row.velocityMaxMmPerDay ?? null,
-        velocityMinMmPerDay: row.velocityMinMmPerDay ?? null,
-        velocityAverageMmPerDay: row.velocityAverageMmPerDay ?? null,
-        observations: row.observations ?? null,
-        source: input.source ?? null,
-      })));
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      const count = await db.insertRadarMonitoringRows(
+        input.rows.map(row => ({
+          userId: ctx.user.id,
+          monitoringRecordId: input.monitoringRecordId,
+          measuredAt: row.measuredAt,
+          pit: row.pit,
+          window: row.window,
+          displacementMaxMm: row.displacementMaxMm ?? null,
+          displacementMinMm: row.displacementMinMm ?? null,
+          displacementAverageMm: row.displacementAverageMm ?? null,
+          velocityMaxMmPerDay: row.velocityMaxMmPerDay ?? null,
+          velocityMinMmPerDay: row.velocityMinMmPerDay ?? null,
+          velocityAverageMmPerDay: row.velocityAverageMmPerDay ?? null,
+          observations: row.observations ?? null,
+          source: input.source ?? null,
+        }))
+      );
       return { count };
     }),
 
@@ -722,59 +959,104 @@ export const monitoringRouter = router({
     .input(z.object({ monitoringRecordId: z.number() }))
     .query(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
       return db.listRadarMonitoringRows(ctx.user.id, input.monitoringRecordId);
     }),
 
   analyzeRadarSummary: protectedProcedure
-    .input(z.object({
-      monitoringRecordId: z.number(),
-      window: z.string().optional(),
-      moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
-      highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
-      criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
-    }))
+    .input(
+      z.object({
+        monitoringRecordId: z.number(),
+        window: z.string().optional(),
+        moderateVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
+        highVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
+        criticalVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-      const stored = await db.listRadarMonitoringRows(ctx.user.id, input.monitoringRecordId);
-      const selected = input.window ? stored.filter(row => row.window === input.window) : stored;
-      if (!selected.length) throw new Error("No Excel radar monitoring rows found");
-      return analyzeRadarTrend(selected.map(row => ({
-        radarPointId: `${row.pit} / ${row.window}`,
-        measuredAt: row.measuredAt,
-        displacementMm: row.displacementAverageMm ?? row.displacementMaxMm ?? 0,
-        velocityMmPerDay: row.velocityAverageMmPerDay ?? row.velocityMaxMmPerDay,
-      })), {
-        moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
-        highVelocityMmPerDay: input.highVelocityMmPerDay,
-        criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
-      });
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      const stored = await db.listRadarMonitoringRows(
+        ctx.user.id,
+        input.monitoringRecordId
+      );
+      const selected = input.window
+        ? stored.filter(row => row.window === input.window)
+        : stored;
+      if (!selected.length)
+        throw new Error("No Excel radar monitoring rows found");
+      return analyzeRadarTrend(
+        selected.map(row => ({
+          radarPointId: `${row.pit} / ${row.window}`,
+          measuredAt: row.measuredAt,
+          displacementMm:
+            row.displacementAverageMm ?? row.displacementMaxMm ?? 0,
+          velocityMmPerDay:
+            row.velocityAverageMmPerDay ?? row.velocityMaxMmPerDay,
+        })),
+        {
+          moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
+          highVelocityMmPerDay: input.highVelocityMmPerDay,
+          criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
+        }
+      );
     }),
 
   analyzeRadar: protectedProcedure
-    .input(z.object({
-      monitoringRecordId: z.number(),
-      radarPointId: z.string().min(1).max(128).optional(),
-      moderateVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
-      highVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
-      criticalVelocityMmPerDay: z.number().positive().default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
-    }))
+    .input(
+      z.object({
+        monitoringRecordId: z.number(),
+        radarPointId: z.string().min(1).max(128).optional(),
+        moderateVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.moderateVelocityMmPerDay),
+        highVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.highVelocityMmPerDay),
+        criticalVelocityMmPerDay: z
+          .number()
+          .positive()
+          .default(DEFAULT_RADAR_THRESHOLDS.criticalVelocityMmPerDay),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const record = await db.getMonitoringRecord(input.monitoringRecordId);
-      if (!record || record.userId !== ctx.user.id) throw new Error("Monitoring record not found");
-      const stored = await db.listMonitoringRadarReadings(ctx.user.id, input.monitoringRecordId);
-      const selected = input.radarPointId ? stored.filter(reading => reading.radarPointId === input.radarPointId) : stored;
-      if (!selected.length) throw new Error("No radar readings found for this wall or point");
-      return analyzeRadarTrend(selected.map(reading => ({
-        radarPointId: reading.radarPointId,
-        measuredAt: reading.measuredAt,
-        displacementMm: reading.displacementMm,
-        velocityMmPerDay: reading.velocityMmPerDay,
-      })), {
-        moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
-        highVelocityMmPerDay: input.highVelocityMmPerDay,
-        criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
-      });
+      if (!record || record.userId !== ctx.user.id)
+        throw new Error("Monitoring record not found");
+      const stored = await db.listMonitoringRadarReadings(
+        ctx.user.id,
+        input.monitoringRecordId
+      );
+      const selected = input.radarPointId
+        ? stored.filter(reading => reading.radarPointId === input.radarPointId)
+        : stored;
+      if (!selected.length)
+        throw new Error("No radar readings found for this wall or point");
+      return analyzeRadarTrend(
+        selected.map(reading => ({
+          radarPointId: reading.radarPointId,
+          measuredAt: reading.measuredAt,
+          displacementMm: reading.displacementMm,
+          velocityMmPerDay: reading.velocityMmPerDay,
+        })),
+        {
+          moderateVelocityMmPerDay: input.moderateVelocityMmPerDay,
+          highVelocityMmPerDay: input.highVelocityMmPerDay,
+          criticalVelocityMmPerDay: input.criticalVelocityMmPerDay,
+        }
+      );
     }),
 });

@@ -51,7 +51,7 @@ const modules = [
     index: "05",
     title: "Design Compliance",
     description:
-      "As-built versus design verification: bench height, berm width and batter angle against tolerances.",
+      "Wall assessment with or without presplit, plus DXF-based berm geometry compliance and reporting.",
     path: "/compliance",
     icon: Ruler,
   },
@@ -99,15 +99,32 @@ const modules = [
 
 export default function Home() {
   const { user } = useAuth();
-  const stability = trpc.stability.list.useQuery(undefined, { enabled: !!user });
-  const classification = trpc.classification.list.useQuery(undefined, { enabled: !!user });
-  const inspections = trpc.inspection.list.useQuery(undefined, { enabled: !!user });
+  const stability = trpc.stability.list.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const classification = trpc.classification.list.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const inspections = trpc.inspection.list.useQuery(undefined, {
+    enabled: !!user,
+  });
   const blasts = trpc.blast.list.useQuery(undefined, { enabled: !!user });
-  const compliance = trpc.compliance.list.useQuery(undefined, { enabled: !!user });
+  const compliance = trpc.compliance.list.useQuery(undefined, {
+    enabled: !!user,
+  });
   const structures = trpc.mapping.list.useQuery(undefined, { enabled: !!user });
-  const kinematics = trpc.kinematics.list.useQuery(undefined, { enabled: !!user });
-  const monitoringProjects = trpc.monitoring.projects.useQuery(undefined, { enabled: !!user });
-  const failures = trpc.reporting.failures.list.useQuery(undefined, { enabled: !!user });
+  const kinematics = trpc.kinematics.list.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const monitoringProjects = trpc.monitoring.projects.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const failures = trpc.reporting.failures.list.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const bermSummary = trpc.berm.summary.useQuery(undefined, {
+    enabled: !!user,
+  });
 
   const counts = [
     { label: "Stability analyses", value: stability.data?.length },
@@ -119,6 +136,7 @@ export default function Home() {
     { label: "Kinematic analyses", value: kinematics.data?.length },
     { label: "Monitoring projects", value: monitoringProjects.data?.length },
     { label: "Failure records", value: failures.data?.length },
+    { label: "Berm comparisons", value: bermSummary.data?.total },
   ];
 
   return (
@@ -128,24 +146,31 @@ export default function Home() {
         <div className="col-span-12 md:col-span-8">
           <div className="flex items-center gap-3 mb-4">
             <img src="/favicon.png" alt="OPGeotech logo" className="h-6 w-6" />
-            <span className="swiss-label">Geotechnical Engineering Platform</span>
+            <span className="swiss-label">
+              Geotechnical Engineering Platform
+            </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold uppercase tracking-tight leading-[0.95]">
             OP
             <span className="text-primary">Geotech</span>
             <br />
-            <span className="text-foreground/40 text-2xl md:text-4xl">Open-Pit Suite</span>
+            <span className="text-foreground/40 text-2xl md:text-4xl">
+              Open-Pit Suite
+            </span>
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-6 max-w-xl">
             Slope stability, rock mass classification, daily inspection
-            reporting, blast assessment and design compliance — unified in
-            one precision-driven workspace for open-pit operations.
+            reporting, blast assessment and design compliance — unified in one
+            precision-driven workspace for open-pit operations.
           </p>
         </div>
         <div className="col-span-12 md:col-span-4 flex flex-col justify-end">
           <div className="border border-foreground divide-y divide-foreground">
             {counts.map(c => (
-              <div key={c.label} className="flex items-center justify-between px-4 py-2.5">
+              <div
+                key={c.label}
+                className="flex items-center justify-between px-4 py-2.5"
+              >
                 <span className="swiss-label">{c.label}</span>
                 <span className="swiss-number font-semibold text-lg">
                   {c.value ?? "—"}
@@ -154,6 +179,27 @@ export default function Home() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="mb-8 flex flex-col gap-4 border border-foreground bg-background p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="swiss-label mb-2">Berm Monitoring</div>
+          <p className="text-sm">
+            {bermSummary.data?.total
+              ? `${bermSummary.data.nonCompliant} Non-Compliant · ${bermSummary.data.warning} Warning · ${bermSummary.data.insufficientData} Insufficient Data`
+              : "Compare planned berms against surveyed DXF As-Built geometry."}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Saved comparison statuses include historical surveys; they do not
+            replace a current field assessment.
+          </p>
+        </div>
+        <Link
+          href="/compliance?tab=berm"
+          className="inline-flex shrink-0 items-center gap-2 border border-foreground px-4 py-2 text-sm font-semibold hover:bg-secondary"
+        >
+          Open Berm Monitoring <ArrowUpRight className="h-4 w-4" />
+        </Link>
       </div>
 
       {/* Module grid */}
@@ -165,7 +211,9 @@ export default function Home() {
             className="group bg-background p-6 flex flex-col gap-4 hover:bg-secondary transition-colors min-h-[210px]"
           >
             <div className="flex items-start justify-between">
-              <span className="swiss-number text-xs text-muted-foreground">{m.index}</span>
+              <span className="swiss-number text-xs text-muted-foreground">
+                {m.index}
+              </span>
               <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
             <m.icon className="h-7 w-7 text-primary" strokeWidth={1.5} />
@@ -184,7 +232,7 @@ export default function Home() {
           className="group bg-foreground text-background p-6 flex flex-col gap-4 hover:bg-primary transition-colors min-h-[210px]"
         >
           <div className="flex items-start justify-between">
-                <span className="swiss-number text-xs opacity-60">11</span>
+            <span className="swiss-number text-xs opacity-60">11</span>
             <ArrowUpRight className="h-4 w-4 opacity-60" />
           </div>
           <div className="mt-auto">

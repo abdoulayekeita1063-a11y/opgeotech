@@ -20,7 +20,7 @@ import {
   structures,
   users,
 } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -75,8 +75,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
+      values.role = "admin";
+      updateSet.role = "admin";
     }
 
     if (!values.lastSignedIn) {
@@ -103,7 +103,11 @@ export async function getUserByOpenId(openId: string) {
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
 }
@@ -117,7 +121,9 @@ async function requireDb() {
 }
 
 // Slope stability
-export async function insertStabilityCalc(values: typeof stabilityCalcs.$inferInsert) {
+export async function insertStabilityCalc(
+  values: typeof stabilityCalcs.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(stabilityCalcs).values(values);
   return res.insertId;
@@ -132,12 +138,18 @@ export async function listStabilityCalcs(userId: number) {
 }
 export async function getStabilityCalc(id: number) {
   const db = await requireDb();
-  const rows = await db.select().from(stabilityCalcs).where(eq(stabilityCalcs.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(stabilityCalcs)
+    .where(eq(stabilityCalcs.id, id))
+    .limit(1);
   return rows[0];
 }
 
 // Rock classification
-export async function insertRockClassification(values: typeof rockClassifications.$inferInsert) {
+export async function insertRockClassification(
+  values: typeof rockClassifications.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(rockClassifications).values(values);
   return res.insertId;
@@ -161,17 +173,22 @@ export async function getRockClassification(id: number) {
 }
 
 // Inspection reports
-export async function insertInspectionReport(values: typeof inspectionReports.$inferInsert) {
+export async function insertInspectionReport(
+  values: typeof inspectionReports.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(inspectionReports).values(values);
   return res.insertId;
 }
 export async function updateInspectionReport(
   id: number,
-  values: Partial<typeof inspectionReports.$inferInsert>,
+  values: Partial<typeof inspectionReports.$inferInsert>
 ) {
   const db = await requireDb();
-  await db.update(inspectionReports).set(values).where(eq(inspectionReports.id, id));
+  await db
+    .update(inspectionReports)
+    .set(values)
+    .where(eq(inspectionReports.id, id));
 }
 export async function listInspectionReports(userId: number) {
   const db = await requireDb();
@@ -192,17 +209,22 @@ export async function getInspectionReport(id: number) {
 }
 
 // Blast assessments
-export async function insertBlastAssessment(values: typeof blastAssessments.$inferInsert) {
+export async function insertBlastAssessment(
+  values: typeof blastAssessments.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(blastAssessments).values(values);
   return res.insertId;
 }
 export async function updateBlastAssessment(
   id: number,
-  values: Partial<typeof blastAssessments.$inferInsert>,
+  values: Partial<typeof blastAssessments.$inferInsert>
 ) {
   const db = await requireDb();
-  await db.update(blastAssessments).set(values).where(eq(blastAssessments.id, id));
+  await db
+    .update(blastAssessments)
+    .set(values)
+    .where(eq(blastAssessments.id, id));
 }
 export async function listBlastAssessments(userId: number) {
   const db = await requireDb();
@@ -223,7 +245,9 @@ export async function getBlastAssessment(id: number) {
 }
 
 // Compliance checks
-export async function insertComplianceCheck(values: typeof complianceChecks.$inferInsert) {
+export async function insertComplianceCheck(
+  values: typeof complianceChecks.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(complianceChecks).values(values);
   return res.insertId;
@@ -269,12 +293,18 @@ export async function listDxfPlans(userId: number) {
 }
 export async function getDxfPlan(id: number) {
   const db = await requireDb();
-  const rows = await db.select().from(dxfPlans).where(eq(dxfPlans.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(dxfPlans)
+    .where(eq(dxfPlans.id, id))
+    .limit(1);
   return rows[0];
 }
 export async function deleteDxfPlan(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(dxfPlans).where(and(eq(dxfPlans.id, id), eq(dxfPlans.userId, userId)));
+  await db
+    .delete(dxfPlans)
+    .where(and(eq(dxfPlans.id, id), eq(dxfPlans.userId, userId)));
 }
 
 // Drillholes
@@ -293,23 +323,40 @@ export async function listDrillholes(userId: number) {
 }
 export async function deleteDrillhole(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(drillholes).where(and(eq(drillholes.id, id), eq(drillholes.userId, userId)));
+  await db
+    .delete(drillholes)
+    .where(and(eq(drillholes.id, id), eq(drillholes.userId, userId)));
 }
 
 // Drillhole logging workbooks
-export async function replaceDrillholeLog(values: typeof drillholeLogs.$inferInsert) {
+export async function replaceDrillholeLog(
+  values: typeof drillholeLogs.$inferInsert
+) {
   const db = await requireDb();
-  await db.delete(drillholeLogs).where(and(eq(drillholeLogs.userId, values.userId), eq(drillholeLogs.holeId, values.holeId)));
+  await db
+    .delete(drillholeLogs)
+    .where(
+      and(
+        eq(drillholeLogs.userId, values.userId),
+        eq(drillholeLogs.holeId, values.holeId)
+      )
+    );
   const [res] = await db.insert(drillholeLogs).values(values);
   return res.insertId;
 }
 export async function listDrillholeLogs(userId: number) {
   const db = await requireDb();
-  return db.select().from(drillholeLogs).where(eq(drillholeLogs.userId, userId)).orderBy(desc(drillholeLogs.updatedAt));
+  return db
+    .select()
+    .from(drillholeLogs)
+    .where(eq(drillholeLogs.userId, userId))
+    .orderBy(desc(drillholeLogs.updatedAt));
 }
 export async function deleteDrillholeLog(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(drillholeLogs).where(and(eq(drillholeLogs.id, id), eq(drillholeLogs.userId, userId)));
+  await db
+    .delete(drillholeLogs)
+    .where(and(eq(drillholeLogs.id, id), eq(drillholeLogs.userId, userId)));
 }
 
 // Structures
@@ -318,13 +365,18 @@ export async function insertStructure(values: typeof structures.$inferInsert) {
   const [res] = await db.insert(structures).values(values);
   return res.insertId;
 }
-export async function insertStructuresBulk(values: (typeof structures.$inferInsert)[]) {
+export async function insertStructuresBulk(
+  values: (typeof structures.$inferInsert)[]
+) {
   const db = await requireDb();
   if (!values.length) return 0;
   await db.insert(structures).values(values);
   return values.length;
 }
-export async function replaceStructuresBulk(userId: number, values: (typeof structures.$inferInsert)[]) {
+export async function replaceStructuresBulk(
+  userId: number,
+  values: (typeof structures.$inferInsert)[]
+) {
   const db = await requireDb();
   return db.transaction(async tx => {
     await tx.delete(structures).where(eq(structures.userId, userId));
@@ -342,11 +394,15 @@ export async function listStructures(userId: number) {
 }
 export async function deleteStructure(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(structures).where(and(eq(structures.id, id), eq(structures.userId, userId)));
+  await db
+    .delete(structures)
+    .where(and(eq(structures.id, id), eq(structures.userId, userId)));
 }
 
 // Piezometer measurements
-export async function insertPiezometer(values: typeof piezometers.$inferInsert) {
+export async function insertPiezometer(
+  values: typeof piezometers.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(piezometers).values(values);
   return Number(res.insertId);
@@ -354,16 +410,37 @@ export async function insertPiezometer(values: typeof piezometers.$inferInsert) 
 
 export async function listPiezometers(userId: number) {
   const db = await requireDb();
-  return db.select().from(piezometers).where(eq(piezometers.userId, userId)).orderBy(piezometers.easting, piezometers.northing);
+  return db
+    .select()
+    .from(piezometers)
+    .where(eq(piezometers.userId, userId))
+    .orderBy(piezometers.easting, piezometers.northing);
+}
+
+export async function updatePiezometerWaterLevel(
+  id: number,
+  userId: number,
+  waterLevel: number,
+  piezometricElevation: number
+) {
+  const db = await requireDb();
+  await db
+    .update(piezometers)
+    .set({ waterLevel, piezometricElevation })
+    .where(and(eq(piezometers.id, id), eq(piezometers.userId, userId)));
 }
 
 export async function deletePiezometer(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(piezometers).where(and(eq(piezometers.id, id), eq(piezometers.userId, userId)));
+  await db
+    .delete(piezometers)
+    .where(and(eq(piezometers.id, id), eq(piezometers.userId, userId)));
 }
 
 // Kinematic analyses
-export async function insertKinematicAnalysis(values: typeof kinematicAnalyses.$inferInsert) {
+export async function insertKinematicAnalysis(
+  values: typeof kinematicAnalyses.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(kinematicAnalyses).values(values);
   return res.insertId;
@@ -386,9 +463,10 @@ export async function getKinematicAnalysis(id: number) {
   return rows[0];
 }
 
-
 // Standalone Monitoring module
-export async function insertMonitoringRecord(values: typeof monitoringRecords.$inferInsert) {
+export async function insertMonitoringRecord(
+  values: typeof monitoringRecords.$inferInsert
+) {
   const db = await requireDb();
   const [res] = await db.insert(monitoringRecords).values(values);
   return res.insertId;
@@ -405,71 +483,131 @@ export async function listMonitoringRecords(userId: number) {
 
 export async function getMonitoringRecord(id: number) {
   const db = await requireDb();
-  const rows = await db.select().from(monitoringRecords).where(eq(monitoringRecords.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(monitoringRecords)
+    .where(eq(monitoringRecords.id, id))
+    .limit(1);
   return rows[0];
 }
 
 export async function deleteMonitoringRecord(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(monitoringRecords).where(and(eq(monitoringRecords.id, id), eq(monitoringRecords.userId, userId)));
+  await db
+    .delete(monitoringRecords)
+    .where(
+      and(eq(monitoringRecords.id, id), eq(monitoringRecords.userId, userId))
+    );
 }
 
-
 // Radar measurements for the standalone Monitoring module
-export async function insertMonitoringRadarReadings(values: (typeof monitoringRadarReadings.$inferInsert)[]) {
+export async function insertMonitoringRadarReadings(
+  values: (typeof monitoringRadarReadings.$inferInsert)[]
+) {
   const db = await requireDb();
   if (!values.length) return 0;
   await db.insert(monitoringRadarReadings).values(values);
   return values.length;
 }
 
-export async function listMonitoringRadarReadings(userId: number, monitoringRecordId: number) {
+export async function listMonitoringRadarReadings(
+  userId: number,
+  monitoringRecordId: number
+) {
   const db = await requireDb();
   return db
     .select()
     .from(monitoringRadarReadings)
-    .where(and(eq(monitoringRadarReadings.userId, userId), eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)))
+    .where(
+      and(
+        eq(monitoringRadarReadings.userId, userId),
+        eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)
+      )
+    )
     .orderBy(monitoringRadarReadings.measuredAt);
 }
 
-export async function deleteMonitoringRadarReadings(userId: number, monitoringRecordId: number) {
+export async function deleteMonitoringRadarReadings(
+  userId: number,
+  monitoringRecordId: number
+) {
   const db = await requireDb();
-  await db.delete(monitoringRadarReadings).where(and(eq(monitoringRadarReadings.userId, userId), eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)));
+  await db
+    .delete(monitoringRadarReadings)
+    .where(
+      and(
+        eq(monitoringRadarReadings.userId, userId),
+        eq(monitoringRadarReadings.monitoringRecordId, monitoringRecordId)
+      )
+    );
 }
 
 // Excel-style daily/window radar summary rows
-export async function insertRadarMonitoringRows(values: (typeof radarMonitoringRows.$inferInsert)[]) {
+export async function insertRadarMonitoringRows(
+  values: (typeof radarMonitoringRows.$inferInsert)[]
+) {
   const db = await requireDb();
   if (!values.length) return 0;
   await db.insert(radarMonitoringRows).values(values);
   return values.length;
 }
 
-export async function replaceProjectRadarMonitoringRows(userId: number, projectId: number, values: (typeof radarMonitoringRows.$inferInsert)[]) {
+export async function replaceProjectRadarMonitoringRows(
+  userId: number,
+  projectId: number,
+  values: (typeof radarMonitoringRows.$inferInsert)[]
+) {
   const db = await requireDb();
   return db.transaction(async tx => {
-    await tx.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, projectId)));
+    await tx
+      .delete(radarMonitoringRows)
+      .where(
+        and(
+          eq(radarMonitoringRows.userId, userId),
+          eq(radarMonitoringRows.projectId, projectId)
+        )
+      );
     if (values.length) await tx.insert(radarMonitoringRows).values(values);
     return values.length;
   });
 }
 
-export async function listRadarMonitoringRows(userId: number, monitoringRecordId: number) {
+export async function listRadarMonitoringRows(
+  userId: number,
+  monitoringRecordId: number
+) {
   const db = await requireDb();
   return db
     .select()
     .from(radarMonitoringRows)
-    .where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)))
+    .where(
+      and(
+        eq(radarMonitoringRows.userId, userId),
+        eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)
+      )
+    )
     .orderBy(radarMonitoringRows.measuredAt);
 }
 
-export async function deleteRadarMonitoringRows(userId: number, monitoringRecordId: number) {
+export async function deleteRadarMonitoringRows(
+  userId: number,
+  monitoringRecordId: number
+) {
   const db = await requireDb();
-  await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)));
+  await db
+    .delete(radarMonitoringRows)
+    .where(
+      and(
+        eq(radarMonitoringRows.userId, userId),
+        eq(radarMonitoringRows.monitoringRecordId, monitoringRecordId)
+      )
+    );
 }
 
 // Monitoring projects organize imported radar workbooks independently of wall-risk records.
-export async function createMonitoringProject(values: typeof monitoringProjects.$inferInsert) {
+export async function createMonitoringProject(
+  values: typeof monitoringProjects.$inferInsert
+) {
   const db = await requireDb();
   const result = await db.insert(monitoringProjects).values(values);
   return Number(result[0].insertId);
@@ -477,38 +615,69 @@ export async function createMonitoringProject(values: typeof monitoringProjects.
 
 export async function listMonitoringProjects(userId: number) {
   const db = await requireDb();
-  return db.select().from(monitoringProjects).where(eq(monitoringProjects.userId, userId)).orderBy(monitoringProjects.createdAt);
+  return db
+    .select()
+    .from(monitoringProjects)
+    .where(eq(monitoringProjects.userId, userId))
+    .orderBy(monitoringProjects.createdAt);
 }
 
 export async function getMonitoringProject(id: number) {
   const db = await requireDb();
-  const rows = await db.select().from(monitoringProjects).where(eq(monitoringProjects.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(monitoringProjects)
+    .where(eq(monitoringProjects.id, id))
+    .limit(1);
   return rows[0];
 }
 
-export async function listProjectRadarMonitoringRows(userId: number, projectId: number) {
+export async function listProjectRadarMonitoringRows(
+  userId: number,
+  projectId: number
+) {
   const db = await requireDb();
   return db
     .select()
     .from(radarMonitoringRows)
-    .where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, projectId)))
+    .where(
+      and(
+        eq(radarMonitoringRows.userId, userId),
+        eq(radarMonitoringRows.projectId, projectId)
+      )
+    )
     .orderBy(radarMonitoringRows.measuredAt);
 }
 
 export async function deleteMonitoringProject(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(radarMonitoringRows).where(and(eq(radarMonitoringRows.userId, userId), eq(radarMonitoringRows.projectId, id)));
-  await db.delete(monitoringProjects).where(and(eq(monitoringProjects.id, id), eq(monitoringProjects.userId, userId)));
+  await db
+    .delete(radarMonitoringRows)
+    .where(
+      and(
+        eq(radarMonitoringRows.userId, userId),
+        eq(radarMonitoringRows.projectId, id)
+      )
+    );
+  await db
+    .delete(monitoringProjects)
+    .where(
+      and(eq(monitoringProjects.id, id), eq(monitoringProjects.userId, userId))
+    );
 }
 
 // Reporting: fall-of-ground / slope failure records
-export async function insertFailureRecord(values: typeof failureRecords.$inferInsert) {
+export async function insertFailureRecord(
+  values: typeof failureRecords.$inferInsert
+) {
   const db = await requireDb();
   const result = await db.insert(failureRecords).values(values);
   return Number(result[0].insertId);
 }
 
-export async function insertFailureRecords(values: (typeof failureRecords.$inferInsert)[]) {
+export async function insertFailureRecords(
+  values: (typeof failureRecords.$inferInsert)[]
+) {
   const db = await requireDb();
   if (!values.length) return 0;
   await db.insert(failureRecords).values(values);
@@ -526,7 +695,9 @@ export async function listFailureRecords(userId: number) {
 
 export async function deleteFailureRecord(id: number, userId: number) {
   const db = await requireDb();
-  await db.delete(failureRecords).where(and(eq(failureRecords.id, id), eq(failureRecords.userId, userId)));
+  await db
+    .delete(failureRecords)
+    .where(and(eq(failureRecords.id, id), eq(failureRecords.userId, userId)));
 }
 
 export async function clearFailureRecords(userId: number) {
@@ -534,10 +705,15 @@ export async function clearFailureRecords(userId: number) {
   await db.delete(failureRecords).where(eq(failureRecords.userId, userId));
 }
 
-export async function replaceFailureRecords(userId: number, values: (typeof failureRecords.$inferInsert)[]) {
+export async function replaceFailureRecords(
+  userId: number,
+  values: (typeof failureRecords.$inferInsert)[]
+) {
   const db = await requireDb();
   return db.transaction(async transaction => {
-    await transaction.delete(failureRecords).where(eq(failureRecords.userId, userId));
+    await transaction
+      .delete(failureRecords)
+      .where(eq(failureRecords.userId, userId));
     if (values.length) await transaction.insert(failureRecords).values(values);
     return values.length;
   });
