@@ -31,9 +31,21 @@ type Analysis = {
   method: string[];
   disclaimer: string;
 };
+type ReviewStatus = "Preliminary" | "Reviewed" | "Approved";
+type SelectionMode = "crest" | "toe" | "scaleA" | "scaleB" | null;
 
 function pointString(point: Point) {
   return `${(point.x * 100).toFixed(1)},${(point.y * 100).toFixed(1)}`;
+}
+
+function angleBetween(a: Point, b: Point) {
+  return Number(
+    (
+      (Math.atan2(Math.abs(b.y - a.y), Math.max(Math.abs(b.x - a.x), 0.0001)) *
+        180) /
+      Math.PI
+    ).toFixed(1)
+  );
 }
 
 function prepareImage(file: File) {
@@ -104,7 +116,19 @@ function prepareImage(file: File) {
   );
 }
 
-function GeometryOverlay({ geometry }: { geometry: Geometry }) {
+function GeometryOverlay({
+  geometry,
+  manualCrest,
+  manualToe,
+  scaleA,
+  scaleB,
+}: {
+  geometry: Geometry;
+  manualCrest?: Point | null;
+  manualToe?: Point | null;
+  scaleA?: Point | null;
+  scaleB?: Point | null;
+}) {
   const facePoints =
     geometry.face.length >= 2
       ? geometry.face.map(pointString).join(" ")
@@ -154,6 +178,68 @@ function GeometryOverlay({ geometry }: { geometry: Geometry }) {
         stroke="white"
         strokeWidth="0.5"
       />
+      {manualCrest && (
+        <circle
+          cx={manualCrest.x * 100}
+          cy={manualCrest.y * 100}
+          r="2.2"
+          fill="#16a34a"
+          stroke="white"
+          strokeWidth="0.7"
+        />
+      )}
+      {manualToe && (
+        <circle
+          cx={manualToe.x * 100}
+          cy={manualToe.y * 100}
+          r="2.2"
+          fill="#7c3aed"
+          stroke="white"
+          strokeWidth="0.7"
+        />
+      )}
+      {manualCrest && manualToe && (
+        <line
+          x1={manualCrest.x * 100}
+          y1={manualCrest.y * 100}
+          x2={manualToe.x * 100}
+          y2={manualToe.y * 100}
+          stroke="#111827"
+          strokeWidth="1"
+          strokeDasharray="2 1"
+        />
+      )}
+      {scaleA && (
+        <circle
+          cx={scaleA.x * 100}
+          cy={scaleA.y * 100}
+          r="1.8"
+          fill="#0284c7"
+          stroke="white"
+          strokeWidth="0.7"
+        />
+      )}
+      {scaleB && (
+        <circle
+          cx={scaleB.x * 100}
+          cy={scaleB.y * 100}
+          r="1.8"
+          fill="#0284c7"
+          stroke="white"
+          strokeWidth="0.7"
+        />
+      )}
+      {scaleA && scaleB && (
+        <line
+          x1={scaleA.x * 100}
+          y1={scaleA.y * 100}
+          x2={scaleB.x * 100}
+          y2={scaleB.y * 100}
+          stroke="#0284c7"
+          strokeWidth="0.9"
+          strokeDasharray="1 1"
+        />
+      )}
     </svg>
   );
 }
@@ -165,9 +251,25 @@ export default function AISlopeAnalysis() {
   const [fileName, setFileName] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
+  const [manualCrest, setManualCrest] = useState<Point | null>(null);
+  const [manualToe, setManualToe] = useState<Point | null>(null);
+  const [scaleA, setScaleA] = useState<Point | null>(null);
+  const [scaleB, setScaleB] = useState<Point | null>(null);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>(null);
+  const [knownScale, setKnownScale] = useState("");
+  const [adjustedAngle, setAdjustedAngle] = useState("");
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("Preliminary");
+  const [reviewExplanation, setReviewExplanation] = useState("");
   const analyze = trpc.aiSlope.analyzePhoto.useMutation({
     onSuccess: result => {
       setAnalysis(result as Analysis);
+      setManualCrest(null);
+      setManualToe(null);
+      setScaleA(null);
+      setScaleB(null);
+      setAdjustedAngle((result as Analysis).estimatedFaceAngle.toFixed(1));
+      setReviewStatus("Preliminary");
+      setReviewExplanation("");
       setError("");
     },
     onError: result =>
@@ -195,6 +297,14 @@ export default function AISlopeAnalysis() {
     try {
       setError("");
       setAnalysis(null);
+      setManualCrest(null);
+      setManualToe(null);
+      setScaleA(null);
+      setScaleB(null);
+      setSelectionMode(null);
+      setAdjustedAngle("");
+      setReviewStatus("Preliminary");
+      setReviewExplanation("");
       setFileName(
         `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB original)`
       );
@@ -261,6 +371,14 @@ export default function AISlopeAnalysis() {
                     setImageData("");
                     setEdgeDensity(0);
                     setAnalysis(null);
+                    setManualCrest(null);
+                    setManualToe(null);
+                    setScaleA(null);
+                    setScaleB(null);
+                    setSelectionMode(null);
+                    setAdjustedAngle("");
+                    setReviewStatus("Preliminary");
+                    setReviewExplanation("");
                     setFileName("");
                   }}
                 >
@@ -269,13 +387,42 @@ export default function AISlopeAnalysis() {
               )}
             </div>
             {imageData ? (
-              <div className="relative overflow-hidden border border-foreground bg-black">
+              <div
+                className={`relative overflow-hidden border border-foreground bg-black ${selectionMode ? "cursor-crosshair" : ""}`}
+                onClick={event => {
+                  if (!selectionMode) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const selected = {
+                    x: Math.max(
+                      0,
+                      Math.min(1, (event.clientX - rect.left) / rect.width)
+                    ),
+                    y: Math.max(
+                      0,
+                      Math.min(1, (event.clientY - rect.top) / rect.height)
+                    ),
+                  };
+                  if (selectionMode === "crest") setManualCrest(selected);
+                  if (selectionMode === "toe") setManualToe(selected);
+                  if (selectionMode === "scaleA") setScaleA(selected);
+                  if (selectionMode === "scaleB") setScaleB(selected);
+                  setSelectionMode(null);
+                }}
+              >
                 <img
                   src={imageData}
                   alt={fileName || "Selected open-pit slope"}
                   className="block max-h-[620px] w-full object-contain"
                 />
-                {analysis && <GeometryOverlay geometry={analysis.geometry} />}
+                {analysis && (
+                  <GeometryOverlay
+                    geometry={analysis.geometry}
+                    manualCrest={manualCrest}
+                    manualToe={manualToe}
+                    scaleA={scaleA}
+                    scaleB={scaleB}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex min-h-[360px] flex-col items-center justify-center border border-dashed border-foreground/50 bg-muted/30 text-center">
@@ -330,6 +477,138 @@ export default function AISlopeAnalysis() {
                 design or safety decisions.
               </p>
             </div>
+            {analysis && (
+              <div className="space-y-4 border border-foreground bg-muted/20 p-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest">
+                    Engineer review and manual controls
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Select points directly on the image. The black dashed line
+                    is the engineer-selected crest-to-toe line.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={selectionMode === "crest" ? "default" : "outline"}
+                    className="rounded-none border-foreground"
+                    onClick={() => setSelectionMode("crest")}
+                  >
+                    Select Crest
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={selectionMode === "toe" ? "default" : "outline"}
+                    className="rounded-none border-foreground"
+                    onClick={() => setSelectionMode("toe")}
+                  >
+                    Select Toe
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={selectionMode === "scaleA" ? "default" : "outline"}
+                    className="rounded-none border-foreground"
+                    onClick={() => setSelectionMode("scaleA")}
+                  >
+                    Select Scale Point A
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={selectionMode === "scaleB" ? "default" : "outline"}
+                    className="rounded-none border-foreground"
+                    onClick={() => setSelectionMode("scaleB")}
+                  >
+                    Select Scale Point B
+                  </Button>
+                </div>
+                {selectionMode && (
+                  <p className="text-sm font-semibold text-primary">
+                    Click the{" "}
+                    {selectionMode === "crest"
+                      ? "crest"
+                      : selectionMode === "toe"
+                        ? "toe"
+                        : `scale point ${selectionMode === "scaleA" ? "A" : "B"}`}{" "}
+                    on the image.
+                  </p>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">
+                    Known scale distance (m)
+                    <input
+                      className="mt-1 w-full border border-foreground bg-background px-3 py-2 font-mono font-normal"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={knownScale}
+                      onChange={event => setKnownScale(event.target.value)}
+                      placeholder="e.g. 5.00"
+                    />
+                  </label>
+                  <label className="text-sm font-semibold">
+                    Engineer-adjusted angle (°)
+                    <input
+                      className="mt-1 w-full border border-foreground bg-background px-3 py-2 font-mono font-normal"
+                      type="number"
+                      min="0"
+                      max="90"
+                      step="0.1"
+                      value={adjustedAngle}
+                      onChange={event => setAdjustedAngle(event.target.value)}
+                    />
+                  </label>
+                </div>
+                {scaleA && scaleB && knownScale && (
+                  <p className="text-xs text-muted-foreground">
+                    Reference selected: {Number(knownScale).toFixed(2)} m. This
+                    documents scale; perspective correction still requires
+                    survey or LiDAR.
+                  </p>
+                )}
+                {manualCrest && manualToe && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-none border-foreground"
+                    onClick={() =>
+                      setAdjustedAngle(
+                        angleBetween(manualCrest, manualToe).toFixed(1)
+                      )
+                    }
+                  >
+                    Calculate angle from selected Crest/Toe
+                  </Button>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">
+                    Review status
+                    <select
+                      className="mt-1 w-full border border-foreground bg-background px-3 py-2 font-normal"
+                      value={reviewStatus}
+                      onChange={event =>
+                        setReviewStatus(event.target.value as ReviewStatus)
+                      }
+                    >
+                      <option>Preliminary</option>
+                      <option>Reviewed</option>
+                      <option>Approved</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">
+                    Engineer explanation
+                    <textarea
+                      className="mt-1 min-h-20 w-full border border-foreground bg-background px-3 py-2 font-normal"
+                      value={reviewExplanation}
+                      onChange={event =>
+                        setReviewExplanation(event.target.value)
+                      }
+                      placeholder="Explain any correction or acceptance decision…"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
             {error && (
               <div className="flex gap-3 border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
                 <AlertTriangle className="h-5 w-5 shrink-0" />
@@ -367,6 +646,32 @@ export default function AISlopeAnalysis() {
                         value={analysis.confidence}
                         className="mt-3 h-2"
                       />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="border border-foreground p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        AI Estimate
+                      </p>
+                      <p className="mt-2 text-2xl font-black">
+                        {analysis.estimatedFaceAngle.toFixed(1)}°
+                      </p>
+                    </div>
+                    <div className="border border-foreground p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Engineer Adjusted
+                      </p>
+                      <p className="mt-2 text-2xl font-black">
+                        {adjustedAngle
+                          ? `${Number(adjustedAngle).toFixed(1)}°`
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="border border-foreground p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Review Status
+                      </p>
+                      <p className="mt-2 text-lg font-black">{reviewStatus}</p>
                     </div>
                   </div>
                   <div className="space-y-3 text-sm">
