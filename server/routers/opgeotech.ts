@@ -13,6 +13,7 @@ import { runKinematicAnalysis } from "../geotech/kinematics";
 import { analyzeRadarTrend, DEFAULT_RADAR_THRESHOLDS } from "../geotech/radar";
 import { scoreWallRisk, serializeWallRisk } from "../geotech/wallRisk";
 import { invokeLLM } from "../_core/llm";
+import { parseSlopeVisionResponse } from "../geotech/slopeVision";
 
 // ── AI Slope Analysis module ──────────────────────────────────────────
 
@@ -66,102 +67,13 @@ export const aiSlopeRouter = router({
             ],
           },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "slope_photo_geometry",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                crest: slopePointSchema,
-                toe: slopePointSchema,
-                face: {
-                  type: "array",
-                  items: slopePointSchema,
-                  minItems: 2,
-                  maxItems: 24,
-                },
-                berms: {
-                  type: "array",
-                  items: {
-                    type: "array",
-                    items: slopePointSchema,
-                    minItems: 2,
-                    maxItems: 12,
-                  },
-                  maxItems: 12,
-                },
-                visibleBoundaries: {
-                  type: "array",
-                  items: slopePointSchema,
-                  maxItems: 48,
-                },
-                representativeSegment: { type: "string" },
-                perspectiveCorrectionApplied: { type: "boolean" },
-                confidence: { type: "number", minimum: 0, maximum: 100 },
-                limitations: {
-                  type: "array",
-                  items: { type: "string" },
-                  maxItems: 8,
-                },
-              },
-              required: [
-                "crest",
-                "toe",
-                "face",
-                "berms",
-                "visibleBoundaries",
-                "representativeSegment",
-                "perspectiveCorrectionApplied",
-                "confidence",
-                "limitations",
-              ],
-              additionalProperties: false,
-            },
-          },
-        },
+        // Gemini vision can reject OpenAI-style strict JSON Schema even when
+        // the image itself is valid. json_object keeps the response structured
+        // without causing a misleading "bad photo" error.
+        response_format: { type: "json_object" },
         max_tokens: 3000,
       });
-
-      const firstChoice = Array.isArray(response.choices)
-        ? response.choices[0]
-        : undefined;
-      if (!firstChoice?.message) {
-        throw new Error(
-          "The vision model did not return an analysis. Please try again with a clear JPEG or PNG photo."
-        );
-      }
-      const content = firstChoice.message.content;
-      const json =
-        typeof content === "string"
-          ? content
-          : (content
-              ?.map(part => (part.type === "text" ? part.text : ""))
-              .join("") ?? "");
-      if (!json.trim()) {
-        throw new Error(
-          "The vision model returned an empty analysis. Please try a clearer photo showing the crest and toe."
-        );
-      }
-      let parsed: {
-        crest: { x: number; y: number };
-        toe: { x: number; y: number };
-        face: Array<{ x: number; y: number }>;
-        berms: Array<Array<{ x: number; y: number }>>;
-        visibleBoundaries: Array<{ x: number; y: number }>;
-        representativeSegment: string;
-        perspectiveCorrectionApplied: boolean;
-        confidence: number;
-        limitations: string[];
-      };
-      try {
-        parsed = JSON.parse(json) as typeof parsed;
-      } catch {
-        throw new Error(
-          "The vision service did not return valid slope geometry. Try a clearer JPEG or PNG showing the complete crest and toe."
-        );
-      }
+      const parsed = parseSlopeVisionResponse(response);
       const points = [
         parsed.crest,
         parsed.toe,
