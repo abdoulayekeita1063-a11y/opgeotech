@@ -477,15 +477,16 @@ export default function AISlopeAnalysis() {
                 design or safety decisions.
               </p>
             </div>
-            {analysis && (
+            {imageData && (
               <div className="space-y-4 border border-foreground bg-muted/20 p-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest">
                     Engineer review and manual controls
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Select points directly on the image. The black dashed line
-                    is the engineer-selected crest-to-toe line.
+                    Select points directly on the image before or after AI
+                    analysis. The black dashed line is the engineer-selected
+                    crest-to-toe line.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
