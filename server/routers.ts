@@ -9,12 +9,21 @@ import {
   inspectionRouter,
   stabilityRouter,
 } from "./routers/geotech";
-import { aiSlopeRouter, drillholeRouter, kinematicsRouter, loggingRouter, mappingRouter, monitoringRouter, piezometerRouter } from "./routers/opgeotech";
+import {
+  aiSlopeRouter,
+  drillholeRouter,
+  kinematicsRouter,
+  loggingRouter,
+  mappingRouter,
+  monitoringRouter,
+  piezometerRouter,
+} from "./routers/opgeotech";
 import { reportingRouter } from "./routers/reporting";
 import { bermRouter } from "./routers/berm";
+import { collaborationRouter } from "./routers/collaboration";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -41,6 +50,7 @@ export const appRouter = router({
   aiSlope: aiSlopeRouter,
   reporting: reportingRouter,
   berm: bermRouter,
+  collaboration: collaborationRouter,
 });
 
 export type AppRouter = typeof appRouter;

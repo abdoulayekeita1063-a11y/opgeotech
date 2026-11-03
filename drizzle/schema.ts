@@ -1,4 +1,14 @@
-import { double, int, json, longtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  double,
+  int,
+  json,
+  longtext,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -39,7 +49,9 @@ export const stabilityCalcs = mysqlTable("stability_calcs", {
   unitWeight: double("unitWeight").notNull(), // kN/m3
   slopeHeight: double("slopeHeight").notNull(), // m
   slopeAngle: double("slopeAngle").notNull(), // degrés
-  waterCondition: mysqlEnum("waterCondition", ["dry", "partial", "saturated"]).default("dry").notNull(),
+  waterCondition: mysqlEnum("waterCondition", ["dry", "partial", "saturated"])
+    .default("dry")
+    .notNull(),
   // Résultats
   fsFellenius: double("fsFellenius").notNull(),
   fsBishop: double("fsBishop").notNull(),
@@ -79,7 +91,9 @@ export const inspectionReports = mysqlTable("inspection_reports", {
   anomalies: text("anomalies"),
   actions: text("actions"), // actions recommandées saisies
   generatedReport: text("generatedReport"), // rapport structuré généré par IA (markdown)
-  status: mysqlEnum("status", ["draft", "generated"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "generated"])
+    .default("draft")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -189,7 +203,9 @@ export const structures = mysqlTable("structures", {
   userId: int("userId").notNull(),
   structureId: varchar("structureId", { length: 64 }),
   zone: varchar("zone", { length: 128 }),
-  structureType: varchar("structureType", { length: 64 }).default("joint").notNull(),
+  structureType: varchar("structureType", { length: 64 })
+    .default("joint")
+    .notNull(),
   dip: double("dip").notNull(), // 0-90 degrees
   dipDirection: double("dipDirection").notNull(), // 0-360 degrees
   easting: double("easting"), // projected X coordinate
@@ -243,7 +259,6 @@ export type Structure = typeof structures.$inferSelect;
 export type Piezometer = typeof piezometers.$inferSelect;
 export type KinematicAnalysis = typeof kinematicAnalyses.$inferSelect;
 
-
 /** Standalone monitoring register for exposed open-pit walls and slopes. */
 export const monitoringRecords = mysqlTable("monitoring_records", {
   id: int("id").autoincrement().primaryKey(),
@@ -257,8 +272,12 @@ export const monitoringRecords = mysqlTable("monitoring_records", {
   startBench: varchar("startBench", { length: 64 }),
   endBench: varchar("endBench", { length: 64 }),
   inspectionDate: varchar("inspectionDate", { length: 32 }),
-  status: mysqlEnum("status", ["Active", "Monitored", "Remediated", "Closed"]).default("Active").notNull(),
-  riskLevel: mysqlEnum("riskLevel", ["Low", "Moderate", "High", "Critical"]).default("Low").notNull(),
+  status: mysqlEnum("status", ["Active", "Monitored", "Remediated", "Closed"])
+    .default("Active")
+    .notNull(),
+  riskLevel: mysqlEnum("riskLevel", ["Low", "Moderate", "High", "Critical"])
+    .default("Low")
+    .notNull(),
   riskScore: double("riskScore"),
   riskClass: varchar("riskClass", { length: 64 }),
   riskColour: varchar("riskColour", { length: 32 }),
@@ -284,7 +303,6 @@ export const monitoringRecords = mysqlTable("monitoring_records", {
 export type MonitoringRecord = typeof monitoringRecords.$inferSelect;
 export type InsertMonitoringRecord = typeof monitoringRecords.$inferInsert;
 
-
 /** Radar time-series measurements attached to a standalone Monitoring wall record. */
 export const monitoringRadarReadings = mysqlTable("monitoring_radar_readings", {
   id: int("id").autoincrement().primaryKey(),
@@ -300,9 +318,10 @@ export const monitoringRadarReadings = mysqlTable("monitoring_radar_readings", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export type MonitoringRadarReading = typeof monitoringRadarReadings.$inferSelect;
-export type InsertMonitoringRadarReading = typeof monitoringRadarReadings.$inferInsert;
-
+export type MonitoringRadarReading =
+  typeof monitoringRadarReadings.$inferSelect;
+export type InsertMonitoringRadarReading =
+  typeof monitoringRadarReadings.$inferInsert;
 
 /** Projects used to organize Monitoring workbooks and reports independently of wall risk records. */
 export const monitoringProjects = mysqlTable("monitoring_projects", {
@@ -316,7 +335,6 @@ export const monitoringProjects = mysqlTable("monitoring_projects", {
 
 export type MonitoringProject = typeof monitoringProjects.$inferSelect;
 export type InsertMonitoringProject = typeof monitoringProjects.$inferInsert;
-
 
 /** Daily/window radar summary rows imported from Excel-style monitoring workbooks. */
 export const radarMonitoringRows = mysqlTable("radar_monitoring_rows", {
@@ -373,9 +391,122 @@ export const bermComparisons = mysqlTable("berm_comparisons", {
   bermId: varchar("bermId", { length: 128 }).notNull(),
   pit: varchar("pit", { length: 128 }).notNull(),
   bench: varchar("bench", { length: 128 }).notNull(),
-  status: varchar("status", { length: 32 }).$type<import("../shared/berm/types").BermStatus>().notNull(),
+  status: varchar("status", { length: 32 })
+    .$type<import("../shared/berm/types").BermStatus>()
+    .notNull(),
   surveyDateMs: double("surveyDateMs"),
-  input: json("input").$type<import("../shared/berm/types").BermAnalysisInput>().notNull(),
-  result: json("result").$type<import("../shared/berm/types").BermAnalysisResult>().notNull(),
+  input: json("input")
+    .$type<import("../shared/berm/types").BermAnalysisInput>()
+    .notNull(),
+  result: json("result")
+    .$type<import("../shared/berm/types").BermAnalysisResult>()
+    .notNull(),
   createdAtMs: double("createdAtMs").notNull(),
 });
+
+/** Shared collaboration primitives. Payloads remain generic so existing modules can adopt them incrementally. */
+export const collaborationTeams = mysqlTable("collaboration_teams", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const collaborationTeamMembers = mysqlTable(
+  "collaboration_team_members",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull(),
+    userId: int("userId").notNull(),
+    role: mysqlEnum("role", [
+      "admin",
+      "manager",
+      "engineer",
+      "reviewer",
+      "viewer",
+    ])
+      .default("engineer")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  }
+);
+
+export const collaborationProjects = mysqlTable("collaboration_projects", {
+  id: int("id").autoincrement().primaryKey(),
+  teamId: int("teamId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const collaborationWorkItems = mysqlTable("collaboration_work_items", {
+  id: int("id").autoincrement().primaryKey(),
+  teamId: int("teamId").notNull(),
+  projectId: int("projectId").notNull(),
+  module: varchar("module", { length: 64 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "in_progress",
+    "waiting_review",
+    "returned",
+    "reviewed",
+    "approved",
+    "archived",
+  ])
+    .default("draft")
+    .notNull(),
+  assignedTo: int("assignedTo"),
+  payload: json("payload").notNull(),
+  versionNumber: int("versionNumber").default(1).notNull(),
+  createdBy: int("createdBy").notNull(),
+  updatedBy: int("updatedBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const collaborationVersions = mysqlTable("collaboration_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  workItemId: int("workItemId").notNull(),
+  versionNumber: int("versionNumber").notNull(),
+  userId: int("userId").notNull(),
+  payload: json("payload").notNull(),
+  changeSummary: text("changeSummary"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const collaborationAuditEvents = mysqlTable(
+  "collaboration_audit_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull(),
+    projectId: int("projectId"),
+    workItemId: int("workItemId"),
+    userId: int("userId").notNull(),
+    action: varchar("action", { length: 64 }).notNull(),
+    beforePayload: json("beforePayload"),
+    afterPayload: json("afterPayload"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  }
+);
+
+export const collaborationSyncOperations = mysqlTable(
+  "collaboration_sync_operations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    operationId: varchar("operationId", { length: 128 }).notNull().unique(),
+    userId: int("userId").notNull(),
+    teamId: int("teamId").notNull(),
+    workItemId: int("workItemId"),
+    operationType: mysqlEnum("operationType", ["create", "update"]).notNull(),
+    baseVersion: int("baseVersion"),
+    payload: json("payload").notNull(),
+    status: mysqlEnum("status", ["pending", "applied", "conflict", "rejected"])
+      .default("pending")
+      .notNull(),
+    errorMessage: text("errorMessage"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    appliedAt: timestamp("appliedAt"),
+  }
+);
