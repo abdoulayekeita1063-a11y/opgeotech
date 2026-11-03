@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Bell,
   ExternalLink,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,6 +54,12 @@ export default function TeamWorkspace() {
     null
   );
   const [commentBody, setCommentBody] = useState("");
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteSearch, setInviteSearch] = useState("");
+  const [inviteRole, setInviteRole] = useState<
+    "manager" | "engineer" | "reviewer" | "viewer"
+  >("engineer");
+  const [inviteUserId, setInviteUserId] = useState<number | null>(null);
 
   const teams = trpc.collaboration.listMyTeams.useQuery();
   const projects = trpc.collaboration.listProjects.useQuery(
@@ -75,6 +82,17 @@ export default function TeamWorkspace() {
     refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });
+  const invitations = trpc.collaboration.invitations.useQuery(undefined, {
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+  });
+  const userSearch = trpc.collaboration.searchUsers.useQuery(
+    { teamId: teamId ?? 0, query: inviteSearch },
+    {
+      enabled:
+        teamId !== null && showInviteForm && inviteSearch.trim().length >= 2,
+    }
+  );
   const comments = trpc.collaboration.comments.useQuery(
     { teamId: teamId ?? 0, workItemId: selectedWorkItemId ?? 0 },
     { enabled: teamId !== null && selectedWorkItemId !== null }
@@ -132,6 +150,25 @@ export default function TeamWorkspace() {
   const markNotificationRead =
     trpc.collaboration.markNotificationRead.useMutation({
       onSuccess: () => void utils.collaboration.notifications.invalidate(),
+    });
+  const inviteMember = trpc.collaboration.inviteMember.useMutation({
+    onSuccess: () => {
+      setInviteSearch("");
+      setInviteUserId(null);
+      setShowInviteForm(false);
+      void utils.collaboration.notifications.invalidate();
+      toast.success("Invitation sent");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const respondToInvitation =
+    trpc.collaboration.respondToInvitation.useMutation({
+      onSuccess: () => {
+        void utils.collaboration.invitations.invalidate();
+        void utils.collaboration.listMyTeams.invalidate();
+        toast.success("Invitation response saved");
+      },
+      onError: error => toast.error(error.message),
     });
   const restoreVersion = trpc.collaboration.updateWorkItem.useMutation({
     onSuccess: () => {
@@ -216,6 +253,64 @@ export default function TeamWorkspace() {
           </div>
         </header>
 
+        {!!invitations.data?.length && (
+          <Card className="rounded-none border-primary shadow-none">
+            <CardHeader className="border-b border-primary px-4 py-4">
+              <CardTitle className="text-sm uppercase tracking-widest">
+                Pending invitations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="divide-y divide-border px-4 py-0">
+              {invitations.data.map(entry => (
+                <div
+                  key={entry.invitation.id}
+                  className="flex flex-col justify-between gap-3 py-4 md:flex-row md:items-center"
+                >
+                  <div>
+                    <p className="font-bold">{entry.team.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Invited by{" "}
+                      {entry.inviter.name ||
+                        entry.inviter.email ||
+                        "Team administrator"}{" "}
+                      · proposed role: {entry.invitation.role}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="rounded-none"
+                      disabled={respondToInvitation.isPending}
+                      onClick={() =>
+                        respondToInvitation.mutate({
+                          id: entry.invitation.id,
+                          accept: true,
+                        })
+                      }
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-none border-foreground"
+                      disabled={respondToInvitation.isPending}
+                      onClick={() =>
+                        respondToInvitation.mutate({
+                          id: entry.invitation.id,
+                          accept: false,
+                        })
+                      }
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         <section className="grid gap-4 lg:grid-cols-[280px_1fr]">
           <Card className="rounded-none border-foreground shadow-none">
             <CardHeader className="border-b border-foreground px-4 py-4">
@@ -297,16 +392,107 @@ export default function TeamWorkspace() {
                   </p>
                 </div>
                 {teamId !== null && (
-                  <Button
-                    variant="outline"
-                    className="rounded-none border-foreground"
-                    onClick={() => setShowProjectForm(value => !value)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" /> Add project
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      className="rounded-none border-foreground"
+                      onClick={() => setShowInviteForm(value => !value)}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" /> Invite member
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-none border-foreground"
+                      onClick={() => setShowProjectForm(value => !value)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Add project
+                    </Button>
+                  </div>
                 )}
               </CardHeader>
               <CardContent className="px-4 py-4">
+                {showInviteForm && teamId !== null && (
+                  <div className="mb-4 border-2 border-primary bg-primary/5 p-4">
+                    <p className="mb-3 text-sm font-bold uppercase tracking-widest">
+                      Invite member
+                    </p>
+                    <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
+                      <input
+                        className="border border-foreground bg-background px-3 py-2 text-sm"
+                        placeholder="Search by name or email"
+                        value={inviteSearch}
+                        onChange={event => {
+                          setInviteSearch(event.target.value);
+                          setInviteUserId(null);
+                        }}
+                      />
+                      <select
+                        className="border border-foreground bg-background px-3 py-2 text-sm"
+                        value={inviteRole}
+                        onChange={event =>
+                          setInviteRole(event.target.value as typeof inviteRole)
+                        }
+                      >
+                        <option value="manager">Manager</option>
+                        <option value="engineer">Engineer</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                      <Button
+                        className="rounded-none"
+                        disabled={
+                          inviteUserId === null || inviteMember.isPending
+                        }
+                        onClick={() =>
+                          inviteUserId !== null &&
+                          inviteMember.mutate({
+                            teamId,
+                            invitedUserId: inviteUserId,
+                            role: inviteRole,
+                          })
+                        }
+                      >
+                        {inviteMember.isPending
+                          ? "Sending…"
+                          : "Send invitation"}
+                      </Button>
+                    </div>
+                    {inviteSearch.trim().length >= 2 && (
+                      <div className="mt-2 divide-y divide-border border border-border bg-background">
+                        {(userSearch.data ?? []).map(user => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => {
+                              setInviteUserId(user.id);
+                              setInviteSearch(
+                                user.name || user.email || `User ${user.id}`
+                              );
+                            }}
+                            className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted ${inviteUserId === user.id ? "bg-primary/10" : ""}`}
+                          >
+                            <UserAvatar
+                              name={user.name}
+                              email={user.email}
+                              avatarUrl={user.avatarUrl}
+                            />
+                            <span>
+                              <strong>{user.name || "Unnamed user"}</strong>
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {user.email || `User ${user.id}`}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                        {!userSearch.isLoading && !userSearch.data?.length && (
+                          <p className="px-3 py-3 text-xs text-muted-foreground">
+                            No matching user found.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {showProjectForm && teamId !== null && (
                   <form
                     className="mb-4 flex flex-col gap-2 border border-foreground p-3 sm:flex-row"

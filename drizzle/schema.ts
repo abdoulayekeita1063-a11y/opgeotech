@@ -534,3 +534,26 @@ export const collaborationNotifications = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   }
 );
+
+export const collaborationInvitations = mysqlTable(
+  "collaboration_invitations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull(),
+    invitedUserId: int("invitedUserId").notNull(),
+    invitedBy: int("invitedBy").notNull(),
+    role: mysqlEnum("role", ["manager", "engineer", "reviewer", "viewer"])
+      .default("engineer")
+      .notNull(),
+    status: mysqlEnum("status", [
+      "pending",
+      "accepted",
+      "declined",
+      "cancelled",
+    ])
+      .default("pending")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    respondedAt: timestamp("respondedAt"),
+  }
+);

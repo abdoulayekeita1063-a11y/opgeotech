@@ -103,6 +103,62 @@ export const collaborationRouter = router({
       return db.listTeamMembers(input.teamId);
     }),
 
+  searchUsers: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        query: z.string().trim().min(2).max(120),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can invite members.",
+        });
+      return db.searchUsers(input.query, ctx.user.id);
+    }),
+
+  inviteMember: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        invitedUserId: z.number().int().positive(),
+        role: z.enum(["manager", "engineer", "reviewer", "viewer"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can invite members.",
+        });
+      return {
+        id: await db.createInvitation({ ...input, invitedBy: ctx.user.id }),
+      };
+    }),
+
+  invitations: protectedProcedure.query(({ ctx }) =>
+    db.listInvitationsForUser(ctx.user.id)
+  ),
+
+  respondToInvitation: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), accept: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const updated = await db.respondToInvitation({
+        ...input,
+        userId: ctx.user.id,
+      });
+      if (!updated)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invitation is no longer available.",
+        });
+      return { success: true } as const;
+    }),
+
   createWorkItem: protectedProcedure
     .input(
       z.object({

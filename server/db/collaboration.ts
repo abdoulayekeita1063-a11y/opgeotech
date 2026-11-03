@@ -1,7 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like, ne, or } from "drizzle-orm";
 import {
   collaborationAuditEvents,
   collaborationComments,
+  collaborationInvitations,
   collaborationNotifications,
   collaborationProjects,
   collaborationSyncOperations,
@@ -76,6 +77,104 @@ export async function listTeamMembers(teamId: number) {
     .from(collaborationTeamMembers)
     .innerJoin(users, eq(users.id, collaborationTeamMembers.userId))
     .where(eq(collaborationTeamMembers.teamId, teamId));
+}
+
+export async function searchUsers(query: string, excludeUserId: number) {
+  const db = await requireDb();
+  const pattern = `%${query.trim()}%`;
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(users)
+    .where(
+      and(
+        or(like(users.name, pattern), like(users.email, pattern)),
+        ne(users.id, excludeUserId)
+      )
+    )
+    .limit(20);
+}
+
+export async function createInvitation(input: {
+  teamId: number;
+  invitedUserId: number;
+  invitedBy: number;
+  role: "manager" | "engineer" | "reviewer" | "viewer";
+}) {
+  const db = await requireDb();
+  const [result] = await db.insert(collaborationInvitations).values(input);
+  await db.insert(collaborationNotifications).values({
+    teamId: input.teamId,
+    userId: input.invitedUserId,
+    type: "invitation",
+    message: "You have been invited to join a geotechnical team.",
+  });
+  return Number(result.insertId);
+}
+
+export async function listInvitationsForUser(userId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      invitation: collaborationInvitations,
+      team: collaborationTeams,
+      inviter: users,
+    })
+    .from(collaborationInvitations)
+    .innerJoin(
+      collaborationTeams,
+      eq(collaborationTeams.id, collaborationInvitations.teamId)
+    )
+    .innerJoin(users, eq(users.id, collaborationInvitations.invitedBy))
+    .where(
+      and(
+        eq(collaborationInvitations.invitedUserId, userId),
+        eq(collaborationInvitations.status, "pending")
+      )
+    )
+    .orderBy(desc(collaborationInvitations.createdAt));
+}
+
+export async function respondToInvitation(input: {
+  id: number;
+  userId: number;
+  accept: boolean;
+}) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const rows = await tx
+      .select()
+      .from(collaborationInvitations)
+      .where(
+        and(
+          eq(collaborationInvitations.id, input.id),
+          eq(collaborationInvitations.invitedUserId, input.userId),
+          eq(collaborationInvitations.status, "pending")
+        )
+      )
+      .limit(1);
+    const invitation = rows[0];
+    if (!invitation) return false;
+    await tx
+      .update(collaborationInvitations)
+      .set({
+        status: input.accept ? "accepted" : "declined",
+        respondedAt: new Date(),
+      })
+      .where(eq(collaborationInvitations.id, input.id));
+    if (input.accept) {
+      await tx.insert(collaborationTeamMembers).values({
+        teamId: invitation.teamId,
+        userId: input.userId,
+        role: invitation.role,
+      });
+    }
+    return true;
+  });
 }
 
 export async function createProject(values: {
