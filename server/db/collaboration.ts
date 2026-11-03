@@ -9,6 +9,7 @@ import {
   collaborationTeams,
   collaborationVersions,
   collaborationWorkItems,
+  users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 
@@ -71,8 +72,9 @@ export async function addTeamMember(values: {
 export async function listTeamMembers(teamId: number) {
   const db = await requireDb();
   return db
-    .select()
+    .select({ membership: collaborationTeamMembers, user: users })
     .from(collaborationTeamMembers)
+    .innerJoin(users, eq(users.id, collaborationTeamMembers.userId))
     .where(eq(collaborationTeamMembers.teamId, teamId));
 }
 
@@ -335,8 +337,9 @@ export async function addComment(input: {
 export async function listComments(teamId: number, workItemId: number) {
   const db = await requireDb();
   return db
-    .select()
+    .select({ comment: collaborationComments, user: users })
     .from(collaborationComments)
+    .innerJoin(users, eq(users.id, collaborationComments.userId))
     .where(
       and(
         eq(collaborationComments.teamId, teamId),

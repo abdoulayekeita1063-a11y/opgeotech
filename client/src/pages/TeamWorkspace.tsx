@@ -71,8 +71,15 @@ export default function TeamWorkspace() {
     { teamId: teamId ?? 0 },
     { enabled: teamId !== null }
   );
-  const notifications = trpc.collaboration.notifications.useQuery();
+  const notifications = trpc.collaboration.notifications.useQuery(undefined, {
+    refetchInterval: 10000,
+    refetchIntervalInBackground: true,
+  });
   const comments = trpc.collaboration.comments.useQuery(
+    { teamId: teamId ?? 0, workItemId: selectedWorkItemId ?? 0 },
+    { enabled: teamId !== null && selectedWorkItemId !== null }
+  );
+  const versions = trpc.collaboration.history.useQuery(
     { teamId: teamId ?? 0, workItemId: selectedWorkItemId ?? 0 },
     { enabled: teamId !== null && selectedWorkItemId !== null }
   );
@@ -126,9 +133,30 @@ export default function TeamWorkspace() {
     trpc.collaboration.markNotificationRead.useMutation({
       onSuccess: () => void utils.collaboration.notifications.invalidate(),
     });
+  const restoreVersion = trpc.collaboration.updateWorkItem.useMutation({
+    onSuccess: () => {
+      if (teamId !== null)
+        void utils.collaboration.listWorkItems.invalidate({
+          teamId,
+          projectId: projectId ?? undefined,
+        });
+      toast.success("Version restored as a new version");
+    },
+    onError: error => toast.error(error.message),
+  });
 
   const selectedTeam = teams.data?.find(item => item.team.id === teamId)?.team;
   const selectedProject = projects.data?.find(item => item.id === projectId);
+  const selectedWorkItem = work.data?.find(
+    item => item.id === selectedWorkItemId
+  );
+  const memberById = useMemo(
+    () =>
+      new Map(
+        (members.data ?? []).map(member => [member.user.id, member.user])
+      ),
+    [members.data]
+  );
   const filteredWork = useMemo(
     () =>
       (work.data ?? []).filter(item => {
@@ -355,6 +383,38 @@ export default function TeamWorkspace() {
                 value={selectedProject?.name ?? "All projects"}
               />
             </div>
+            {teamId !== null && (
+              <Card className="rounded-none border-foreground shadow-none">
+                <CardHeader className="border-b border-foreground px-4 py-4">
+                  <CardTitle className="text-sm uppercase tracking-widest">
+                    Team members
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3 px-4 py-4">
+                  {(members.data ?? []).map(member => (
+                    <div
+                      key={member.user.id}
+                      className="flex items-center gap-2 border border-border px-3 py-2"
+                    >
+                      <UserAvatar
+                        name={member.user.name}
+                        email={member.user.email}
+                        avatarUrl={member.user.avatarUrl}
+                      />
+                      <div>
+                        <p className="text-sm font-bold">
+                          {member.user.name || "Unnamed user"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {member.user.email || `User ${member.user.id}`} ·{" "}
+                          {member.membership.role}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="rounded-none border-foreground shadow-none">
               <CardHeader className="gap-4 border-b border-foreground px-4 py-4">
@@ -426,7 +486,10 @@ export default function TeamWorkspace() {
                           <td className="px-4 py-4">
                             <p className="font-bold">{item.title}</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              #{item.id} · Updated by user {item.updatedBy}
+                              #{item.id} · Updated by{" "}
+                              {memberById.get(item.updatedBy)?.name ||
+                                memberById.get(item.updatedBy)?.email ||
+                                `User ${item.updatedBy}`}
                             </p>
                           </td>
                           <td className="px-4 py-4 font-mono text-xs uppercase">
@@ -460,10 +523,12 @@ export default function TeamWorkspace() {
                               <option value="">Unassigned</option>
                               {(members.data ?? []).map(member => (
                                 <option
-                                  key={member.userId}
-                                  value={member.userId}
+                                  key={member.user.id}
+                                  value={member.user.id}
                                 >
-                                  User {member.userId}
+                                  {member.user.name ||
+                                    member.user.email ||
+                                    `User ${member.user.id}`}
                                 </option>
                               ))}
                             </select>
@@ -523,13 +588,15 @@ export default function TeamWorkspace() {
                 <CardContent className="space-y-3 px-4 py-4">
                   {(comments.data ?? []).map(comment => (
                     <div
-                      key={comment.id}
+                      key={comment.comment.id}
                       className="border-l-2 border-primary bg-muted/30 px-3 py-2 text-sm"
                     >
-                      <p>{comment.body}</p>
+                      <p>{comment.comment.body}</p>
                       <p className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-                        User {comment.userId} ·{" "}
-                        {new Date(comment.createdAt).toLocaleString()}
+                        {comment.user.name ||
+                          comment.user.email ||
+                          `User ${comment.user.id}`}{" "}
+                        · {new Date(comment.comment.createdAt).toLocaleString()}
                       </p>
                     </div>
                   ))}
@@ -566,6 +633,75 @@ export default function TeamWorkspace() {
                 </CardContent>
               </Card>
             )}
+            {selectedWorkItemId !== null &&
+              teamId !== null &&
+              selectedWorkItem && (
+                <Card className="rounded-none border-amber-600 shadow-none">
+                  <CardHeader className="border-b border-amber-600 bg-amber-50 px-4 py-4">
+                    <CardTitle className="text-sm uppercase tracking-widest">
+                      Conflict resolution · #{selectedWorkItemId}
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-amber-900">
+                      Choose a saved version to restore it as a new version. The
+                      current version is never deleted.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-2 px-4 py-4">
+                    {(versions.data ?? []).map(version => (
+                      <div
+                        key={version.id}
+                        className="flex flex-col justify-between gap-3 border border-border p-3 sm:flex-row sm:items-center"
+                      >
+                        <div>
+                          <p className="font-bold">
+                            Version {version.versionNumber}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Edited by{" "}
+                            {memberById.get(version.userId)?.name ||
+                              memberById.get(version.userId)?.email ||
+                              `User ${version.userId}`}{" "}
+                            · {new Date(version.createdAt).toLocaleString()} ·{" "}
+                            {version.changeSummary || "No change summary"}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-none border-foreground"
+                          disabled={
+                            restoreVersion.isPending ||
+                            version.versionNumber ===
+                              selectedWorkItem.versionNumber
+                          }
+                          onClick={() =>
+                            restoreVersion.mutate({
+                              teamId,
+                              id: selectedWorkItem.id,
+                              expectedVersion: selectedWorkItem.versionNumber,
+                              payload: version.payload as Record<
+                                string,
+                                unknown
+                              >,
+                              changeSummary: `Restored version ${version.versionNumber}`,
+                            })
+                          }
+                        >
+                          {version.versionNumber ===
+                          selectedWorkItem.versionNumber
+                            ? "Current version"
+                            : "Restore this version"}
+                        </Button>
+                      </div>
+                    ))}
+                    {!versions.data?.length && (
+                      <p className="text-sm text-muted-foreground">
+                        No version history available.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             {!!notifications.data?.length && (
               <Card className="rounded-none border-foreground shadow-none">
                 <CardHeader className="border-b border-foreground px-4 py-4">
@@ -623,5 +759,33 @@ function Metric({
       </div>
       <p className="mt-3 truncate text-xl font-black">{value}</p>
     </div>
+  );
+}
+
+function UserAvatar({
+  name,
+  email,
+  avatarUrl,
+}: {
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+}) {
+  const initials = (name || email || "U")
+    .split(/\s+/)
+    .map(part => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return avatarUrl ? (
+    <img
+      src={avatarUrl}
+      alt={name || "User avatar"}
+      className="h-9 w-9 rounded-full border border-foreground object-cover"
+    />
+  ) : (
+    <span className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground bg-primary text-xs font-black text-primary-foreground">
+      {initials}
+    </span>
   );
 }
