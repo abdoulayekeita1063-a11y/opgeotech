@@ -23,9 +23,12 @@ import Drilling from "./pages/Drilling";
 import LoggingData from "./pages/LoggingData";
 import AISlopeAnalysis from "./pages/AISlopeAnalysis";
 import Piezometer from "./pages/Piezometer";
+import TeamWorkspace from "./pages/TeamWorkspace";
 
 function LegacyRedirect({ to }: { to: string }) {
-  useEffect(() => { window.location.replace(to); }, [to]);
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
   return null;
 }
 
@@ -38,20 +41,36 @@ function Router() {
         <Route path={"/stability"} component={SlopeStability} />
         <Route path={"/ai-slope-analysis"} component={AISlopeAnalysis} />
         <Route path={"/classification"} component={RockClassification} />
-        <Route path={"/inspections"} component={() => <LegacyRedirect to="/reporting#inspections" />} />
+        <Route
+          path={"/inspections"}
+          component={() => <LegacyRedirect to="/reporting#inspections" />}
+        />
         <Route path={"/blast"} component={PostBlast} />
         <Route path={"/compliance"} component={DesignCompliance} />
         <Route path={"/drilling"} component={Drilling} />
         <Route path={"/drilling/planning"} component={Drillhole} />
         <Route path={"/drilling/logging"} component={LoggingData} />
-        <Route path={"/drillhole"} component={() => <LegacyRedirect to="/drilling/planning" />} />
+        <Route
+          path={"/drillhole"}
+          component={() => <LegacyRedirect to="/drilling/planning" />}
+        />
         <Route path={"/mapping"} component={StructuralMapping} />
         <Route path={"/kinematics"} component={KinematicAnalysis} />
-        <Route path={"/wall-risk-classification"} component={WallRiskClassification} />
+        <Route
+          path={"/wall-risk-classification"}
+          component={WallRiskClassification}
+        />
         <Route path={"/monitoring"} component={Monitoring} />
         <Route path={"/piezometer"} component={Piezometer} />
-        <Route path={"/radar-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
-        <Route path={"/radar-failure-report"} component={() => <LegacyRedirect to="/monitoring#report" />} />
+        <Route path={"/team-workspace"} component={TeamWorkspace} />
+        <Route
+          path={"/radar-report"}
+          component={() => <LegacyRedirect to="/monitoring#report" />}
+        />
+        <Route
+          path={"/radar-failure-report"}
+          component={() => <LegacyRedirect to="/monitoring#report" />}
+        />
         <Route path={"/archive"} component={Archive} />
         <Route path={"/download"} component={Download} />
         <Route path={"/404"} component={NotFound} />

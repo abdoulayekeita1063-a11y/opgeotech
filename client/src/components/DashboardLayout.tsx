@@ -39,10 +39,11 @@ import {
   ScanLine,
   Triangle,
   Waves,
+  UsersRound,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 
 const menuItems = [
@@ -56,9 +57,14 @@ const menuItems = [
   { icon: Drill, label: "Drilling", path: "/drilling" },
   { icon: Compass, label: "Structural Mapping", path: "/mapping" },
   { icon: Triangle, label: "Kinematic Analysis", path: "/kinematics" },
-  { icon: ShieldAlert, label: "Wall Risk Classification", path: "/wall-risk-classification" },
+  {
+    icon: ShieldAlert,
+    label: "Wall Risk Classification",
+    path: "/wall-risk-classification",
+  },
   { icon: Activity, label: "Monitoring", path: "/monitoring" },
   { icon: Waves, label: "Piezometer", path: "/piezometer" },
+  { icon: UsersRound, label: "Team Workspace", path: "/team-workspace" },
   { icon: Archive, label: "Archive", path: "/archive" },
   { icon: Download, label: "Download App", path: "/download" },
 ];
@@ -84,7 +90,7 @@ export default function DashboardLayout({
   }, [sidebarWidth]);
 
   if (loading) {
-    return <DashboardLayoutSkeleton />
+    return <DashboardLayoutSkeleton />;
   }
 
   if (!user) {
@@ -93,7 +99,11 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <div className="flex items-center gap-3">
-              <img src="/favicon.png" alt="OPGeotech logo" className="h-9 w-9" />
+              <img
+                src="/favicon.png"
+                alt="OPGeotech logo"
+                className="h-9 w-9"
+              />
               <h1 className="text-2xl font-extrabold tracking-tight text-center uppercase">
                 OPGeotech
               </h1>
@@ -145,7 +155,9 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => location === item.path || location.startsWith(`${item.path}/`));
+  const activeMenuItem = menuItems.find(
+    item => location === item.path || location.startsWith(`${item.path}/`)
+  );
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -215,7 +227,9 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
               {menuItems.map(item => {
-                const isActive = location === item.path || location.startsWith(`${item.path}/`);
+                const isActive =
+                  location === item.path ||
+                  location.startsWith(`${item.path}/`);
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
