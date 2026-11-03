@@ -31,6 +31,25 @@ export default function SaveToTeamWorkspace({
 
   function saveWork() {
     if (teamId === null || projectId === null) return;
+    const fields = Array.from(
+      document.querySelectorAll<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >("main input, main select, main textarea")
+    ).reduce<Record<string, string | boolean>>((snapshot, field, index) => {
+      if (field.type === "file") return snapshot;
+      const baseKey =
+        field.name ||
+        field.id ||
+        field.getAttribute("aria-label") ||
+        `field_${index + 1}`;
+      const key =
+        snapshot[baseKey] === undefined ? baseKey : `${baseKey}_${index + 1}`;
+      snapshot[key] =
+        field instanceof HTMLInputElement && field.type === "checkbox"
+          ? field.checked
+          : field.value;
+      return snapshot;
+    }, {});
     save.mutate({
       teamId,
       projectId,
@@ -41,7 +60,8 @@ export default function SaveToTeamWorkspace({
         module,
         route: window.location.pathname,
         savedAt: new Date().toISOString(),
-        note: "Shared workspace snapshot created from the module header.",
+        fields,
+        note: "Shared workspace snapshot captured from the visible module form.",
       },
     });
   }

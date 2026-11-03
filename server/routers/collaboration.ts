@@ -96,6 +96,13 @@ export const collaborationRouter = router({
       return db.listProjectsForTeam(input.teamId);
     }),
 
+  listMembers: protectedProcedure
+    .input(z.object({ teamId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await requireMembership(input.teamId, ctx.user.id);
+      return db.listTeamMembers(input.teamId);
+    }),
+
   createWorkItem: protectedProcedure
     .input(
       z.object({
@@ -129,6 +136,65 @@ export const collaborationRouter = router({
     .query(async ({ ctx, input }) => {
       await requireMembership(input.teamId, ctx.user.id);
       return db.listWorkItems(input.teamId, input.projectId);
+    }),
+
+  assignWorkItem: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        workItemId: z.number().int().positive(),
+        assignedTo: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can assign work.",
+        });
+      const updated = await db.assignWorkItem({
+        id: input.workItemId,
+        teamId: input.teamId,
+        assignedTo: input.assignedTo,
+        userId: ctx.user.id,
+      });
+      if (!updated)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Work item not found.",
+        });
+      return { success: true } as const;
+    }),
+
+  addComment: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        workItemId: z.number().int().positive(),
+        body: z.string().trim().min(1).max(5000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canEdit(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Read-only users cannot comment.",
+        });
+      return { id: await db.addComment({ ...input, userId: ctx.user.id }) };
+    }),
+
+  comments: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        workItemId: z.number().int().positive(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await requireMembership(input.teamId, ctx.user.id);
+      return db.listComments(input.teamId, input.workItemId);
     }),
 
   updateWorkItem: protectedProcedure
@@ -257,6 +323,17 @@ export const collaborationRouter = router({
         input.status,
         input.errorMessage
       );
+      return { success: true } as const;
+    }),
+
+  notifications: protectedProcedure.query(({ ctx }) =>
+    db.listNotifications(ctx.user.id)
+  ),
+
+  markNotificationRead: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.markNotificationRead(input.id, ctx.user.id);
       return { success: true } as const;
     }),
 });

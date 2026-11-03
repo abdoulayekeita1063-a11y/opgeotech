@@ -13,6 +13,9 @@ import {
   ShieldCheck,
   GitBranch,
   Loader2,
+  MessageSquare,
+  Bell,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +49,10 @@ export default function TeamWorkspace() {
   const [projectName, setProjectName] = useState("");
   const [showTeamForm, setShowTeamForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [selectedWorkItemId, setSelectedWorkItemId] = useState<number | null>(
+    null
+  );
+  const [commentBody, setCommentBody] = useState("");
 
   const teams = trpc.collaboration.listMyTeams.useQuery();
   const projects = trpc.collaboration.listProjects.useQuery(
@@ -59,6 +66,15 @@ export default function TeamWorkspace() {
   const pending = trpc.collaboration.pendingOfflineOperations.useQuery(
     { teamId: teamId ?? 0 },
     { enabled: teamId !== null }
+  );
+  const members = trpc.collaboration.listMembers.useQuery(
+    { teamId: teamId ?? 0 },
+    { enabled: teamId !== null }
+  );
+  const notifications = trpc.collaboration.notifications.useQuery();
+  const comments = trpc.collaboration.comments.useQuery(
+    { teamId: teamId ?? 0, workItemId: selectedWorkItemId ?? 0 },
+    { enabled: teamId !== null && selectedWorkItemId !== null }
   );
 
   const createTeam = trpc.collaboration.createTeam.useMutation({
@@ -82,6 +98,34 @@ export default function TeamWorkspace() {
     },
     onError: error => toast.error(error.message),
   });
+  const assign = trpc.collaboration.assignWorkItem.useMutation({
+    onSuccess: () => {
+      if (teamId !== null)
+        void utils.collaboration.listWorkItems.invalidate({
+          teamId,
+          projectId: projectId ?? undefined,
+        });
+      toast.success("Work item assigned");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const addComment = trpc.collaboration.addComment.useMutation({
+    onSuccess: () => {
+      setCommentBody("");
+      if (teamId !== null && selectedWorkItemId !== null)
+        void utils.collaboration.comments.invalidate({
+          teamId,
+          workItemId: selectedWorkItemId,
+        });
+      void utils.collaboration.notifications.invalidate();
+      toast.success("Comment added");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const markNotificationRead =
+    trpc.collaboration.markNotificationRead.useMutation({
+      onSuccess: () => void utils.collaboration.notifications.invalidate(),
+    });
 
   const selectedTeam = teams.data?.find(item => item.team.id === teamId)?.team;
   const selectedProject = projects.data?.find(item => item.id === projectId);
@@ -105,6 +149,21 @@ export default function TeamWorkspace() {
   function selectTeam(id: number) {
     setTeamId(id);
     setProjectId(null);
+  }
+
+  function continueWork(item: NonNullable<typeof work.data>[number]) {
+    const payload = item.payload as { route?: string };
+    localStorage.setItem(
+      "opgeotech:resume-work-item",
+      JSON.stringify({
+        id: item.id,
+        title: item.title,
+        module: item.module,
+        payload: item.payload,
+      })
+    );
+    toast.success("Shared snapshot loaded. Opening the source module.");
+    window.location.href = payload.route || "/";
   }
 
   return (
@@ -353,7 +412,9 @@ export default function TeamWorkspace() {
                         <th className="px-4 py-3">Module</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3">Version</th>
+                        <th className="px-4 py-3">Assigned to</th>
                         <th className="px-4 py-3">Last edited</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -381,15 +442,63 @@ export default function TeamWorkspace() {
                           <td className="px-4 py-4 font-mono">
                             v{item.versionNumber}
                           </td>
+                          <td className="px-4 py-4">
+                            <select
+                              className="border border-border bg-background px-2 py-1 text-xs"
+                              value={item.assignedTo ?? ""}
+                              onChange={event =>
+                                assign.mutate({
+                                  teamId: teamId!,
+                                  workItemId: item.id,
+                                  assignedTo: event.target.value
+                                    ? Number(event.target.value)
+                                    : null,
+                                })
+                              }
+                              disabled={teamId === null || assign.isPending}
+                            >
+                              <option value="">Unassigned</option>
+                              {(members.data ?? []).map(member => (
+                                <option
+                                  key={member.userId}
+                                  value={member.userId}
+                                >
+                                  User {member.userId}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
                           <td className="px-4 py-4 text-xs text-muted-foreground">
                             {new Date(item.updatedAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-none border-foreground"
+                                onClick={() => continueWork(item)}
+                              >
+                                <ExternalLink className="mr-1 h-3.5 w-3.5" />{" "}
+                                Continue
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-none border-foreground"
+                                onClick={() => setSelectedWorkItemId(item.id)}
+                              >
+                                <MessageSquare className="mr-1 h-3.5 w-3.5" />{" "}
+                                Comments
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
                       {!filteredWork.length && (
                         <tr>
                           <td
-                            colSpan={5}
+                            colSpan={7}
                             className="px-4 py-12 text-center text-sm text-muted-foreground"
                           >
                             {teamId
@@ -403,6 +512,91 @@ export default function TeamWorkspace() {
                 </div>
               </CardContent>
             </Card>
+            {selectedWorkItemId !== null && teamId !== null && (
+              <Card className="rounded-none border-foreground shadow-none">
+                <CardHeader className="border-b border-foreground px-4 py-4">
+                  <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-widest">
+                    <MessageSquare className="h-4 w-4 text-primary" /> Comments
+                    · Work item #{selectedWorkItemId}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 px-4 py-4">
+                  {(comments.data ?? []).map(comment => (
+                    <div
+                      key={comment.id}
+                      className="border-l-2 border-primary bg-muted/30 px-3 py-2 text-sm"
+                    >
+                      <p>{comment.body}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                        User {comment.userId} ·{" "}
+                        {new Date(comment.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                  {!comments.data?.length && (
+                    <p className="text-sm text-muted-foreground">
+                      No comments yet.
+                    </p>
+                  )}
+                  <form
+                    className="flex gap-2"
+                    onSubmit={event => {
+                      event.preventDefault();
+                      if (commentBody.trim())
+                        addComment.mutate({
+                          teamId,
+                          workItemId: selectedWorkItemId,
+                          body: commentBody.trim(),
+                        });
+                    }}
+                  >
+                    <input
+                      className="min-w-0 flex-1 border border-foreground bg-background px-3 py-2 text-sm"
+                      placeholder="Write a comment for the team…"
+                      value={commentBody}
+                      onChange={event => setCommentBody(event.target.value)}
+                    />
+                    <Button
+                      className="rounded-none"
+                      disabled={addComment.isPending}
+                    >
+                      Comment
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+            {!!notifications.data?.length && (
+              <Card className="rounded-none border-foreground shadow-none">
+                <CardHeader className="border-b border-foreground px-4 py-4">
+                  <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-widest">
+                    <Bell className="h-4 w-4 text-primary" /> Notifications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="divide-y divide-border px-4 py-0">
+                  {notifications.data.slice(0, 8).map(notification => (
+                    <div
+                      key={notification.id}
+                      className={`flex items-center justify-between gap-4 py-3 text-sm ${notification.readAt ? "opacity-60" : "font-semibold"}`}
+                    >
+                      <span>{notification.message}</span>
+                      {!notification.readAt && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-none border-foreground"
+                          onClick={() =>
+                            markNotificationRead.mutate({ id: notification.id })
+                          }
+                        >
+                          Mark read
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </section>
       </div>

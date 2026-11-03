@@ -510,3 +510,26 @@ export const collaborationSyncOperations = mysqlTable(
     appliedAt: timestamp("appliedAt"),
   }
 );
+
+export const collaborationComments = mysqlTable("collaboration_comments", {
+  id: int("id").autoincrement().primaryKey(),
+  teamId: int("teamId").notNull(),
+  workItemId: int("workItemId").notNull(),
+  userId: int("userId").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const collaborationNotifications = mysqlTable(
+  "collaboration_notifications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teamId: int("teamId").notNull(),
+    userId: int("userId").notNull(),
+    workItemId: int("workItemId"),
+    type: varchar("type", { length: 64 }).notNull(),
+    message: varchar("message", { length: 500 }).notNull(),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  }
+);

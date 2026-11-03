@@ -1,6 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import {
   collaborationAuditEvents,
+  collaborationComments,
+  collaborationNotifications,
   collaborationProjects,
   collaborationSyncOperations,
   collaborationTeamMembers,
@@ -64,6 +66,14 @@ export async function addTeamMember(values: {
 }) {
   const db = await requireDb();
   await db.insert(collaborationTeamMembers).values(values);
+}
+
+export async function listTeamMembers(teamId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(collaborationTeamMembers)
+    .where(eq(collaborationTeamMembers.teamId, teamId));
 }
 
 export async function createProject(values: {
@@ -151,6 +161,41 @@ export async function getWorkItem(id: number, teamId: number) {
     )
     .limit(1);
   return rows[0];
+}
+
+export async function assignWorkItem(input: {
+  id: number;
+  teamId: number;
+  assignedTo: number | null;
+  userId: number;
+}) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(collaborationWorkItems)
+    .where(
+      and(
+        eq(collaborationWorkItems.id, input.id),
+        eq(collaborationWorkItems.teamId, input.teamId)
+      )
+    )
+    .limit(1);
+  const item = rows[0];
+  if (!item) return false;
+  await db
+    .update(collaborationWorkItems)
+    .set({ assignedTo: input.assignedTo, updatedBy: input.userId })
+    .where(eq(collaborationWorkItems.id, input.id));
+  if (input.assignedTo && input.assignedTo !== input.userId) {
+    await db.insert(collaborationNotifications).values({
+      teamId: input.teamId,
+      userId: input.assignedTo,
+      workItemId: input.id,
+      type: "assignment",
+      message: `You were assigned work item: ${item.title}`,
+    });
+  }
+  return true;
 }
 
 export async function updateWorkItemOptimistic(input: {
@@ -256,6 +301,71 @@ export async function listAuditEvents(teamId: number, workItemId?: number) {
     .from(collaborationAuditEvents)
     .where(where)
     .orderBy(desc(collaborationAuditEvents.createdAt));
+}
+
+export async function addComment(input: {
+  teamId: number;
+  workItemId: number;
+  userId: number;
+  body: string;
+}) {
+  const db = await requireDb();
+  const [result] = await db.insert(collaborationComments).values(input);
+  const members = await db
+    .select({ userId: collaborationTeamMembers.userId })
+    .from(collaborationTeamMembers)
+    .where(eq(collaborationTeamMembers.teamId, input.teamId));
+  const recipients = members
+    .map(member => member.userId)
+    .filter(userId => userId !== input.userId);
+  if (recipients.length) {
+    await db.insert(collaborationNotifications).values(
+      recipients.map(userId => ({
+        teamId: input.teamId,
+        userId,
+        workItemId: input.workItemId,
+        type: "comment",
+        message: "A teammate added a comment to shared work.",
+      }))
+    );
+  }
+  return Number(result.insertId);
+}
+
+export async function listComments(teamId: number, workItemId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(collaborationComments)
+    .where(
+      and(
+        eq(collaborationComments.teamId, teamId),
+        eq(collaborationComments.workItemId, workItemId)
+      )
+    )
+    .orderBy(collaborationComments.createdAt);
+}
+
+export async function listNotifications(userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(collaborationNotifications)
+    .where(eq(collaborationNotifications.userId, userId))
+    .orderBy(desc(collaborationNotifications.createdAt));
+}
+
+export async function markNotificationRead(id: number, userId: number) {
+  const db = await requireDb();
+  await db
+    .update(collaborationNotifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(collaborationNotifications.id, id),
+        eq(collaborationNotifications.userId, userId)
+      )
+    );
 }
 
 export async function enqueueSyncOperation(
