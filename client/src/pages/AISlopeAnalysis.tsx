@@ -323,6 +323,7 @@ export default function AISlopeAnalysis() {
       <ModuleHeader
         index="02.01"
         title="AI Slope Analysis"
+        module="AI Slope Analysis"
         description="Preliminary photo-based estimation of open-pit slope geometry using crest/toe detection, segmentation and image geometry."
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.7fr)]">

@@ -10,7 +10,11 @@ import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { exportRecordAsPdf, markdownToHtml } from "@/lib/exportPdf";
 
-export default function DailyInspections({ embedded = false }: { embedded?: boolean }) {
+export default function DailyInspections({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const [form, setForm] = useState({
     title: "",
     inspectionDate: new Date().toISOString().slice(0, 10),
@@ -40,9 +44,12 @@ export default function DailyInspections({ embedded = false }: { embedded?: bool
 
   const submit = () => {
     if (!form.title.trim()) return toast.error("Please provide a report title");
-    if (!form.zones.trim()) return toast.error("Please list the inspected zones");
-    if (!form.weather.trim()) return toast.error("Please describe weather conditions");
-    if (!form.observations.trim()) return toast.error("Please enter field observations");
+    if (!form.zones.trim())
+      return toast.error("Please list the inspected zones");
+    if (!form.weather.trim())
+      return toast.error("Please describe weather conditions");
+    if (!form.observations.trim())
+      return toast.error("Please enter field observations");
     create.mutate({
       title: form.title.trim(),
       inspectionDate: form.inspectionDate,
@@ -57,49 +64,97 @@ export default function DailyInspections({ embedded = false }: { embedded?: bool
 
   return (
     <div className={embedded ? "" : "max-w-6xl mx-auto px-4 py-8"}>
-      {!embedded && <ModuleHeader
-        index="03"
-        title="Daily Inspections"
-        description="Enter field data — observations, anomalies, weather, inspected zones — to produce a structured, professionally worded daily geotechnical inspection report."
-      />}
+      {!embedded && (
+        <ModuleHeader
+          index="03"
+          title="Daily Inspections"
+          module="Daily Inspections"
+          description="Enter field data — observations, anomalies, weather, inspected zones — to produce a structured, professionally worded daily geotechnical inspection report."
+        />
+      )}
       <div className="grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-5 space-y-4">
           <SectionLabel>Field Data</SectionLabel>
           <div>
             <Label className="swiss-label mb-1.5 block">Report title *</Label>
-            <Input value={form.title} onChange={set("title")} placeholder="e.g. Daily inspection — East pit" />
+            <Input
+              value={form.title}
+              onChange={set("title")}
+              placeholder="e.g. Daily inspection — East pit"
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="swiss-label mb-1.5 block">Date *</Label>
-              <Input type="date" value={form.inspectionDate} onChange={set("inspectionDate")} />
+              <Input
+                type="date"
+                value={form.inspectionDate}
+                onChange={set("inspectionDate")}
+              />
             </div>
             <div>
               <Label className="swiss-label mb-1.5 block">Inspector</Label>
-              <Input value={form.inspector} onChange={set("inspector")} placeholder="Name" />
+              <Input
+                value={form.inspector}
+                onChange={set("inspector")}
+                placeholder="Name"
+              />
             </div>
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">Inspected zones *</Label>
-            <Input value={form.zones} onChange={set("zones")} placeholder="e.g. East wall benches 1230–1260, ramp 4" />
+            <Label className="swiss-label mb-1.5 block">
+              Inspected zones *
+            </Label>
+            <Input
+              value={form.zones}
+              onChange={set("zones")}
+              placeholder="e.g. East wall benches 1230–1260, ramp 4"
+            />
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">Weather conditions *</Label>
-            <Input value={form.weather} onChange={set("weather")} placeholder="e.g. Light rain overnight, 12 °C, overcast" />
+            <Label className="swiss-label mb-1.5 block">
+              Weather conditions *
+            </Label>
+            <Input
+              value={form.weather}
+              onChange={set("weather")}
+              placeholder="e.g. Light rain overnight, 12 °C, overcast"
+            />
           </div>
           <div>
             <Label className="swiss-label mb-1.5 block">Observations *</Label>
-            <Textarea rows={5} value={form.observations} onChange={set("observations")} placeholder="Raw field notes: face conditions, seepage, cracks, rockfall, berm state…" />
+            <Textarea
+              rows={5}
+              value={form.observations}
+              onChange={set("observations")}
+              placeholder="Raw field notes: face conditions, seepage, cracks, rockfall, berm state…"
+            />
           </div>
           <div>
             <Label className="swiss-label mb-1.5 block">Anomalies</Label>
-            <Textarea rows={3} value={form.anomalies} onChange={set("anomalies")} placeholder="e.g. New tension crack 15 m behind crest of bench 1250…" />
+            <Textarea
+              rows={3}
+              value={form.anomalies}
+              onChange={set("anomalies")}
+              placeholder="e.g. New tension crack 15 m behind crest of bench 1250…"
+            />
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">Recommended actions</Label>
-            <Textarea rows={3} value={form.actions} onChange={set("actions")} placeholder="e.g. Install prisms, restrict access below bench 1250…" />
+            <Label className="swiss-label mb-1.5 block">
+              Recommended actions
+            </Label>
+            <Textarea
+              rows={3}
+              value={form.actions}
+              onChange={set("actions")}
+              placeholder="e.g. Install prisms, restrict access below bench 1250…"
+            />
           </div>
-          <Button className="w-full font-bold uppercase tracking-wider" disabled={create.isPending} onClick={submit}>
+          <Button
+            className="w-full font-bold uppercase tracking-wider"
+            disabled={create.isPending}
+            onClick={submit}
+          >
             {create.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> Generating report…
@@ -117,7 +172,12 @@ export default function DailyInspections({ embedded = false }: { embedded?: bool
                 variant="outline"
                 size="sm"
                 className="font-bold uppercase tracking-wider text-xs"
-                onClick={() => exportRecordAsPdf(form.title || "Inspection report", markdownToHtml(report))}
+                onClick={() =>
+                  exportRecordAsPdf(
+                    form.title || "Inspection report",
+                    markdownToHtml(report)
+                  )
+                }
               >
                 <FileDown className="h-3.5 w-3.5" /> Export PDF
               </Button>

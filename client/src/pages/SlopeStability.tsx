@@ -84,6 +84,7 @@ export default function SlopeStability() {
       <ModuleHeader
         index="02"
         title="Slope Stability"
+        module="Slope Stability"
         description="Limit-equilibrium factor of safety for single or multi-bench slopes using Fellenius and simplified Bishop methods, with per-bench Mohr–Coulomb or Hoek–Brown strength."
       />
       <div className="grid grid-cols-12 gap-8">

@@ -1199,6 +1199,7 @@ export default function LoggingData() {
       <ModuleHeader
         index="06.02"
         title="Logging Data"
+        module="Logging Data"
         description="Log rock mass, soil and discontinuity data by depth interval using the supplied HOLEID workbook structure."
       />
       <div className="flex flex-wrap gap-2 mb-6">

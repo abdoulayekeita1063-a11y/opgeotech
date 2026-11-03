@@ -1,6 +1,11 @@
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { Button } from "@/components/ui/button";
-import { Download as DownloadIcon, Monitor, Smartphone, Globe } from "lucide-react";
+import {
+  Download as DownloadIcon,
+  Monitor,
+  Smartphone,
+  Globe,
+} from "lucide-react";
 
 const DOWNLOAD_URL = "/manus-storage/OPGeotech-Setup_77674499.exe?download=1";
 
@@ -10,6 +15,7 @@ export default function Download() {
       <ModuleHeader
         index=""
         title="Download OPGeotech"
+        module="Download"
         description="Install OPGeotech as a standalone desktop application on Windows, or add it to your home screen on mobile."
       />
 
@@ -20,11 +26,14 @@ export default function Download() {
             <Monitor className="h-8 w-8" />
             <div>
               <h2 className="font-bold text-lg uppercase">Windows Desktop</h2>
-              <p className="text-xs text-muted-foreground">Windows 10/11 (64-bit)</p>
+              <p className="text-xs text-muted-foreground">
+                Windows 10/11 (64-bit)
+              </p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Download the standalone installer (.exe). Runs in its own window without a browser, with offline detection and automatic updates.
+            Download the standalone installer (.exe). Runs in its own window
+            without a browser, with offline detection and automatic updates.
           </p>
           <a href={DOWNLOAD_URL} download="OPGeotech-Setup.exe">
             <Button className="w-full font-bold uppercase tracking-wider">
@@ -33,7 +42,8 @@ export default function Download() {
             </Button>
           </a>
           <p className="text-xs text-muted-foreground">
-            Note: Windows SmartScreen may show a warning since the app is not code-signed. Click "More info" → "Run anyway" to proceed.
+            Note: Windows SmartScreen may show a warning since the app is not
+            code-signed. Click "More info" → "Run anyway" to proceed.
           </p>
         </div>
 
@@ -42,19 +52,33 @@ export default function Download() {
           <div className="flex items-center gap-3">
             <Smartphone className="h-8 w-8" />
             <div>
-              <h2 className="font-bold text-lg uppercase">Mobile / Any Platform</h2>
-              <p className="text-xs text-muted-foreground">Chrome, Edge, Safari</p>
+              <h2 className="font-bold text-lg uppercase">
+                Mobile / Any Platform
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Chrome, Edge, Safari
+              </p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Install as a Progressive Web App (PWA) directly from your browser — works on Windows, Mac, Linux, Android and iOS.
+            Install as a Progressive Web App (PWA) directly from your browser —
+            works on Windows, Mac, Linux, Android and iOS.
           </p>
           <div className="border border-dashed border-muted-foreground/40 p-4 text-sm space-y-2">
             <p className="font-medium">How to install:</p>
             <ul className="space-y-1 text-muted-foreground text-xs">
-              <li><strong>Chrome/Edge (PC):</strong> Click the install icon in the address bar, or Menu → "Install OPGeotech"</li>
-              <li><strong>Android (Chrome):</strong> Menu ⋮ → "Add to Home Screen" or "Install app"</li>
-              <li><strong>iPhone/iPad (Safari):</strong> Share → "Add to Home Screen"</li>
+              <li>
+                <strong>Chrome/Edge (PC):</strong> Click the install icon in the
+                address bar, or Menu → "Install OPGeotech"
+              </li>
+              <li>
+                <strong>Android (Chrome):</strong> Menu ⋮ → "Add to Home Screen"
+                or "Install app"
+              </li>
+              <li>
+                <strong>iPhone/iPad (Safari):</strong> Share → "Add to Home
+                Screen"
+              </li>
             </ul>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

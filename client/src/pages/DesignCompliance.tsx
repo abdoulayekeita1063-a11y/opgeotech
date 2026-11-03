@@ -501,6 +501,7 @@ export default function DesignCompliance() {
       <ModuleHeader
         index="05"
         title="Design Compliance"
+        module="Design Compliance"
         description="Wall quality assessment and DXF-based comparison of planned versus As-Built berm geometry."
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>

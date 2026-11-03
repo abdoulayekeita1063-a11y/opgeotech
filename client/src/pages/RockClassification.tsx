@@ -15,9 +15,20 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-type ClassResult = { score: number; rockClass: string; interpretation: string; governingJointSet?: 1 | 2 };
+type ClassResult = {
+  score: number;
+  rockClass: string;
+  interpretation: string;
+  governingJointSet?: 1 | 2;
+};
 
-function ResultBlock({ result, label }: { result: ClassResult | null; label: string }) {
+function ResultBlock({
+  result,
+  label,
+}: {
+  result: ClassResult | null;
+  label: string;
+}) {
   if (!result)
     return (
       <div className="border border-dashed border-muted-foreground/40 p-8 text-center text-sm text-muted-foreground">
@@ -38,7 +49,9 @@ function ResultBlock({ result, label }: { result: ClassResult | null; label: str
         </div>
         <div className="bg-background p-6">
           <div className="swiss-label mb-2">Rock mass class</div>
-          <div className="font-bold text-xl leading-tight">{result.rockClass}</div>
+          <div className="font-bold text-xl leading-tight">
+            {result.rockClass}
+          </div>
         </div>
       </div>
       <div className="border-l-4 border-primary pl-4 text-sm leading-relaxed">
@@ -47,7 +60,8 @@ function ResultBlock({ result, label }: { result: ClassResult | null; label: str
       {result.governingJointSet && label === "SMR" && (
         <div className="border border-foreground p-4 text-sm">
           <span className="swiss-label mr-2">Governing joint set</span>
-          Joint Set {result.governingJointSet} — lower SMR score controls the classification.
+          Joint Set {result.governingJointSet} — lower SMR score controls the
+          classification.
         </div>
       )}
       <p className="text-xs text-muted-foreground">Saved to archive.</p>
@@ -61,6 +75,7 @@ export default function RockClassification() {
       <ModuleHeader
         index="03"
         title="Rock Classification"
+        module="Rock Classification"
         description="Rock mass characterization using four classification systems: RMR (Bieniawski 1989), SMR (Romana), Q-system (Barton) and GSI (Hoek). Each index is computed automatically with its engineering interpretation."
       />
       <Tabs defaultValue="rmr">
@@ -115,7 +130,9 @@ function TitleZone({
   return (
     <>
       <div>
-        <Label className="swiss-label mb-1.5 block">Classification title *</Label>
+        <Label className="swiss-label mb-1.5 block">
+          Classification title *
+        </Label>
         <Input
           value={title}
           onChange={e => setTitle(e.target.value)}
@@ -124,13 +141,23 @@ function TitleZone({
       </div>
       <div>
         <Label className="swiss-label mb-1.5 block">Zone / sector</Label>
-        <Input value={zone} onChange={e => setZone(e.target.value)} placeholder="e.g. North pit" />
+        <Input
+          value={zone}
+          onChange={e => setZone(e.target.value)}
+          placeholder="e.g. North pit"
+        />
       </div>
     </>
   );
 }
 
-function TwoCol({ form, results }: { form: React.ReactNode; results: React.ReactNode }) {
+function TwoCol({
+  form,
+  results,
+}: {
+  form: React.ReactNode;
+  results: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-12 gap-8">
       <div className="col-span-12 lg:col-span-5 space-y-4">{form}</div>
@@ -166,31 +193,69 @@ function RMRForm() {
       form={
         <>
           <SectionLabel>RMR Parameters (Bieniawski 1989)</SectionLabel>
-          <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
+          <TitleZone
+            title={title}
+            zone={zone}
+            setTitle={setTitle}
+            setZone={setZone}
+          />
           <FieldGrid>
             <div>
               <Label className="swiss-label mb-1.5 block">UCS (MPa)</Label>
-              <Input type="number" value={ucs} onChange={e => setUcs(e.target.value)} />
+              <Input
+                type="number"
+                value={ucs}
+                onChange={e => setUcs(e.target.value)}
+              />
             </div>
             <div>
               <Label className="swiss-label mb-1.5 block">RQD (%)</Label>
-              <Input type="number" value={rqd} onChange={e => setRqd(e.target.value)} />
+              <Input
+                type="number"
+                value={rqd}
+                onChange={e => setRqd(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Joint spacing (m)</Label>
-              <Input type="number" step="0.01" value={spacing} onChange={e => setSpacing(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Joint spacing (m)
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={spacing}
+                onChange={e => setSpacing(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Joint condition (0–30)</Label>
-              <Input type="number" value={condition} onChange={e => setCondition(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Joint condition (0–30)
+              </Label>
+              <Input
+                type="number"
+                value={condition}
+                onChange={e => setCondition(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Groundwater (0–15)</Label>
-              <Input type="number" value={groundwater} onChange={e => setGroundwater(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Groundwater (0–15)
+              </Label>
+              <Input
+                type="number"
+                value={groundwater}
+                onChange={e => setGroundwater(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Orientation adj. (−60–0)</Label>
-              <Input type="number" value={orientation} onChange={e => setOrientation(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Orientation adj. (−60–0)
+              </Label>
+              <Input
+                type="number"
+                value={orientation}
+                onChange={e => setOrientation(e.target.value)}
+              />
             </div>
           </FieldGrid>
           <Button
@@ -210,7 +275,11 @@ function RMRForm() {
               });
             }}
           >
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute RMR"}
+            {compute.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Compute RMR"
+            )}
           </Button>
         </>
       }
@@ -229,7 +298,9 @@ function SMRForm() {
   const [jointDipDirection2, setJointDipDirection2] = useState("220");
   const [slopeDip, setSlopeDip] = useState("70");
   const [slopeDipDirection, setSlopeDipDirection] = useState("120");
-  const [excavationMethod, setExcavationMethod] = useState("production-blasting");
+  const [excavationMethod, setExcavationMethod] = useState(
+    "production-blasting"
+  );
   const [result, setResult] = useState<ClassResult | null>(null);
 
   const compute = trpc.classification.computeSMR.useMutation({
@@ -246,24 +317,49 @@ function SMRForm() {
         <>
           <SectionLabel>SMR Parameters (Romana)</SectionLabel>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            SMR = RMRbasic + (F1 × F2 × F3) + F4. Enter two joint sets; both are evaluated independently and the lower governing SMR controls the classification.
+            SMR = RMRbasic + (F1 × F2 × F3) + F4. Enter two joint sets; both are
+            evaluated independently and the lower governing SMR controls the
+            classification.
           </p>
-          <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
+          <TitleZone
+            title={title}
+            zone={zone}
+            setTitle={setTitle}
+            setZone={setZone}
+          />
           <div>
-            <Label className="swiss-label mb-1.5 block">Basic RMR (0–100)</Label>
-            <Input type="number" value={rmrBasic} onChange={e => setRmrBasic(e.target.value)} />
+            <Label className="swiss-label mb-1.5 block">
+              Basic RMR (0–100)
+            </Label>
+            <Input
+              type="number"
+              value={rmrBasic}
+              onChange={e => setRmrBasic(e.target.value)}
+            />
           </div>
           <FieldGrid>
             <div className="col-span-2 border-l-4 border-primary pl-4">
               <div className="swiss-label mb-3">Joint Set 1</div>
               <FieldGrid>
                 <div>
-                  <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
-                  <Input type="number" value={jointDip} onChange={e => setJointDip(e.target.value)} />
+                  <Label className="swiss-label mb-1.5 block">
+                    Joint dip (°)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={jointDip}
+                    onChange={e => setJointDip(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
-                  <Input type="number" value={jointDipDirection} onChange={e => setJointDipDirection(e.target.value)} />
+                  <Label className="swiss-label mb-1.5 block">
+                    Joint dip direction (°)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={jointDipDirection}
+                    onChange={e => setJointDipDirection(e.target.value)}
+                  />
                 </div>
               </FieldGrid>
             </div>
@@ -271,35 +367,74 @@ function SMRForm() {
               <div className="swiss-label mb-3">Joint Set 2</div>
               <FieldGrid>
                 <div>
-                  <Label className="swiss-label mb-1.5 block">Joint dip (°)</Label>
-                  <Input type="number" value={jointDip2} onChange={e => setJointDip2(e.target.value)} />
+                  <Label className="swiss-label mb-1.5 block">
+                    Joint dip (°)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={jointDip2}
+                    onChange={e => setJointDip2(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label className="swiss-label mb-1.5 block">Joint dip direction (°)</Label>
-                  <Input type="number" value={jointDipDirection2} onChange={e => setJointDipDirection2(e.target.value)} />
+                  <Label className="swiss-label mb-1.5 block">
+                    Joint dip direction (°)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={jointDipDirection2}
+                    onChange={e => setJointDipDirection2(e.target.value)}
+                  />
                 </div>
               </FieldGrid>
             </div>
             <div>
               <Label className="swiss-label mb-1.5 block">Slope dip (°)</Label>
-              <Input type="number" value={slopeDip} onChange={e => setSlopeDip(e.target.value)} />
+              <Input
+                type="number"
+                value={slopeDip}
+                onChange={e => setSlopeDip(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Slope dip direction (°)</Label>
-              <Input type="number" value={slopeDipDirection} onChange={e => setSlopeDipDirection(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Slope dip direction (°)
+              </Label>
+              <Input
+                type="number"
+                value={slopeDipDirection}
+                onChange={e => setSlopeDipDirection(e.target.value)}
+              />
             </div>
           </FieldGrid>
           <div>
-            <Label className="swiss-label mb-1.5 block">Excavation method (F4)</Label>
-            <Select value={excavationMethod} onValueChange={setExcavationMethod}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <Label className="swiss-label mb-1.5 block">
+              Excavation method (F4)
+            </Label>
+            <Select
+              value={excavationMethod}
+              onValueChange={setExcavationMethod}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="natural">Natural slope (+15)</SelectItem>
-                <SelectItem value="pre-splitting">Pre-splitting (+10)</SelectItem>
-                <SelectItem value="smooth-blasting">Smooth blasting (+8)</SelectItem>
-                <SelectItem value="mechanical">Mechanical excavation (0)</SelectItem>
-                <SelectItem value="production-blasting">Production blasting (−8)</SelectItem>
-                <SelectItem value="poor-blasting">Poor blasting (−12)</SelectItem>
+                <SelectItem value="pre-splitting">
+                  Pre-splitting (+10)
+                </SelectItem>
+                <SelectItem value="smooth-blasting">
+                  Smooth blasting (+8)
+                </SelectItem>
+                <SelectItem value="mechanical">
+                  Mechanical excavation (0)
+                </SelectItem>
+                <SelectItem value="production-blasting">
+                  Production blasting (−8)
+                </SelectItem>
+                <SelectItem value="poor-blasting">
+                  Poor blasting (−12)
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -318,11 +453,21 @@ function SMRForm() {
                 jointDipDirection2: Number(jointDipDirection2),
                 slopeDip: Number(slopeDip),
                 slopeDipDirection: Number(slopeDipDirection),
-                excavationMethod: excavationMethod as "natural" | "pre-splitting" | "smooth-blasting" | "mechanical" | "production-blasting" | "poor-blasting",
+                excavationMethod: excavationMethod as
+                  | "natural"
+                  | "pre-splitting"
+                  | "smooth-blasting"
+                  | "mechanical"
+                  | "production-blasting"
+                  | "poor-blasting",
               });
             }}
           >
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute SMR"}
+            {compute.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Compute SMR"
+            )}
           </Button>
         </>
       }
@@ -427,10 +572,19 @@ function QForm() {
       form={
         <>
           <SectionLabel>Q-System Parameters (Barton)</SectionLabel>
-          <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
+          <TitleZone
+            title={title}
+            zone={zone}
+            setTitle={setTitle}
+            setZone={setZone}
+          />
           <div>
             <Label className="swiss-label mb-1.5 block">RQD (%)</Label>
-            <Input type="number" value={rqd} onChange={e => setRqd(e.target.value)} />
+            <Input
+              type="number"
+              value={rqd}
+              onChange={e => setRqd(e.target.value)}
+            />
           </div>
           {selects.map(sel => (
             <div key={sel.label}>
@@ -466,7 +620,11 @@ function QForm() {
               });
             }}
           >
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute Q"}
+            {compute.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Compute Q"
+            )}
           </Button>
           <p className="text-xs text-muted-foreground swiss-number">
             Q = (RQD/Jn) × (Jr/Ja) × (Jw/SRF)
@@ -478,7 +636,13 @@ function QForm() {
   );
 }
 
-function GSIChartPreview({ structure, surface }: { structure: number; surface: number }) {
+function GSIChartPreview({
+  structure,
+  surface,
+}: {
+  structure: number;
+  surface: number;
+}) {
   // The chart-only asset has its plotting grid in the right/lower portion of the image.
   // Surface quality moves left → right; decreasing interlocking moves top → bottom.
   const markerLeft = Math.max(52, Math.min(96, 52 + (100 - surface) * 0.46));
@@ -488,10 +652,14 @@ function GSIChartPreview({ structure, surface }: { structure: number; surface: n
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <SectionLabel>GSI Selection Chart</SectionLabel>
-        <span className="text-xs font-mono text-muted-foreground">Selected: {Math.round((structure + surface) / 2)}</span>
+        <span className="text-xs font-mono text-muted-foreground">
+          Selected: {Math.round((structure + surface) / 2)}
+        </span>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Use the chart as a visual guide. Choose the closest structure and surface-condition categories, then refine the numeric ratings if required.
+        Use the chart as a visual guide. Choose the closest structure and
+        surface-condition categories, then refine the numeric ratings if
+        required.
       </p>
       <div className="relative overflow-hidden border border-foreground bg-white">
         <img
@@ -501,7 +669,12 @@ function GSIChartPreview({ structure, surface }: { structure: number; surface: n
         />
         <div
           className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow-[0_0_0_2px_rgba(0,0,0,0.7)]"
-          style={{ left: `${markerLeft}%`, top: `${markerTop}%`, width: 14, height: 14 }}
+          style={{
+            left: `${markerLeft}%`,
+            top: `${markerTop}%`,
+            width: 14,
+            height: 14,
+          }}
           aria-label={`Selected GSI position: structure ${structure}, surface ${surface}`}
         />
       </div>
@@ -547,35 +720,74 @@ function GSIForm() {
         <>
           <SectionLabel>GSI Parameters (Hoek)</SectionLabel>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Select the closest structure and surface-condition description from the supplied GSI chart. The numeric values remain editable for engineering judgement.
+            Select the closest structure and surface-condition description from
+            the supplied GSI chart. The numeric values remain editable for
+            engineering judgement.
           </p>
-          <TitleZone title={title} zone={zone} setTitle={setTitle} setZone={setZone} />
+          <TitleZone
+            title={title}
+            zone={zone}
+            setTitle={setTitle}
+            setZone={setZone}
+          />
           <div>
-            <Label className="swiss-label mb-1.5 block">Rock-mass structure</Label>
+            <Label className="swiss-label mb-1.5 block">
+              Rock-mass structure
+            </Label>
             <Select value={structure} onValueChange={setStructure}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {structureOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                {structureOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label className="swiss-label mb-1.5 block">Surface condition</Label>
+            <Label className="swiss-label mb-1.5 block">
+              Surface condition
+            </Label>
             <Select value={surface} onValueChange={setSurface}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {surfaceOptions.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                {surfaceOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <FieldGrid>
             <div>
-              <Label className="swiss-label mb-1.5 block">Structure rating (0–100)</Label>
-              <Input type="number" min="0" max="100" value={structure} onChange={e => setStructure(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Structure rating (0–100)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={structure}
+                onChange={e => setStructure(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label mb-1.5 block">Surface rating (0–100)</Label>
-              <Input type="number" min="0" max="100" value={surface} onChange={e => setSurface(e.target.value)} />
+              <Label className="swiss-label mb-1.5 block">
+                Surface rating (0–100)
+              </Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                value={surface}
+                onChange={e => setSurface(e.target.value)}
+              />
             </div>
           </FieldGrid>
           <Button
@@ -591,13 +803,20 @@ function GSIForm() {
               });
             }}
           >
-            {compute.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Compute GSI"}
+            {compute.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Compute GSI"
+            )}
           </Button>
         </>
       }
       results={
         <div className="space-y-8">
-          <GSIChartPreview structure={Number(structure)} surface={Number(surface)} />
+          <GSIChartPreview
+            structure={Number(structure)}
+            surface={Number(surface)}
+          />
           <ResultBlock result={result} label="GSI" />
         </div>
       }

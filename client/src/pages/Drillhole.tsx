@@ -31,7 +31,9 @@ export default function Drillhole() {
   const [uploading, setUploading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [placing, setPlacing] = useState(false);
-  const [pendingXY, setPendingXY] = useState<{ x: number; y: number } | null>(null);
+  const [pendingXY, setPendingXY] = useState<{ x: number; y: number } | null>(
+    null
+  );
 
   // hole form state
   const [holeId, setHoleId] = useState("");
@@ -43,7 +45,10 @@ export default function Drillhole() {
   const [depth, setDepth] = useState("30");
   const [purpose, setPurpose] = useState("geotechnical");
   const [notes, setNotes] = useState("");
-  const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number } | null>(null);
+  const [cursorCoords, setCursorCoords] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const plans = trpc.drillhole.listPlans.useQuery();
   const holes = trpc.drillhole.listHoles.useQuery();
@@ -54,7 +59,9 @@ export default function Drillhole() {
 
   const importDxf = trpc.drillhole.importDxf.useMutation({
     onSuccess: res => {
-      toast.success(`DXF imported — ${res.entityCount} entities, ${res.layers.length} layers`);
+      toast.success(
+        `DXF imported — ${res.entityCount} entities, ${res.layers.length} layers`
+      );
       utils.drillhole.listPlans.invalidate();
       setSelectedPlanId(res.id as number);
     },
@@ -105,7 +112,10 @@ export default function Drillhole() {
     const bytes = new Uint8Array(buf);
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+      binary += String.fromCharCode.apply(
+        null,
+        Array.from(bytes.subarray(i, i + chunk))
+      );
     }
     importDxf.mutate({ name: f.name, base64: btoa(binary) });
   };
@@ -115,8 +125,10 @@ export default function Drillhole() {
     const x = parseFloat(collarX);
     const y = parseFloat(collarY);
     const d = parseFloat(depth);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return toast.error("Collar X and Y are required");
-    if (!Number.isFinite(d) || d <= 0) return toast.error("Depth must be positive");
+    if (!Number.isFinite(x) || !Number.isFinite(y))
+      return toast.error("Collar X and Y are required");
+    if (!Number.isFinite(d) || d <= 0)
+      return toast.error("Depth must be positive");
     createHole.mutate({
       planId: selectedPlanId,
       holeId: holeId.trim(),
@@ -165,17 +177,23 @@ export default function Drillhole() {
     toast.success(`Collar set at X=${x}, Y=${y}`);
   };
 
-  const onSvgMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!geometry) return;
-    const svg = e.currentTarget;
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return;
-    const p = pt.matrixTransform(ctm.inverse());
-    setCursorCoords({ x: Math.round(p.x * 100) / 100, y: Math.round(-p.y * 100) / 100 });
-  }, [geometry]);
+  const onSvgMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!geometry) return;
+      const svg = e.currentTarget;
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const p = pt.matrixTransform(ctm.inverse());
+      setCursorCoords({
+        x: Math.round(p.x * 100) / 100,
+        y: Math.round(-p.y * 100) / 100,
+      });
+    },
+    [geometry]
+  );
 
   const planHoles = (holes.data ?? []).filter(
     h => selectedPlanId == null || h.planId === selectedPlanId
@@ -186,6 +204,7 @@ export default function Drillhole() {
       <ModuleHeader
         index="06"
         title="Drillhole Planning"
+        module="Drillhole Planning"
         description="Import a DXF site plan with its original real-world coordinates (Easting/Northing), visualize it, and plan geotechnical drillholes — collar coordinates, azimuth, dip and depth — directly on the plan."
       />
 
@@ -226,7 +245,9 @@ export default function Drillhole() {
           {(plans.data?.length ?? 0) > 0 && (
             <div className="flex items-center gap-2 mb-4">
               <Select
-                value={selectedPlanId != null ? String(selectedPlanId) : undefined}
+                value={
+                  selectedPlanId != null ? String(selectedPlanId) : undefined
+                }
                 onValueChange={v => setSelectedPlanId(Number(v))}
               >
                 <SelectTrigger className="rounded-none border-foreground w-72">
@@ -264,7 +285,10 @@ export default function Drillhole() {
             </div>
           )}
 
-          <div className="border border-foreground bg-white relative" style={{ minHeight: 380 }}>
+          <div
+            className="border border-foreground bg-white relative"
+            style={{ minHeight: 380 }}
+          >
             {planDetail.isLoading && selectedPlanId != null ? (
               <div className="flex items-center justify-center h-96">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -301,19 +325,25 @@ export default function Drillhole() {
                         strokeWidth={strokeW}
                       />
                     ) : (
-                      <circle key={`p${i}`} cx={p.x} cy={p.y} r={strokeW * 2.5} fill="#666" />
+                      <circle
+                        key={`p${i}`}
+                        cx={p.x}
+                        cy={p.y}
+                        r={strokeW * 2.5}
+                        fill="#666"
+                      />
                     )
                   )}
                   {/* planned holes */}
-                  {planHoles.map(h => (
+                  {planHoles.map(h =>
                     (() => {
                       // Project the hole trace in plan view:
                       // Horizontal projection length = depth * cos(dip)
                       // dip is stored as negative (e.g. -90 = vertical, -60 = 60° from horizontal)
-                      const dipRad = Math.abs(h.dip) * Math.PI / 180;
+                      const dipRad = (Math.abs(h.dip) * Math.PI) / 180;
                       const horizLen = h.depth * Math.cos(dipRad);
                       // Azimuth: 0=North(+Y), 90=East(+X)
-                      const azRad = (h.azimuth) * Math.PI / 180;
+                      const azRad = (h.azimuth * Math.PI) / 180;
                       const dx = horizLen * Math.sin(azRad);
                       const dy = horizLen * Math.cos(azRad);
                       const toeX = h.collarX + dx;
@@ -331,9 +361,21 @@ export default function Drillhole() {
                             strokeLinecap="round"
                           />
                           {/* Collar point (filled) */}
-                          <circle cx={h.collarX} cy={h.collarY} r={strokeW * 5} fill="#d32f2f" />
+                          <circle
+                            cx={h.collarX}
+                            cy={h.collarY}
+                            r={strokeW * 5}
+                            fill="#d32f2f"
+                          />
                           {/* Toe point (open) */}
-                          <circle cx={toeX} cy={toeY} r={strokeW * 4} fill="none" stroke="#d32f2f" strokeWidth={strokeW * 1.5} />
+                          <circle
+                            cx={toeX}
+                            cy={toeY}
+                            r={strokeW * 4}
+                            fill="none"
+                            stroke="#d32f2f"
+                            strokeWidth={strokeW * 1.5}
+                          />
                           {/* Direction arrow at midpoint */}
                           {horizLen > strokeW * 20 && (
                             <circle
@@ -346,7 +388,7 @@ export default function Drillhole() {
                         </g>
                       );
                     })()
-                  ))}
+                  )}
                   {pendingXY && (
                     <circle
                       cx={pendingXY.x}
@@ -388,8 +430,9 @@ export default function Drillhole() {
               <div className="flex flex-col items-center justify-center h-96 text-sm text-muted-foreground gap-2 p-8 text-center">
                 <Upload className="h-8 w-8 opacity-30" />
                 <p>
-                  Import a DXF plan (pit design, bench layout) to visualize it and place
-                  drillholes. Supported entities: lines, polylines, circles, points, text.
+                  Import a DXF plan (pit design, bench layout) to visualize it
+                  and place drillholes. Supported entities: lines, polylines,
+                  circles, points, text.
                 </p>
               </div>
             )}
@@ -397,9 +440,11 @@ export default function Drillhole() {
           {geometry && (
             <div className="flex items-center justify-between mt-2">
               <p className="text-xs text-muted-foreground font-mono">
-                {geometry.entityCount} entities · layers: {geometry.layers.slice(0, 6).join(", ")}
-                {geometry.layers.length > 6 ? "…" : ""} · bounds E [{geometry.bounds.minX} –{" "}
-                {geometry.bounds.maxX}] N [{geometry.bounds.minY} – {geometry.bounds.maxY}]
+                {geometry.entityCount} entities · layers:{" "}
+                {geometry.layers.slice(0, 6).join(", ")}
+                {geometry.layers.length > 6 ? "…" : ""} · bounds E [
+                {geometry.bounds.minX} – {geometry.bounds.maxX}] N [
+                {geometry.bounds.minY} – {geometry.bounds.maxY}]
               </p>
               {cursorCoords && (
                 <p className="text-xs font-mono font-bold">
@@ -484,7 +529,9 @@ export default function Drillhole() {
               />
             </div>
             <div>
-              <Label className="swiss-label text-[11px]">Dip (°, −90 = vertical)</Label>
+              <Label className="swiss-label text-[11px]">
+                Dip (°, −90 = vertical)
+              </Label>
               <Input
                 type="number"
                 className="rounded-none border-foreground mt-1"
@@ -507,13 +554,17 @@ export default function Drillhole() {
             disabled={createHole.isPending}
             onClick={submitHole}
           >
-            {createHole.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {createHole.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            )}
             Save Drillhole
           </Button>
 
-         <div className="mt-8">
+          <div className="mt-8">
             <div className="flex items-center justify-between">
-              <SectionLabel>Planned holes ({(holes.data ?? []).length})</SectionLabel>
+              <SectionLabel>
+                Planned holes ({(holes.data ?? []).length})
+              </SectionLabel>
               {(holes.data ?? []).length > 0 && (
                 <Button
                   size="sm"
@@ -521,15 +572,38 @@ export default function Drillhole() {
                   className="rounded-none border-foreground text-xs font-bold uppercase"
                   onClick={() => {
                     const rows = (holes.data ?? []).map(h => {
-                      const dipRad = Math.abs(h.dip) * Math.PI / 180;
+                      const dipRad = (Math.abs(h.dip) * Math.PI) / 180;
                       const horizLen = h.depth * Math.cos(dipRad);
-                      const azRad = h.azimuth * Math.PI / 180;
-                      const toeX = Math.round((h.collarX + horizLen * Math.sin(azRad)) * 1000) / 1000;
-                      const toeY = Math.round((h.collarY + horizLen * Math.cos(azRad)) * 1000) / 1000;
-                      const toeZ = Math.round((h.collarZ - h.depth * Math.sin(dipRad)) * 1000) / 1000;
-                      return [h.holeId, h.collarX, h.collarY, h.collarZ, h.azimuth, h.dip, h.depth, toeX, toeY, toeZ, h.purpose, h.notes || ""].join(",");
+                      const azRad = (h.azimuth * Math.PI) / 180;
+                      const toeX =
+                        Math.round(
+                          (h.collarX + horizLen * Math.sin(azRad)) * 1000
+                        ) / 1000;
+                      const toeY =
+                        Math.round(
+                          (h.collarY + horizLen * Math.cos(azRad)) * 1000
+                        ) / 1000;
+                      const toeZ =
+                        Math.round(
+                          (h.collarZ - h.depth * Math.sin(dipRad)) * 1000
+                        ) / 1000;
+                      return [
+                        h.holeId,
+                        h.collarX,
+                        h.collarY,
+                        h.collarZ,
+                        h.azimuth,
+                        h.dip,
+                        h.depth,
+                        toeX,
+                        toeY,
+                        toeZ,
+                        h.purpose,
+                        h.notes || "",
+                      ].join(",");
                     });
-                    const header = "HoleID,CollarX,CollarY,CollarZ,Azimuth,Dip,Depth,ToeX,ToeY,ToeZ,Purpose,Notes";
+                    const header =
+                      "HoleID,CollarX,CollarY,CollarZ,Azimuth,Dip,Depth,ToeX,ToeY,ToeZ,Purpose,Notes";
                     const csv = [header, ...rows].join("\n");
                     const blob = new Blob([csv], { type: "text/csv" });
                     const url = URL.createObjectURL(blob);
@@ -547,14 +621,20 @@ export default function Drillhole() {
             </div>
             <div className="border border-foreground divide-y divide-border mt-3 max-h-[320px] overflow-y-auto">
               {(holes.data ?? []).length === 0 && (
-                <p className="p-4 text-sm text-muted-foreground">No drillholes planned yet.</p>
+                <p className="p-4 text-sm text-muted-foreground">
+                  No drillholes planned yet.
+                </p>
               )}
               {(holes.data ?? []).map(h => (
-                <div key={h.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                <div
+                  key={h.id}
+                  className="flex items-center justify-between px-3 py-2 text-sm"
+                >
                   <div className="font-mono">
                     <span className="font-bold">{h.holeId}</span>{" "}
                     <span className="text-muted-foreground">
-                      X{h.collarX} Y{h.collarY} · {h.depth} m · az {h.azimuth}° / dip {h.dip}°
+                      X{h.collarX} Y{h.collarY} · {h.depth} m · az {h.azimuth}°
+                      / dip {h.dip}°
                     </span>
                   </div>
                   <Button

@@ -13,7 +13,13 @@ import { FileDown, Loader2 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { escapeHtml, exportRecordAsPdf, markdownToHtml } from "@/lib/exportPdf";
 
-type Category = "all" | "stability" | "classification" | "inspection" | "blast" | "compliance";
+type Category =
+  | "all"
+  | "stability"
+  | "classification"
+  | "inspection"
+  | "blast"
+  | "compliance";
 
 interface ArchiveRecord {
   key: string;
@@ -38,7 +44,10 @@ const catLabel: Record<Exclude<Category, "all">, string> = {
 
 function kv(rows: Array<[string, string]>): string {
   return `<table>${rows
-    .map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td class="metric">${escapeHtml(v)}</td></tr>`)
+    .map(
+      ([k, v]) =>
+        `<tr><th>${escapeHtml(k)}</th><td class="metric">${escapeHtml(v)}</td></tr>`
+    )
     .join("")}</table>`;
 }
 
@@ -92,11 +101,15 @@ export default function Archive() {
             <div className="grid grid-cols-2 gap-px bg-foreground border border-foreground">
               <div className="bg-background p-4">
                 <div className="swiss-label mb-1">FS Bishop</div>
-                <div className="swiss-number text-3xl font-bold">{r.fsBishop.toFixed(2)}</div>
+                <div className="swiss-number text-3xl font-bold">
+                  {r.fsBishop.toFixed(2)}
+                </div>
               </div>
               <div className="bg-background p-4">
                 <div className="swiss-label mb-1">FS Fellenius</div>
-                <div className="swiss-number text-3xl font-bold">{r.fsFellenius.toFixed(2)}</div>
+                <div className="swiss-number text-3xl font-bold">
+                  {r.fsFellenius.toFixed(2)}
+                </div>
               </div>
             </div>
             <table className="w-full text-sm border border-foreground">
@@ -105,17 +118,25 @@ export default function Archive() {
                   ["Cohesion c′", `${r.cohesion} kPa`],
                   ["Friction angle φ′", `${r.frictionAngle} °`],
                   ["Unit weight γ", `${r.unitWeight} kN/m³`],
-                  ["Height H / Angle β", `${r.slopeHeight} m / ${r.slopeAngle} °`],
+                  [
+                    "Height H / Angle β",
+                    `${r.slopeHeight} m / ${r.slopeAngle} °`,
+                  ],
                   ["Groundwater", r.waterCondition],
                 ].map(([k, v]) => (
-                  <tr key={k} className="border-b border-foreground last:border-b-0">
+                  <tr
+                    key={k}
+                    className="border-b border-foreground last:border-b-0"
+                  >
                     <td className="px-3 py-1.5 swiss-label">{k}</td>
                     <td className="px-3 py-1.5 swiss-number text-right">{v}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="border-l-4 border-primary pl-4 text-sm">{r.interpretation}</div>
+            <div className="border-l-4 border-primary pl-4 text-sm">
+              {r.interpretation}
+            </div>
           </div>
         ),
       });
@@ -154,7 +175,9 @@ export default function Archive() {
                 <div className="font-bold">{r.rockClass}</div>
               </div>
             </div>
-            <div className="border-l-4 border-primary pl-4 text-sm">{r.interpretation}</div>
+            <div className="border-l-4 border-primary pl-4 text-sm">
+              {r.interpretation}
+            </div>
           </div>
         ),
       });
@@ -170,10 +193,15 @@ export default function Archive() {
         date: new Date(r.createdAt),
         summary: `${r.inspectionDate} · ${r.inspector || "Inspector n/a"}`,
         pdfTitle: r.title,
-        pdfBody: () => markdownToHtml(r.generatedReport || `# ${r.title}\n\nNo generated report.`),
+        pdfBody: () =>
+          markdownToHtml(
+            r.generatedReport || `# ${r.title}\n\nNo generated report.`
+          ),
         detail: (
           <div className="prose prose-sm max-w-none">
-            <Streamdown>{r.generatedReport || "_No generated report._"}</Streamdown>
+            <Streamdown>
+              {r.generatedReport || "_No generated report._"}
+            </Streamdown>
           </div>
         ),
       });
@@ -190,7 +218,9 @@ export default function Archive() {
         summary: `Score ${r.qualityScore ?? "—"}/100 · ${r.fragmentationRating ?? ""}`,
         pdfTitle: r.title,
         pdfBody: () =>
-          markdownToHtml(r.generatedReport || `# ${r.title}\n\nNo generated report.`) +
+          markdownToHtml(
+            r.generatedReport || `# ${r.title}\n\nNo generated report.`
+          ) +
           kv([
             ["Quality score", `${r.qualityScore ?? "—"}/100`],
             ["Fragmentation", r.fragmentationRating || "—"],
@@ -201,35 +231,51 @@ export default function Archive() {
             <div className="grid grid-cols-3 gap-px bg-foreground border border-foreground">
               <div className="bg-background p-4">
                 <div className="swiss-label mb-1">Score</div>
-                <div className="swiss-number text-2xl font-bold">{r.qualityScore ?? "—"}/100</div>
+                <div className="swiss-number text-2xl font-bold">
+                  {r.qualityScore ?? "—"}/100
+                </div>
               </div>
               <div className="bg-background p-4">
                 <div className="swiss-label mb-1">Fragmentation</div>
-                <div className="font-bold text-sm">{r.fragmentationRating ?? "—"}</div>
+                <div className="font-bold text-sm">
+                  {r.fragmentationRating ?? "—"}
+                </div>
               </div>
               <div className="bg-background p-4">
                 <div className="swiss-label mb-1">Break control</div>
-                <div className="font-bold text-sm">{r.overbreakDetected ?? "—"}</div>
+                <div className="font-bold text-sm">
+                  {r.overbreakDetected ?? "—"}
+                </div>
               </div>
             </div>
             {(r.beforePhotoUrl || r.afterPhotoUrl) && (
               <div className="grid grid-cols-2 gap-2">
                 {r.beforePhotoUrl && (
                   <figure>
-                    <img src={r.beforePhotoUrl} alt="Before blast" className="border border-foreground w-full" />
+                    <img
+                      src={r.beforePhotoUrl}
+                      alt="Before blast"
+                      className="border border-foreground w-full"
+                    />
                     <figcaption className="swiss-label mt-1">Before</figcaption>
                   </figure>
                 )}
                 {r.afterPhotoUrl && (
                   <figure>
-                    <img src={r.afterPhotoUrl} alt="After blast" className="border border-foreground w-full" />
+                    <img
+                      src={r.afterPhotoUrl}
+                      alt="After blast"
+                      className="border border-foreground w-full"
+                    />
                     <figcaption className="swiss-label mt-1">After</figcaption>
                   </figure>
                 )}
               </div>
             )}
             <div className="prose prose-sm max-w-none">
-              <Streamdown>{r.generatedReport || "_No generated report._"}</Streamdown>
+              <Streamdown>
+                {r.generatedReport || "_No generated report._"}
+              </Streamdown>
             </div>
           </div>
         ),
@@ -253,16 +299,27 @@ export default function Archive() {
             ["Date", new Date(r.createdAt).toLocaleString()],
             ["Verdict", r.compliant ? "COMPLIANT" : "NON-COMPLIANT"],
             ["Compliance", `${r.compliancePct}%`],
-            ["Bench height (design / as-built)", `${r.designBenchHeight} / ${r.actualBenchHeight} m`],
-            ["Berm width (design / as-built)", `${r.designBermWidth} / ${r.actualBermWidth} m`],
-            ["Batter angle (design / as-built)", `${r.designBatterAngle} / ${r.actualBatterAngle} °`],
+            [
+              "Bench height (design / as-built)",
+              `${r.designBenchHeight} / ${r.actualBenchHeight} m`,
+            ],
+            [
+              "Berm width (design / as-built)",
+              `${r.designBermWidth} / ${r.actualBermWidth} m`,
+            ],
+            [
+              "Batter angle (design / as-built)",
+              `${r.designBatterAngle} / ${r.actualBatterAngle} °`,
+            ],
           ]) +
           `<h2>Interpretation</h2><p>${escapeHtml(r.interpretation || "")}</p>`,
         detail: (
           <div className="space-y-4">
             <div
               className={`px-3 py-2 font-bold uppercase tracking-wider text-sm ${
-                r.compliant ? "bg-foreground text-background" : "bg-primary text-primary-foreground"
+                r.compliant
+                  ? "bg-foreground text-background"
+                  : "bg-primary text-primary-foreground"
               }`}
             >
               {r.compliant ? "Compliant" : "Non-compliant"} — {r.compliancePct}%
@@ -270,18 +327,32 @@ export default function Archive() {
             <table className="w-full text-sm border border-foreground">
               <tbody>
                 {[
-                  ["Bench height", `${r.designBenchHeight} m → ${r.actualBenchHeight} m`],
-                  ["Berm width", `${r.designBermWidth} m → ${r.actualBermWidth} m`],
-                  ["Batter angle", `${r.designBatterAngle} ° → ${r.actualBatterAngle} °`],
+                  [
+                    "Bench height",
+                    `${r.designBenchHeight} m → ${r.actualBenchHeight} m`,
+                  ],
+                  [
+                    "Berm width",
+                    `${r.designBermWidth} m → ${r.actualBermWidth} m`,
+                  ],
+                  [
+                    "Batter angle",
+                    `${r.designBatterAngle} ° → ${r.actualBatterAngle} °`,
+                  ],
                 ].map(([k, v]) => (
-                  <tr key={k} className="border-b border-foreground last:border-b-0">
+                  <tr
+                    key={k}
+                    className="border-b border-foreground last:border-b-0"
+                  >
                     <td className="px-3 py-1.5 swiss-label">{k}</td>
                     <td className="px-3 py-1.5 swiss-number text-right">{v}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="border-l-4 border-primary pl-4 text-sm">{r.interpretation}</div>
+            <div className="border-l-4 border-primary pl-4 text-sm">
+              {r.interpretation}
+            </div>
           </div>
         ),
       });
@@ -289,15 +360,23 @@ export default function Archive() {
 
     out.sort((a, b) => b.date.getTime() - a.date.getTime());
     return out;
-  }, [stability.data, classification.data, inspections.data, blasts.data, compliance.data]);
+  }, [
+    stability.data,
+    classification.data,
+    inspections.data,
+    blasts.data,
+    compliance.data,
+  ]);
 
-  const filtered = cat === "all" ? records : records.filter(r => r.category === cat);
+  const filtered =
+    cat === "all" ? records : records.filter(r => r.category === cat);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <ModuleHeader
         index="06"
         title="Archive"
+        module="Archive"
         description="Centralized history of all analyses, classifications, inspection reports, blast assessments and compliance checks. Open any record to review it and export it as PDF."
       />
       <Tabs value={cat} onValueChange={v => setCat(v as Category)}>
@@ -334,8 +413,8 @@ export default function Archive() {
         )}
         {!loading && filtered.length === 0 && (
           <div className="border border-dashed border-muted-foreground/40 p-10 text-center text-sm text-muted-foreground">
-            No records yet. Results from every module are automatically
-            archived here.
+            No records yet. Results from every module are automatically archived
+            here.
           </div>
         )}
         {!loading && filtered.length > 0 && (
@@ -383,7 +462,10 @@ export default function Archive() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2">
-                  <span className="swiss-square" style={{ width: "0.5rem", height: "0.5rem" }} />
+                  <span
+                    className="swiss-square"
+                    style={{ width: "0.5rem", height: "0.5rem" }}
+                  />
                   <span className="swiss-label">{selected.categoryLabel}</span>
                 </div>
                 <DialogTitle className="text-xl font-extrabold uppercase tracking-tight">
@@ -398,7 +480,9 @@ export default function Archive() {
               <div className="mt-4 flex justify-end">
                 <Button
                   className="font-bold uppercase tracking-wider"
-                  onClick={() => exportRecordAsPdf(selected.pdfTitle, selected.pdfBody())}
+                  onClick={() =>
+                    exportRecordAsPdf(selected.pdfTitle, selected.pdfBody())
+                  }
                 >
                   <FileDown className="h-4 w-4" /> Export PDF
                 </Button>

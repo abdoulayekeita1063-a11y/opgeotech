@@ -336,6 +336,7 @@ export default function Piezometer() {
       <ModuleHeader
         index="11"
         title="Piezometer"
+        module="Piezometer"
         description="Record piezometer coordinates and groundwater readings, derive piezometric elevation, and export the interpreted line as a 3D DXF polyline."
       />
       <div className="mt-7 grid gap-6 xl:grid-cols-[390px_1fr]">

@@ -13,12 +13,44 @@ import {
 import { Loader2, Upload, Trash2, Download } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ModuleHeader, SectionLabel } from "@/components/ModuleHeader";
-import { StructuralBlockViewer, type StructurePoint } from "@/components/StructuralBlockViewer";
+import {
+  StructuralBlockViewer,
+  type StructurePoint,
+} from "@/components/StructuralBlockViewer";
 
-const STRUCTURE_TYPES = ["joint", "fault", "bedding", "foliation", "shear", "vein", "contact"];
-const ALTERATIONS = ["fresh", "slightly weathered", "moderately weathered", "highly weathered", "decomposed"];
-const INFILLS = ["none", "clean", "calcite", "quartz", "clay", "gouge", "breccia", "oxide"];
-const ROUGHNESS = ["very rough", "rough", "slightly rough", "smooth", "slickensided"];
+const STRUCTURE_TYPES = [
+  "joint",
+  "fault",
+  "bedding",
+  "foliation",
+  "shear",
+  "vein",
+  "contact",
+];
+const ALTERATIONS = [
+  "fresh",
+  "slightly weathered",
+  "moderately weathered",
+  "highly weathered",
+  "decomposed",
+];
+const INFILLS = [
+  "none",
+  "clean",
+  "calcite",
+  "quartz",
+  "clay",
+  "gouge",
+  "breccia",
+  "oxide",
+];
+const ROUGHNESS = [
+  "very rough",
+  "rough",
+  "slightly rough",
+  "smooth",
+  "slickensided",
+];
 
 /** Map descriptive roughness to a default JRC when none is given. */
 const ROUGHNESS_JRC: Record<string, number> = {
@@ -67,7 +99,9 @@ export default function StructuralMapping() {
 
   const importCsv = trpc.mapping.importCsv.useMutation({
     onSuccess: r => {
-      toast.success(`${r.count} structures imported — previous mapping data replaced`);
+      toast.success(
+        `${r.count} structures imported — previous mapping data replaced`
+      );
       utils.mapping.list.invalidate();
     },
     onError: e => toast.error(e.message),
@@ -81,15 +115,22 @@ export default function StructuralMapping() {
   const submit = () => {
     const d = parseFloat(dip);
     const dd = parseFloat(dipDirection);
-    if (!Number.isFinite(d) || d < 0 || d > 90) return toast.error("Dip must be 0–90°");
-    if (!Number.isFinite(dd) || dd < 0 || dd > 360) return toast.error("Dip direction must be 0–360°");
+    if (!Number.isFinite(d) || d < 0 || d > 90)
+      return toast.error("Dip must be 0–90°");
+    if (!Number.isFinite(dd) || dd < 0 || dd > 360)
+      return toast.error("Dip direction must be 0–360°");
     const p = parseFloat(persistence);
-    if (!Number.isFinite(p) || p <= 0 || p > 10000) return toast.error("Structure persistence must be greater than 0 and no more than 10,000 m");
-    const coordinate = (value: string) => value.trim() ? parseFloat(value) : undefined;
+    if (!Number.isFinite(p) || p <= 0 || p > 10000)
+      return toast.error(
+        "Structure persistence must be greater than 0 and no more than 10,000 m"
+      );
+    const coordinate = (value: string) =>
+      value.trim() ? parseFloat(value) : undefined;
     const e = coordinate(easting);
     const n = coordinate(northing);
     const z = coordinate(elevation);
-    if ([e, n, z].some(value => value !== undefined && !Number.isFinite(value))) return toast.error("Coordinates must be valid numbers");
+    if ([e, n, z].some(value => value !== undefined && !Number.isFinite(value)))
+      return toast.error("Coordinates must be valid numbers");
     create.mutate({
       structureId: structureId || undefined,
       zone: zone || undefined,
@@ -103,15 +144,21 @@ export default function StructuralMapping() {
       alteration,
       infill,
       roughness,
-      jrc: jrc ? parseFloat(jrc) : ROUGHNESS_JRC[roughness] ?? null,
+      jrc: jrc ? parseFloat(jrc) : (ROUGHNESS_JRC[roughness] ?? null),
     });
   };
 
   const handleCsv = async (f: File) => {
     const text = await f.text();
     const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) return toast.error("CSV needs a header row and at least one data row");
-    const header = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ""));
+    if (lines.length < 2)
+      return toast.error("CSV needs a header row and at least one data row");
+    const header = lines[0].split(",").map(h =>
+      h
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z_]/g, "")
+    );
     const col = (names: string[]) => header.findIndex(h => names.includes(h));
     const iDip = col(["dip"]);
     const iDd = col(["dipdirection", "dip_direction", "dipdir", "dd"]);
@@ -127,7 +174,12 @@ export default function StructuralMapping() {
     const iEasting = col(["easting", "easting_m", "x"]);
     const iNorthing = col(["northing", "northing_m", "y"]);
     const iElevation = col(["elevation", "elevation_m", "rl", "z"]);
-    const iPersistence = col(["persistence", "persistence_m", "structure_length", "length_m"]);
+    const iPersistence = col([
+      "persistence",
+      "persistence_m",
+      "structure_length",
+      "length_m",
+    ]);
 
     const rows = [];
     for (let i = 1; i < lines.length && rows.length < 2000; i++) {
@@ -139,13 +191,22 @@ export default function StructuralMapping() {
       rows.push({
         structureId: iId >= 0 ? c[iId] || undefined : undefined,
         zone: iZone >= 0 ? c[iZone] || undefined : undefined,
-        structureType: iType >= 0 && c[iType] ? c[iType].toLowerCase() : "joint",
+        structureType:
+          iType >= 0 && c[iType] ? c[iType].toLowerCase() : "joint",
         dip: d,
         dipDirection: dd,
-        easting: iEasting >= 0 && c[iEasting] ? parseFloat(c[iEasting]) : undefined,
-        northing: iNorthing >= 0 && c[iNorthing] ? parseFloat(c[iNorthing]) : undefined,
-        elevation: iElevation >= 0 && c[iElevation] ? parseFloat(c[iElevation]) : undefined,
-        persistence: iPersistence >= 0 && c[iPersistence] ? parseFloat(c[iPersistence]) : undefined,
+        easting:
+          iEasting >= 0 && c[iEasting] ? parseFloat(c[iEasting]) : undefined,
+        northing:
+          iNorthing >= 0 && c[iNorthing] ? parseFloat(c[iNorthing]) : undefined,
+        elevation:
+          iElevation >= 0 && c[iElevation]
+            ? parseFloat(c[iElevation])
+            : undefined,
+        persistence:
+          iPersistence >= 0 && c[iPersistence]
+            ? parseFloat(c[iPersistence])
+            : undefined,
         alteration: iAlt >= 0 ? c[iAlt] || undefined : undefined,
         infill: iInf >= 0 ? c[iInf] || undefined : undefined,
         roughness: iRou >= 0 ? c[iRou] || undefined : undefined,
@@ -185,13 +246,20 @@ export default function StructuralMapping() {
   }, [list.data]);
 
   const typeColor = (t: string) =>
-    t === "fault" ? "#d32f2f" : t === "bedding" ? "#1565c0" : t === "foliation" ? "#6a1b9a" : "#111";
+    t === "fault"
+      ? "#d32f2f"
+      : t === "bedding"
+        ? "#1565c0"
+        : t === "foliation"
+          ? "#6a1b9a"
+          : "#111";
 
   return (
     <div>
       <ModuleHeader
         index="07"
         title="Structural Mapping"
+        module="Structural Mapping"
         description="Record discontinuity data — dip, dip direction, persistence length, alteration, infill and roughness — manually or by CSV import, and review the pole distribution on a stereonet."
       />
 
@@ -254,7 +322,9 @@ export default function StructuralMapping() {
               />
             </div>
             <div>
-              <Label className="swiss-label text-[11px]">Dip direction (°) *</Label>
+              <Label className="swiss-label text-[11px]">
+                Dip direction (°) *
+              </Label>
               <Input
                 type="number"
                 className="rounded-none border-foreground mt-1"
@@ -265,18 +335,40 @@ export default function StructuralMapping() {
             </div>
             <div>
               <Label className="swiss-label text-[11px]">Easting (m)</Label>
-              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Projected X" value={easting} onChange={e => setEasting(e.target.value)} />
+              <Input
+                type="number"
+                className="rounded-none border-foreground mt-1"
+                placeholder="Projected X"
+                value={easting}
+                onChange={e => setEasting(e.target.value)}
+              />
             </div>
             <div>
               <Label className="swiss-label text-[11px]">Northing (m)</Label>
-              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Projected Y" value={northing} onChange={e => setNorthing(e.target.value)} />
+              <Input
+                type="number"
+                className="rounded-none border-foreground mt-1"
+                placeholder="Projected Y"
+                value={northing}
+                onChange={e => setNorthing(e.target.value)}
+              />
             </div>
             <div className="col-span-2">
-              <Label className="swiss-label text-[11px]">Elevation / RL (m)</Label>
-              <Input type="number" className="rounded-none border-foreground mt-1" placeholder="Z / reduced level" value={elevation} onChange={e => setElevation(e.target.value)} />
+              <Label className="swiss-label text-[11px]">
+                Elevation / RL (m)
+              </Label>
+              <Input
+                type="number"
+                className="rounded-none border-foreground mt-1"
+                placeholder="Z / reduced level"
+                value={elevation}
+                onChange={e => setElevation(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="swiss-label text-[11px]">Persistence length (m) *</Label>
+              <Label className="swiss-label text-[11px]">
+                Persistence length (m) *
+              </Label>
               <Input
                 type="number"
                 min="0.01"
@@ -338,7 +430,9 @@ export default function StructuralMapping() {
             disabled={create.isPending}
             onClick={submit}
           >
-            {create.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {create.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            )}
             Record Structure
           </Button>
 
@@ -377,22 +471,63 @@ export default function StructuralMapping() {
             </Button>
           </div>
           <p className="mt-2 border-l-4 border-primary bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-            CSV replacement import: valid rows from the selected file replace all previously recorded structures. The old data is never mixed with the new file.
+            CSV replacement import: valid rows from the selected file replace
+            all previously recorded structures. The old data is never mixed with
+            the new file.
           </p>
         </div>
 
         {/* stereonet + list */}
         <div className="col-span-12 lg:col-span-7">
-          <SectionLabel>Stereonet — poles to planes (equal-angle, lower hemisphere)</SectionLabel>
+          <SectionLabel>
+            Stereonet — poles to planes (equal-angle, lower hemisphere)
+          </SectionLabel>
           <div className="border border-foreground bg-white p-4 flex justify-center">
-            <svg viewBox="-1.15 -1.15 2.3 2.3" className="w-full max-w-[420px] h-auto">
-              <circle cx="0" cy="0" r="1" fill="none" stroke="#111" strokeWidth="0.012" />
-              <line x1="0" y1="-1" x2="0" y2="-1.06" stroke="#111" strokeWidth="0.012" />
-              <text x="0" y="-1.08" fontSize="0.09" textAnchor="middle" fontFamily="IBM Plex Mono">
+            <svg
+              viewBox="-1.15 -1.15 2.3 2.3"
+              className="w-full max-w-[420px] h-auto"
+            >
+              <circle
+                cx="0"
+                cy="0"
+                r="1"
+                fill="none"
+                stroke="#111"
+                strokeWidth="0.012"
+              />
+              <line
+                x1="0"
+                y1="-1"
+                x2="0"
+                y2="-1.06"
+                stroke="#111"
+                strokeWidth="0.012"
+              />
+              <text
+                x="0"
+                y="-1.08"
+                fontSize="0.09"
+                textAnchor="middle"
+                fontFamily="IBM Plex Mono"
+              >
                 N
               </text>
-              <line x1="-0.03" y1="0" x2="0.03" y2="0" stroke="#111" strokeWidth="0.008" />
-              <line x1="0" y1="-0.03" x2="0" y2="0.03" stroke="#111" strokeWidth="0.008" />
+              <line
+                x1="-0.03"
+                y1="0"
+                x2="0.03"
+                y2="0"
+                stroke="#111"
+                strokeWidth="0.008"
+              />
+              <line
+                x1="0"
+                y1="-0.03"
+                x2="0"
+                y2="0.03"
+                stroke="#111"
+                strokeWidth="0.008"
+              />
               {[30, 60].map(a => (
                 <circle
                   key={a}
@@ -405,21 +540,56 @@ export default function StructuralMapping() {
                 />
               ))}
               {poles.map(p => (
-                <circle key={p.id} cx={p.x} cy={p.y} r="0.028" fill={typeColor(p.type)} fillOpacity="0.75" />
+                <circle
+                  key={p.id}
+                  cx={p.x}
+                  cy={p.y}
+                  r="0.028"
+                  fill={typeColor(p.type)}
+                  fillOpacity="0.75"
+                />
               ))}
             </svg>
           </div>
           <div className="flex gap-4 mt-2 text-xs font-mono">
-            <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#111" }} />joint</span>
-            <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#d32f2f" }} />fault</span>
-            <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#1565c0" }} />bedding</span>
-            <span><span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: "#6a1b9a" }} />foliation</span>
+            <span>
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-1"
+                style={{ background: "#111" }}
+              />
+              joint
+            </span>
+            <span>
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-1"
+                style={{ background: "#d32f2f" }}
+              />
+              fault
+            </span>
+            <span>
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-1"
+                style={{ background: "#1565c0" }}
+              />
+              bedding
+            </span>
+            <span>
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-1"
+                style={{ background: "#6a1b9a" }}
+              />
+              foliation
+            </span>
           </div>
 
-          <StructuralBlockViewer structures={(list.data ?? []) as StructurePoint[]} />
+          <StructuralBlockViewer
+            structures={(list.data ?? []) as StructurePoint[]}
+          />
 
           <div className="mt-6">
-            <SectionLabel>Recorded structures ({(list.data ?? []).length})</SectionLabel>
+            <SectionLabel>
+              Recorded structures ({(list.data ?? []).length})
+            </SectionLabel>
             <div className="border border-foreground mt-2 max-h-[300px] overflow-y-auto">
               <table className="w-full text-xs font-mono">
                 <thead className="sticky top-0 bg-secondary">
@@ -441,14 +611,18 @@ export default function StructuralMapping() {
                 <tbody>
                   {(list.data ?? []).map(s => (
                     <tr key={s.id} className="border-b border-border">
-                      <td className="px-2 py-1">{s.structureId || `#${s.id}`}</td>
+                      <td className="px-2 py-1">
+                        {s.structureId || `#${s.id}`}
+                      </td>
                       <td className="px-2 py-1">{s.structureType}</td>
                       <td className="px-2 py-1">{s.dip}°</td>
                       <td className="px-2 py-1">{s.dipDirection}°</td>
                       <td className="px-2 py-1">{s.easting ?? "—"}</td>
                       <td className="px-2 py-1">{s.northing ?? "—"}</td>
                       <td className="px-2 py-1">{s.elevation ?? "—"}</td>
-                      <td className="px-2 py-1">{s.persistence == null ? "—" : `${s.persistence} m`}</td>
+                      <td className="px-2 py-1">
+                        {s.persistence == null ? "—" : `${s.persistence} m`}
+                      </td>
                       <td className="px-2 py-1">{s.jrc ?? "—"}</td>
                       <td className="px-2 py-1">{s.alteration || "—"}</td>
                       <td className="px-2 py-1">{s.infill || "—"}</td>
@@ -464,7 +638,10 @@ export default function StructuralMapping() {
                   ))}
                   {(list.data ?? []).length === 0 && (
                     <tr>
-                      <td colSpan={12} className="px-3 py-4 text-muted-foreground">
+                      <td
+                        colSpan={12}
+                        className="px-3 py-4 text-muted-foreground"
+                      >
                         No structures recorded yet. Add one or import a CSV.
                       </td>
                     </tr>
