@@ -23,6 +23,7 @@ import { toast } from "sonner";
 const statusLabels: Record<string, string> = {
   draft: "Draft",
   in_progress: "In Progress",
+  completed: "Completed",
   waiting_review: "Waiting for Review",
   returned: "Returned for Correction",
   reviewed: "Reviewed",
@@ -33,6 +34,7 @@ const statusLabels: Record<string, string> = {
 const statusClasses: Record<string, string> = {
   draft: "border-slate-400 bg-slate-50 text-slate-700",
   in_progress: "border-sky-500 bg-sky-50 text-sky-800",
+  completed: "border-emerald-500 bg-emerald-50 text-emerald-800",
   waiting_review: "border-amber-500 bg-amber-50 text-amber-800",
   returned: "border-red-500 bg-red-50 text-red-800",
   reviewed: "border-violet-500 bg-violet-50 text-violet-800",
@@ -222,6 +224,7 @@ export default function TeamWorkspace() {
       "opgeotech:resume-work-item",
       JSON.stringify({
         id: item.id,
+        teamId,
         title: item.title,
         module: item.module,
         payload: item.payload,

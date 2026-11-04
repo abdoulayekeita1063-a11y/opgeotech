@@ -1,0 +1,1 @@
+ALTER TABLE `collaboration_work_items` MODIFY COLUMN `status` enum('draft','in_progress','completed','waiting_review','returned','reviewed','approved','archived') NOT NULL DEFAULT 'draft';

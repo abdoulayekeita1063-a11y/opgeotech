@@ -13,6 +13,7 @@ const roleSchema = z.enum([
 const statusSchema = z.enum([
   "draft",
   "in_progress",
+  "completed",
   "waiting_review",
   "returned",
   "reviewed",
@@ -167,6 +168,7 @@ export const collaborationRouter = router({
         module: z.string().trim().min(1).max(64),
         title: z.string().trim().min(1).max(255),
         assignedTo: z.number().int().positive().optional(),
+        status: statusSchema.optional(),
         payload: jsonPayload,
       })
     )
@@ -192,6 +194,24 @@ export const collaborationRouter = router({
     .query(async ({ ctx, input }) => {
       await requireMembership(input.teamId, ctx.user.id);
       return db.listWorkItems(input.teamId, input.projectId);
+    }),
+
+  getWorkItem: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        id: z.number().int().positive(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await requireMembership(input.teamId, ctx.user.id);
+      const item = await db.getWorkItem(input.id, input.teamId);
+      if (!item)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Work item not found.",
+        });
+      return item;
     }),
 
   assignWorkItem: protectedProcedure

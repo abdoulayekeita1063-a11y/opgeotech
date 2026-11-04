@@ -450,6 +450,7 @@ export const collaborationWorkItems = mysqlTable("collaboration_work_items", {
   status: mysqlEnum("status", [
     "draft",
     "in_progress",
+    "completed",
     "waiting_review",
     "returned",
     "reviewed",

@@ -203,6 +203,15 @@ export async function createWorkItem(values: {
   module: string;
   title: string;
   assignedTo?: number;
+  status?:
+    | "draft"
+    | "in_progress"
+    | "completed"
+    | "waiting_review"
+    | "returned"
+    | "reviewed"
+    | "approved"
+    | "archived";
   payload: unknown;
   createdBy: number;
 }) {
@@ -210,6 +219,7 @@ export async function createWorkItem(values: {
   return db.transaction(async tx => {
     const [result] = await tx.insert(collaborationWorkItems).values({
       ...values,
+      status: values.status ?? "draft",
       payload: values.payload,
       updatedBy: values.createdBy,
     });
@@ -309,6 +319,7 @@ export async function updateWorkItemOptimistic(input: {
   status?:
     | "draft"
     | "in_progress"
+    | "completed"
     | "waiting_review"
     | "returned"
     | "reviewed"
@@ -375,6 +386,27 @@ export async function updateWorkItemOptimistic(input: {
       beforePayload: current.payload,
       afterPayload: input.payload,
     });
+    if (input.status && input.status !== current.status) {
+      const nextStatus = input.status;
+      const members = await tx
+        .select({ userId: collaborationTeamMembers.userId })
+        .from(collaborationTeamMembers)
+        .where(eq(collaborationTeamMembers.teamId, input.teamId));
+      const recipients = members
+        .map(member => member.userId)
+        .filter(userId => userId !== input.userId);
+      if (recipients.length) {
+        await tx.insert(collaborationNotifications).values(
+          recipients.map(userId => ({
+            teamId: input.teamId,
+            userId,
+            workItemId: input.id,
+            type: "status_change",
+            message: `Work item status changed to ${nextStatus.replaceAll("_", " ")}.`,
+          }))
+        );
+      }
+    }
     return { kind: "updated" as const, versionNumber: nextVersion };
   });
 }
