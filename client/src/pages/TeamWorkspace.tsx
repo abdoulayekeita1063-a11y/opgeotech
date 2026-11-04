@@ -17,6 +17,7 @@ import {
   Bell,
   ExternalLink,
   UserPlus,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,6 +56,7 @@ export default function TeamWorkspace() {
   const [selectedWorkItemId, setSelectedWorkItemId] = useState<number | null>(
     null
   );
+  const [openedWorkItemId, setOpenedWorkItemId] = useState<number | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteSearch, setInviteSearch] = useState("");
@@ -189,6 +191,16 @@ export default function TeamWorkspace() {
   const selectedWorkItem = work.data?.find(
     item => item.id === selectedWorkItemId
   );
+  const openedWorkItem = work.data?.find(item => item.id === openedWorkItemId);
+  const openedPayload = openedWorkItem?.payload as
+    | {
+        route?: string;
+        module?: string;
+        savedAt?: string;
+        fields?: Record<string, unknown>;
+        note?: string;
+      }
+    | undefined;
   const memberById = useMemo(
     () =>
       new Map(
@@ -232,6 +244,11 @@ export default function TeamWorkspace() {
     );
     toast.success("Shared snapshot loaded. Opening the source module.");
     window.location.href = payload.route || "/";
+  }
+
+  function openWorkFile(item: NonNullable<typeof work.data>[number]) {
+    setOpenedWorkItemId(item.id);
+    toast.success(`Opened shared file: ${item.title}`);
   }
 
   return (
@@ -731,6 +748,15 @@ export default function TeamWorkspace() {
                                 size="sm"
                                 variant="outline"
                                 className="rounded-none border-foreground"
+                                onClick={() => openWorkFile(item)}
+                              >
+                                <FileText className="mr-1 h-3.5 w-3.5" /> Open
+                                file
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-none border-foreground"
                                 onClick={() => continueWork(item)}
                               >
                                 <ExternalLink className="mr-1 h-3.5 w-3.5" />{" "}
@@ -766,6 +792,94 @@ export default function TeamWorkspace() {
                 </div>
               </CardContent>
             </Card>
+            {openedWorkItemId !== null && teamId !== null && openedWorkItem && (
+              <Card className="rounded-none border-primary shadow-none">
+                <CardHeader className="flex-row items-start justify-between gap-4 border-b border-primary bg-primary/5 px-4 py-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-sm uppercase tracking-widest">
+                      <FileText className="h-4 w-4 text-primary" /> Opened
+                      shared file
+                    </CardTitle>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {openedWorkItem.title} · {openedWorkItem.module} · version{" "}
+                      {openedWorkItem.versionNumber}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="rounded-none"
+                    onClick={() => continueWork(openedWorkItem)}
+                  >
+                    <ExternalLink className="mr-1 h-3.5 w-3.5" /> Open in module
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4 px-4 py-4">
+                  <div className="grid gap-3 text-xs sm:grid-cols-3">
+                    <div className="border border-border p-3">
+                      <span className="block uppercase tracking-widest text-muted-foreground">
+                        Status
+                      </span>
+                      <strong className="mt-1 block text-sm">
+                        {statusLabels[openedWorkItem.status] ??
+                          openedWorkItem.status}
+                      </strong>
+                    </div>
+                    <div className="border border-border p-3">
+                      <span className="block uppercase tracking-widest text-muted-foreground">
+                        Saved route
+                      </span>
+                      <strong className="mt-1 block break-all text-sm">
+                        {openedPayload?.route ?? "Not specified"}
+                      </strong>
+                    </div>
+                    <div className="border border-border p-3">
+                      <span className="block uppercase tracking-widest text-muted-foreground">
+                        Last saved
+                      </span>
+                      <strong className="mt-1 block text-sm">
+                        {openedPayload?.savedAt
+                          ? new Date(openedPayload.savedAt).toLocaleString()
+                          : new Date(openedWorkItem.updatedAt).toLocaleString()}
+                      </strong>
+                    </div>
+                  </div>
+                  {openedPayload?.fields &&
+                  Object.keys(openedPayload.fields).length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-widest">
+                        Saved form fields
+                      </p>
+                      <div className="grid max-h-72 gap-2 overflow-y-auto border border-border p-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {Object.entries(openedPayload.fields).map(
+                          ([field, value]) => (
+                            <div
+                              key={field}
+                              className="min-w-0 border-b border-border pb-2"
+                            >
+                              <span className="block truncate text-[10px] uppercase tracking-widest text-muted-foreground">
+                                {field}
+                              </span>
+                              <span className="mt-1 block break-words text-sm">
+                                {formatSharedValue(value)}
+                              </span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      This shared file has no captured form fields.
+                    </p>
+                  )}
+                  {openedPayload?.note && (
+                    <p className="text-xs text-muted-foreground">
+                      {openedPayload.note}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
             {selectedWorkItemId !== null && teamId !== null && (
               <Card className="rounded-none border-foreground shadow-none">
                 <CardHeader className="border-b border-foreground px-4 py-4">
@@ -977,4 +1091,11 @@ function UserAvatar({
       {initials}
     </span>
   );
+}
+
+function formatSharedValue(value: unknown) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
