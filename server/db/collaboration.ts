@@ -1,4 +1,4 @@
-import { and, desc, eq, like, ne, or } from "drizzle-orm";
+import { and, desc, eq, inArray, like, ne, or } from "drizzle-orm";
 import {
   collaborationAuditEvents,
   collaborationComments,
@@ -186,6 +186,119 @@ export async function createProject(values: {
   const db = await requireDb();
   const [result] = await db.insert(collaborationProjects).values(values);
   return Number(result.insertId);
+}
+
+export async function deleteProject(input: {
+  projectId: number;
+  teamId: number;
+}) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const project = await tx
+      .select({ id: collaborationProjects.id })
+      .from(collaborationProjects)
+      .where(
+        and(
+          eq(collaborationProjects.id, input.projectId),
+          eq(collaborationProjects.teamId, input.teamId)
+        )
+      )
+      .limit(1);
+    if (!project[0]) return false;
+    const items = await tx
+      .select({ id: collaborationWorkItems.id })
+      .from(collaborationWorkItems)
+      .where(
+        and(
+          eq(collaborationWorkItems.projectId, input.projectId),
+          eq(collaborationWorkItems.teamId, input.teamId)
+        )
+      );
+    const ids = items.map(item => item.id);
+    if (ids.length) {
+      await tx
+        .delete(collaborationNotifications)
+        .where(inArray(collaborationNotifications.workItemId, ids));
+      await tx
+        .delete(collaborationComments)
+        .where(inArray(collaborationComments.workItemId, ids));
+      await tx
+        .delete(collaborationVersions)
+        .where(inArray(collaborationVersions.workItemId, ids));
+      await tx
+        .delete(collaborationAuditEvents)
+        .where(inArray(collaborationAuditEvents.workItemId, ids));
+      await tx
+        .delete(collaborationSyncOperations)
+        .where(inArray(collaborationSyncOperations.workItemId, ids));
+      await tx
+        .delete(collaborationWorkItems)
+        .where(inArray(collaborationWorkItems.id, ids));
+    }
+    await tx
+      .delete(collaborationProjects)
+      .where(eq(collaborationProjects.id, input.projectId));
+    return true;
+  });
+}
+
+export async function deleteTeam(teamId: number) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const team = await tx
+      .select({ id: collaborationTeams.id })
+      .from(collaborationTeams)
+      .where(eq(collaborationTeams.id, teamId))
+      .limit(1);
+    if (!team[0]) return false;
+    const items = await tx
+      .select({ id: collaborationWorkItems.id })
+      .from(collaborationWorkItems)
+      .where(eq(collaborationWorkItems.teamId, teamId));
+    const ids = items.map(item => item.id);
+    if (ids.length) {
+      await tx
+        .delete(collaborationNotifications)
+        .where(inArray(collaborationNotifications.workItemId, ids));
+      await tx
+        .delete(collaborationComments)
+        .where(inArray(collaborationComments.workItemId, ids));
+      await tx
+        .delete(collaborationVersions)
+        .where(inArray(collaborationVersions.workItemId, ids));
+      await tx
+        .delete(collaborationAuditEvents)
+        .where(inArray(collaborationAuditEvents.workItemId, ids));
+      await tx
+        .delete(collaborationSyncOperations)
+        .where(inArray(collaborationSyncOperations.workItemId, ids));
+      await tx
+        .delete(collaborationWorkItems)
+        .where(inArray(collaborationWorkItems.id, ids));
+    }
+    await tx
+      .delete(collaborationNotifications)
+      .where(eq(collaborationNotifications.teamId, teamId));
+    await tx
+      .delete(collaborationAuditEvents)
+      .where(eq(collaborationAuditEvents.teamId, teamId));
+    await tx
+      .delete(collaborationSyncOperations)
+      .where(eq(collaborationSyncOperations.teamId, teamId));
+    await tx
+      .delete(collaborationInvitations)
+      .where(eq(collaborationInvitations.teamId, teamId));
+    await tx
+      .delete(collaborationProjects)
+      .where(eq(collaborationProjects.teamId, teamId));
+    await tx
+      .delete(collaborationTeamMembers)
+      .where(eq(collaborationTeamMembers.teamId, teamId));
+    await tx
+      .delete(collaborationTeams)
+      .where(eq(collaborationTeams.id, teamId));
+    return true;
+  });
 }
 
 export async function listProjectsForTeam(teamId: number) {

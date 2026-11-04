@@ -51,6 +51,21 @@ export const collaborationRouter = router({
     db.listTeamsForUser(ctx.user.id)
   ),
 
+  deleteTeam: protectedProcedure
+    .input(z.object({ teamId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can delete a team.",
+        });
+      const deleted = await db.deleteTeam(input.teamId);
+      if (!deleted)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+      return { success: true } as const;
+    }),
+
   addMember: protectedProcedure
     .input(
       z.object({
@@ -95,6 +110,29 @@ export const collaborationRouter = router({
     .query(async ({ ctx, input }) => {
       await requireMembership(input.teamId, ctx.user.id);
       return db.listProjectsForTeam(input.teamId);
+    }),
+
+  deleteProject: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        projectId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can delete a project.",
+        });
+      const deleted = await db.deleteProject(input);
+      if (!deleted)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found in this team.",
+        });
+      return { success: true } as const;
     }),
 
   listMembers: protectedProcedure

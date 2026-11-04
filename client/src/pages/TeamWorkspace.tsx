@@ -20,6 +20,7 @@ import {
   UserPlus,
   FileText,
   Download as DownloadIcon,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -130,6 +131,33 @@ export default function TeamWorkspace() {
     },
     onError: error => toast.error(error.message),
   });
+  const deleteTeam = trpc.collaboration.deleteTeam.useMutation({
+    onSuccess: () => {
+      setTeamId(null);
+      setProjectId(null);
+      setSelectedWorkItemId(null);
+      setOpenedWorkItemId(null);
+      void utils.collaboration.listMyTeams.invalidate();
+      toast.success("Team deleted");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const deleteProject = trpc.collaboration.deleteProject.useMutation({
+    onSuccess: () => {
+      setProjectId(null);
+      setSelectedWorkItemId(null);
+      setOpenedWorkItemId(null);
+      if (teamId !== null) {
+        void utils.collaboration.listProjects.invalidate({ teamId });
+        void utils.collaboration.listWorkItems.invalidate({
+          teamId,
+          projectId: undefined,
+        });
+      }
+      toast.success("Project deleted");
+    },
+    onError: error => toast.error(error.message),
+  });
   const assign = trpc.collaboration.assignWorkItem.useMutation({
     onSuccess: () => {
       if (teamId !== null)
@@ -190,6 +218,9 @@ export default function TeamWorkspace() {
   });
 
   const selectedTeam = teams.data?.find(item => item.team.id === teamId)?.team;
+  const selectedMembership = teams.data?.find(
+    item => item.team.id === teamId
+  )?.membership;
   const selectedProject = projects.data?.find(item => item.id === projectId);
   const selectedWorkItem = work.data?.find(
     item => item.id === selectedWorkItemId
@@ -496,16 +527,41 @@ export default function TeamWorkspace() {
                 </p>
               )}
               {(teams.data ?? []).map(({ team, membership }) => (
-                <button
+                <div
                   key={team.id}
-                  onClick={() => selectTeam(team.id)}
-                  className={`w-full border p-3 text-left transition-colors ${teamId === team.id ? "border-primary bg-primary/5" : "border-border hover:border-foreground"}`}
+                  className={`flex items-stretch border transition-colors ${teamId === team.id ? "border-primary bg-primary/5" : "border-border hover:border-foreground"}`}
                 >
-                  <span className="block font-bold">{team.name}</span>
-                  <span className="mt-1 block text-xs uppercase tracking-widest text-muted-foreground">
-                    {membership.role} · Team {team.id}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => selectTeam(team.id)}
+                    className="min-w-0 flex-1 p-3 text-left"
+                  >
+                    <span className="block truncate font-bold">
+                      {team.name}
+                    </span>
+                    <span className="mt-1 block text-xs uppercase tracking-widest text-muted-foreground">
+                      {membership.role} · Team {team.id}
+                    </span>
+                  </button>
+                  {(membership.role === "admin" ||
+                    membership.role === "manager") && (
+                    <button
+                      type="button"
+                      className="px-3 text-red-600 hover:bg-red-50"
+                      aria-label={`Delete team ${team.name}`}
+                      disabled={deleteTeam.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete team “${team.name}” and all its projects and shared work? This cannot be undone.`
+                          )
+                        )
+                          deleteTeam.mutate({ teamId: team.id });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               ))}
             </CardContent>
           </Card>
@@ -663,14 +719,40 @@ export default function TeamWorkspace() {
                 {teamId && (
                   <div className="flex flex-wrap gap-2">
                     {(projects.data ?? []).map(project => (
-                      <button
+                      <div
                         key={project.id}
-                        onClick={() => setProjectId(project.id)}
-                        className={`flex items-center gap-2 border px-3 py-2 text-sm ${projectId === project.id ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground"}`}
+                        className={`flex items-center border text-sm ${projectId === project.id ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-foreground"}`}
                       >
-                        <FolderKanban className="h-4 w-4" />
-                        {project.name}
-                      </button>
+                        <button
+                          onClick={() => setProjectId(project.id)}
+                          className="flex min-w-0 items-center gap-2 px-3 py-2 text-left"
+                        >
+                          <FolderKanban className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{project.name}</span>
+                        </button>
+                        {(selectedMembership?.role === "admin" ||
+                          selectedMembership?.role === "manager") && (
+                          <button
+                            type="button"
+                            className={`px-2 py-2 ${projectId === project.id ? "text-primary-foreground hover:bg-primary-foreground/10" : "text-red-600 hover:bg-red-50"}`}
+                            aria-label={`Delete project ${project.name}`}
+                            disabled={deleteProject.isPending}
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Delete project “${project.name}” and all its shared work? This cannot be undone.`
+                                )
+                              )
+                                deleteProject.mutate({
+                                  teamId: teamId!,
+                                  projectId: project.id,
+                                });
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     ))}
                     {!projects.isLoading && !projects.data?.length && (
                       <p className="text-sm text-muted-foreground">
