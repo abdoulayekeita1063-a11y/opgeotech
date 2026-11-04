@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   ExternalLink,
   UserPlus,
   FileText,
+  Download as DownloadIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,6 +59,7 @@ export default function TeamWorkspace() {
     null
   );
   const [openedWorkItemId, setOpenedWorkItemId] = useState<number | null>(null);
+  const [pdfFilename, setPdfFilename] = useState("opgeotech-shared-work");
   const [commentBody, setCommentBody] = useState("");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteSearch, setInviteSearch] = useState("");
@@ -201,6 +204,11 @@ export default function TeamWorkspace() {
         note?: string;
       }
     | undefined;
+  useEffect(() => {
+    if (openedWorkItem) {
+      setPdfFilename(safePdfFilename(openedWorkItem.title));
+    }
+  }, [openedWorkItem]);
   const memberById = useMemo(
     () =>
       new Map(
@@ -249,6 +257,108 @@ export default function TeamWorkspace() {
   function openWorkFile(item: NonNullable<typeof work.data>[number]) {
     setOpenedWorkItemId(item.id);
     toast.success(`Opened shared file: ${item.title}`);
+  }
+
+  function downloadOpenedPdf() {
+    if (!openedWorkItem) return;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const margin = 18;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = 20;
+    const ensureSpace = (height: number) => {
+      if (y + height > pageHeight - 18) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+    const addWrapped = (text: string, x: number, width: number, size = 10) => {
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(text, width) as string[];
+      ensureSpace(lines.length * 5 + 3);
+      doc.text(lines, x, y);
+      y += lines.length * 5 + 3;
+    };
+
+    doc.setFillColor(211, 47, 47);
+    doc.rect(margin, y - 5, 5, 5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.text("OPGeotech", margin + 9, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(new Date().toLocaleString(), pageWidth - margin, y, {
+      align: "right",
+    });
+    y += 12;
+    doc.setDrawColor(20, 20, 20);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    addWrapped(openedWorkItem.title, margin, pageWidth - margin * 2, 20);
+    doc.setFont("helvetica", "normal");
+    addWrapped("Shared work file", margin, pageWidth - margin * 2, 10);
+
+    const metadata: Array<[string, string]> = [
+      ["Module", openedWorkItem.module],
+      ["Status", statusLabels[openedWorkItem.status] ?? openedWorkItem.status],
+      ["Version", `v${openedWorkItem.versionNumber}`],
+      ["Work item", `#${openedWorkItem.id}`],
+      ["Saved route", openedPayload?.route ?? "Not specified"],
+      [
+        "Last saved",
+        openedPayload?.savedAt
+          ? new Date(openedPayload.savedAt).toLocaleString()
+          : new Date(openedWorkItem.updatedAt).toLocaleString(),
+      ],
+    ];
+    doc.setFont("helvetica", "normal");
+    metadata.forEach(([label, value]) => {
+      ensureSpace(10);
+      doc.setFillColor(246, 246, 246);
+      doc.rect(margin, y - 5, 48, 9, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text(label, margin + 3, y + 1);
+      doc.setFont("helvetica", "normal");
+      addWrapped(value, margin + 52, pageWidth - margin * 2 - 52, 9);
+    });
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    addWrapped("Saved form fields", margin, pageWidth - margin * 2, 13);
+    doc.setFont("helvetica", "normal");
+    Object.entries(openedPayload?.fields ?? {}).forEach(([field, value]) => {
+      ensureSpace(10);
+      const formatted = formatSharedValue(value);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.text(field, margin, y);
+      doc.setFont("helvetica", "normal");
+      addWrapped(formatted, margin + 55, pageWidth - margin * 2 - 55, 9);
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y + 1, pageWidth - margin, y + 1);
+    });
+    if (openedPayload?.note) {
+      y += 5;
+      doc.setFont("helvetica", "italic");
+      addWrapped(openedPayload.note, margin, pageWidth - margin * 2, 9);
+    }
+    const pages = doc.getNumberOfPages();
+    for (let page = 1; page <= pages; page += 1) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `OPGeotech · Shared work file · ${page}/${pages}`,
+        margin,
+        pageHeight - 9
+      );
+      doc.setTextColor(0, 0, 0);
+    }
+    doc.save(`${safePdfFilename(pdfFilename || openedWorkItem.title)}.pdf`);
+    toast.success("Shared work PDF downloaded");
   }
 
   return (
@@ -872,6 +982,24 @@ export default function TeamWorkspace() {
                       This shared file has no captured form fields.
                     </p>
                   )}
+                  <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-end">
+                    <label className="min-w-0 flex-1 text-xs font-bold uppercase tracking-widest">
+                      PDF filename
+                      <input
+                        className="mt-1 w-full border border-foreground bg-background px-3 py-2 text-sm font-normal"
+                        value={pdfFilename}
+                        onChange={event => setPdfFilename(event.target.value)}
+                        placeholder="opgeotech-shared-work"
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      className="rounded-none"
+                      onClick={downloadOpenedPdf}
+                    >
+                      <DownloadIcon className="mr-2 h-4 w-4" /> Download PDF
+                    </Button>
+                  </div>
                   {openedPayload?.note && (
                     <p className="text-xs text-muted-foreground">
                       {openedPayload.note}
@@ -1091,6 +1219,15 @@ function UserAvatar({
       {initials}
     </span>
   );
+}
+
+function safePdfFilename(value: string) {
+  const cleaned = value
+    .trim()
+    .replace(/\.pdf$/i, "")
+    .replace(/[^a-z0-9-_]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+  return cleaned || "opgeotech-shared-work";
 }
 
 function formatSharedValue(value: unknown) {
