@@ -1,6 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "../db/collaboration";
+import {
+  initializeProjectFolders,
+  safeProjectFolder,
+} from "../supabaseStorage";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const roleSchema = z.enum([
@@ -100,9 +104,18 @@ export const collaborationRouter = router({
           code: "FORBIDDEN",
           message: "Only team managers can create projects.",
         });
-      return {
-        id: await db.createProject({ ...input, createdBy: ctx.user.id }),
-      };
+      const id = await db.createProject({ ...input, createdBy: ctx.user.id });
+      let storageReady = false;
+      try {
+        await initializeProjectFolders(safeProjectFolder(input.name, id));
+        storageReady = true;
+      } catch (error) {
+        console.warn(
+          "Project created but Storage folders were not initialized",
+          error
+        );
+      }
+      return { id, storageReady };
     }),
 
   listProjects: protectedProcedure

@@ -23,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ProjectDataRoom } from "@/components/ProjectDataRoom";
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
@@ -127,7 +128,11 @@ export default function TeamWorkspace() {
       setProjectId(result.id);
       if (teamId !== null)
         void utils.collaboration.listProjects.invalidate({ teamId });
-      toast.success("Project created");
+      toast.success(
+        result.storageReady
+          ? "Project created with its Supabase Storage folders."
+          : "Project created; initialize its Storage folders from the Data Room."
+      );
     },
     onError: error => toast.error(error.message),
   });
@@ -781,6 +786,9 @@ export default function TeamWorkspace() {
                 value={selectedProject?.name ?? "All projects"}
               />
             </div>
+            {teamId !== null && projectId !== null && selectedProject && (
+              <ProjectDataRoom teamId={teamId} projectId={projectId} />
+            )}
             {teamId !== null && (
               <Card className="rounded-none border-foreground shadow-none">
                 <CardHeader className="border-b border-foreground px-4 py-4">

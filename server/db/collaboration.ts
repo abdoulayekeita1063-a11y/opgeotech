@@ -310,6 +310,21 @@ export async function listProjectsForTeam(teamId: number) {
     .orderBy(desc(collaborationProjects.createdAt));
 }
 
+export async function getProjectForTeam(projectId: number, teamId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(collaborationProjects)
+    .where(
+      and(
+        eq(collaborationProjects.id, projectId),
+        eq(collaborationProjects.teamId, teamId)
+      )
+    )
+    .limit(1);
+  return rows[0];
+}
+
 export async function createWorkItem(values: {
   teamId: number;
   projectId: number;
