@@ -66,7 +66,7 @@ const menuItems = [
   { icon: Waves, label: "Piezometer", path: "/piezometer" },
   { icon: UsersRound, label: "Team Workspace", path: "/team-workspace" },
   { icon: Archive, label: "Archive", path: "/archive" },
-  { icon: Download, label: "Download App", path: "/download" },
+  { icon: Download, label: "Desktop Installer", path: "/download" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
