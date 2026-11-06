@@ -44,6 +44,32 @@ function InstallerCard({
           </span>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        <div className="grid grid-cols-2 gap-px border border-slate-200 bg-slate-200 text-xs">
+          <div className="bg-slate-50 p-3">
+            <p className="uppercase tracking-wider text-muted-foreground">
+              Release
+            </p>
+            <p className="mt-1 font-bold text-foreground">v1.0.0</p>
+          </div>
+          <div className="bg-slate-50 p-3">
+            <p className="uppercase tracking-wider text-muted-foreground">
+              Architecture
+            </p>
+            <p className="mt-1 font-bold text-foreground">Windows x64</p>
+          </div>
+          <div className="bg-slate-50 p-3">
+            <p className="uppercase tracking-wider text-muted-foreground">
+              File size
+            </p>
+            <p className="mt-1 font-bold text-amber-700">Pending build</p>
+          </div>
+          <div className="bg-slate-50 p-3">
+            <p className="uppercase tracking-wider text-muted-foreground">
+              Signature
+            </p>
+            <p className="mt-1 font-bold text-amber-700">Pending signing</p>
+          </div>
+        </div>
       </div>
       <div className="mt-6 space-y-3">
         <Button className="w-full font-bold uppercase tracking-wider" disabled>
@@ -113,6 +139,16 @@ export default function Download() {
                 and signing script. Compile the final binaries on a trusted
                 Windows build machine.
               </p>
+              <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>
+                  Package version:{" "}
+                  <strong className="text-foreground">v1.0.0</strong>
+                </span>
+                <span>
+                  Download size:{" "}
+                  <strong className="text-foreground">9.5 KB</strong>
+                </span>
+              </div>
             </div>
           </div>
           <a
