@@ -114,6 +114,24 @@ function downloadTextFile(fileName: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+function createDesktopPairingFile(
+  token: string,
+  mode: "download_only" | "bidirectional"
+) {
+  return JSON.stringify(
+    {
+      version: 1,
+      appUrl: window.location.origin,
+      syncToken: token,
+      mode,
+      localRoot: "C:\\OPGeotech\\Projects",
+      createdAt: new Date().toISOString(),
+    },
+    null,
+    2
+  );
+}
+
 export function ProjectDataRoom({
   teamId,
   projectId,
@@ -124,6 +142,9 @@ export function ProjectDataRoom({
   const fileRef = useRef<HTMLInputElement>(null);
   const [folder, setFolder] = useState("01_Project");
   const [initializing, setInitializing] = useState(false);
+  const [syncMode, setSyncMode] = useState<"download_only" | "bidirectional">(
+    "download_only"
+  );
   const files = trpc.projectStorage.list.useQuery({ teamId, projectId });
   const syncTokens = trpc.collaboration.listSyncTokens.useQuery({
     teamId,
@@ -175,12 +196,12 @@ export function ProjectDataRoom({
   const createSyncToken = trpc.collaboration.createSyncToken.useMutation({
     onSuccess: result => {
       downloadTextFile(
-        `OPGeotech-Windows-Sync-${projectId}.ps1`,
-        createWindowsSyncScript(result.token)
+        `OPGeotech-Desktop-Pairing-${projectId}.json`,
+        createDesktopPairingFile(result.token, syncMode)
       );
       void syncTokens.refetch();
       toast.success(
-        "Windows sync script downloaded. Run it once as a test, then schedule it every 15 minutes."
+        "Desktop pairing file downloaded. The Windows installer can configure the project without manual token entry."
       );
     },
     onError: error => toast.error(error.message),
@@ -272,30 +293,55 @@ export function ProjectDataRoom({
                 sync
               </p>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Download a read-only PowerShell agent configured for this
-                project. It checks Supabase every 15 minutes and keeps local
-                files without deleting local data.
+                Generate a secure pairing file for the Windows installer. The
+                desktop agent checks Supabase every 15 minutes. Bidirectional
+                mode uploads local changes and preserves conflicts as separate
+                local files.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={createSyncToken.isPending}
-              onClick={() =>
-                createSyncToken.mutate({
-                  teamId,
-                  projectId,
-                  label: "Windows sync every 15 minutes",
-                })
-              }
-            >
-              {createSyncToken.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Download Windows sync agent
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Select
+                value={syncMode}
+                onValueChange={value =>
+                  setSyncMode(value as "download_only" | "bidirectional")
+                }
+              >
+                <SelectTrigger className="w-[190px] bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="download_only">
+                    Cloud → Windows only
+                  </SelectItem>
+                  <SelectItem value="bidirectional">
+                    Bidirectional with conflicts
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createSyncToken.isPending}
+                onClick={() =>
+                  createSyncToken.mutate({
+                    teamId,
+                    projectId,
+                    mode: syncMode,
+                    label:
+                      syncMode === "bidirectional"
+                        ? "Windows bidirectional sync every 15 minutes"
+                        : "Windows download sync every 15 minutes",
+                  })
+                }
+              >
+                {createSyncToken.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download pairing file
+              </Button>
+            </div>
           </div>
           {(syncTokens.data?.length ?? 0) > 0 && (
             <div className="mt-3 space-y-2 border-t border-red-200 pt-3 text-xs">
@@ -306,8 +352,11 @@ export function ProjectDataRoom({
                   key={token.id}
                 >
                   <span>
-                    {token.label} · created{" "}
-                    {new Date(token.createdAt).toLocaleString()}
+                    {token.label} ·{" "}
+                    {token.mode === "bidirectional"
+                      ? "bidirectional"
+                      : "read-only"}{" "}
+                    · created {new Date(token.createdAt).toLocaleString()}
                     {token.revokedAt ? " · revoked" : ""}
                   </span>
                   {!token.revokedAt && (

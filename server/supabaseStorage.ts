@@ -174,6 +174,35 @@ export async function uploadProjectFile(input: {
   return { path, bucket: ENV.supabaseStorageBucket };
 }
 
+export async function uploadProjectObject(input: {
+  projectFolder: string;
+  relativePath: string;
+  mimeType: string;
+  data: Buffer;
+}) {
+  const relativePath = input.relativePath.replace(/\\/g, "/");
+  const isAllowed = PROJECT_STORAGE_FOLDERS.some(
+    folder =>
+      relativePath.startsWith(`${folder}/`) && !relativePath.includes("..")
+  );
+  if (!isAllowed || relativePath.endsWith("/.keep")) {
+    throw new Error("The file path is outside the allowed project folders.");
+  }
+  const path = `${input.projectFolder}/${relativePath}`;
+  await storageRequest(
+    `/object/${encodeURIComponent(ENV.supabaseStorageBucket)}/${encodePath(path)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": input.mimeType || "application/octet-stream",
+        "x-upsert": "true",
+      },
+      body: input.data as unknown as BodyInit,
+    }
+  );
+  return { path, bucket: ENV.supabaseStorageBucket };
+}
+
 export async function listProjectFiles(projectFolder: string) {
   await ensureProjectBucket();
   const response = await storageRequest(

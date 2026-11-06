@@ -5,6 +5,7 @@ param(
   [string]$AppUrl,
   [string]$SyncToken,
   [string]$LocalRoot = "C:\OPGeotech\Projects",
+  [string]$PairingFile,
   [switch]$ConfigureOnly
 )
 
@@ -20,13 +21,30 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
   throw "Please run this installer as Administrator."
 }
 
+if ([string]::IsNullOrWhiteSpace($PairingFile)) {
+  $downloadPairing = Get-ChildItem -Path (Join-Path $env:USERPROFILE "Downloads") -Filter "OPGeotech-Desktop-Pairing-*.json" -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($downloadPairing) { $PairingFile = $downloadPairing.FullName }
+}
+if (-not [string]::IsNullOrWhiteSpace($PairingFile) -and (Test-Path $PairingFile)) {
+  $pairing = Get-Content $PairingFile -Raw | ConvertFrom-Json
+  if ([string]::IsNullOrWhiteSpace($AppUrl)) { $AppUrl = [string]$pairing.appUrl }
+  if ([string]::IsNullOrWhiteSpace($SyncToken)) { $SyncToken = [string]$pairing.syncToken }
+  if ($LocalRoot -eq "C:\OPGeotech\Projects" -and -not [string]::IsNullOrWhiteSpace([string]$pairing.localRoot)) {
+    $LocalRoot = [string]$pairing.localRoot
+  }
+  $pairingMode = [string]$pairing.mode
+} else {
+  $pairingMode = "download_only"
+}
+
 if ([string]::IsNullOrWhiteSpace($AppUrl)) { $AppUrl = Read-Host "OPGeotech web address (for example https://your-opgeotech-domain)" }
 if ([string]::IsNullOrWhiteSpace($SyncToken)) { $SyncToken = Read-Host "Project Windows sync token" }
 if ([string]::IsNullOrWhiteSpace($AppUrl) -or [string]::IsNullOrWhiteSpace($SyncToken)) { throw "An OPGeotech URL and a project sync token are required." }
 
 New-Item -ItemType Directory -Force -Path $root, $LocalRoot, $programDir, $configDir | Out-Null
 Copy-Item -Force $syncSource $syncScript
-$config = [ordered]@{ appUrl = $AppUrl.TrimEnd('/'); syncToken = $SyncToken.Trim(); localRoot = $LocalRoot }
+$config = [ordered]@{ appUrl = $AppUrl.TrimEnd('/'); syncToken = $SyncToken.Trim(); mode = $pairingMode; localRoot = $LocalRoot }
 $configPath = Join-Path $configDir "config.json"
 $config | ConvertTo-Json | Set-Content -Encoding UTF8 $configPath
 

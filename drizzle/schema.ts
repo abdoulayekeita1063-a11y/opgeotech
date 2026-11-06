@@ -566,6 +566,9 @@ export const projectSyncTokens = mysqlTable("project_sync_tokens", {
   createdBy: int("createdBy").notNull(),
   tokenHash: varchar("tokenHash", { length: 128 }).notNull().unique(),
   label: varchar("label", { length: 120 }).notNull(),
+  mode: mysqlEnum("mode", ["download_only", "bidirectional"])
+    .default("download_only")
+    .notNull(),
   lastUsedAt: timestamp("lastUsedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   revokedAt: timestamp("revokedAt"),

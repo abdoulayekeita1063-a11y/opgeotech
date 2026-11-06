@@ -1,10 +1,11 @@
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import * as collaborationDb from "./db/collaboration";
 import {
   downloadProjectFile,
   listProjectFilesForExport,
   projectStorageBucket,
   safeProjectFolder,
+  uploadProjectObject,
 } from "./supabaseStorage";
 
 function getToken(request: Request) {
@@ -46,6 +47,7 @@ export function registerProjectSyncRoutes(app: Express) {
           name: access.project.name,
           folder: projectFolder,
         },
+        mode: access.token.mode,
         bucket: projectStorageBucket(),
         generatedAt: new Date().toISOString(),
         files,
@@ -82,4 +84,48 @@ export function registerProjectSyncRoutes(app: Express) {
       response.status(500).json({ error: String(error) });
     }
   });
+
+  app.post(
+    "/api/project-sync/:token/file",
+    express.raw({ type: "application/octet-stream", limit: "50mb" }),
+    async (request, response) => {
+      try {
+        const access = await authorize(request, response);
+        if (!access) return;
+        if (access.token.mode !== "bidirectional") {
+          response.status(403).json({ error: "This sync token is read-only." });
+          return;
+        }
+        const path = String(request.query.path ?? "");
+        const projectFolder = safeProjectFolder(
+          access.project.name,
+          access.project.id
+        );
+        if (!path.startsWith(`${projectFolder}/`)) {
+          response
+            .status(400)
+            .json({ error: "File path is outside the project." });
+          return;
+        }
+        const relativePath = path.slice(`${projectFolder}/`.length);
+        const body = Buffer.isBuffer(request.body)
+          ? request.body
+          : Buffer.from([]);
+        if (!body.byteLength) {
+          response.status(400).json({ error: "The upload body is empty." });
+          return;
+        }
+        await uploadProjectObject({
+          projectFolder,
+          relativePath,
+          mimeType:
+            request.header("content-type") ?? "application/octet-stream",
+          data: body,
+        });
+        response.json({ success: true, path });
+      } catch (error) {
+        response.status(500).json({ error: String(error) });
+      }
+    }
+  );
 }

@@ -199,6 +199,7 @@ export async function createProjectSyncToken(input: {
   projectId: number;
   createdBy: number;
   label: string;
+  mode: "download_only" | "bidirectional";
 }) {
   const db = await requireDb();
   const token = `opg_sync_${randomBytes(32).toString("base64url")}`;
@@ -232,6 +233,7 @@ export async function listProjectSyncTokens(teamId: number, projectId: number) {
     .select({
       id: projectSyncTokens.id,
       label: projectSyncTokens.label,
+      mode: projectSyncTokens.mode,
       createdAt: projectSyncTokens.createdAt,
       lastUsedAt: projectSyncTokens.lastUsedAt,
       revokedAt: projectSyncTokens.revokedAt,

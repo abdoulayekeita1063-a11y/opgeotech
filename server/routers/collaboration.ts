@@ -142,6 +142,9 @@ export const collaborationRouter = router({
         teamId: z.number().int().positive(),
         projectId: z.number().int().positive(),
         label: z.string().trim().min(2).max(120).default("Windows sync"),
+        mode: z
+          .enum(["download_only", "bidirectional"])
+          .default("download_only"),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -1,0 +1,1 @@
+ALTER TABLE `project_sync_tokens` ADD `mode` enum('download_only','bidirectional') DEFAULT 'download_only' NOT NULL;
