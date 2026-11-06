@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, like, ne, or } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
+import { and, desc, eq, inArray, isNull, like, ne, or } from "drizzle-orm";
 import {
   collaborationAuditEvents,
   collaborationComments,
@@ -10,6 +11,7 @@ import {
   collaborationTeams,
   collaborationVersions,
   collaborationWorkItems,
+  projectSyncTokens,
   users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -186,6 +188,87 @@ export async function createProject(values: {
   const db = await requireDb();
   const [result] = await db.insert(collaborationProjects).values(values);
   return Number(result.insertId);
+}
+
+function hashSyncToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export async function createProjectSyncToken(input: {
+  teamId: number;
+  projectId: number;
+  createdBy: number;
+  label: string;
+}) {
+  const db = await requireDb();
+  const token = `opg_sync_${randomBytes(32).toString("base64url")}`;
+  const [result] = await db.insert(projectSyncTokens).values({
+    ...input,
+    tokenHash: hashSyncToken(token),
+  });
+  return { id: Number(result.insertId), token };
+}
+
+export async function revokeProjectSyncToken(input: {
+  id: number;
+  teamId: number;
+}) {
+  const db = await requireDb();
+  const result = await db
+    .update(projectSyncTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(projectSyncTokens.id, input.id),
+        eq(projectSyncTokens.teamId, input.teamId)
+      )
+    );
+  return result[0]?.affectedRows > 0;
+}
+
+export async function listProjectSyncTokens(teamId: number, projectId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: projectSyncTokens.id,
+      label: projectSyncTokens.label,
+      createdAt: projectSyncTokens.createdAt,
+      lastUsedAt: projectSyncTokens.lastUsedAt,
+      revokedAt: projectSyncTokens.revokedAt,
+    })
+    .from(projectSyncTokens)
+    .where(
+      and(
+        eq(projectSyncTokens.teamId, teamId),
+        eq(projectSyncTokens.projectId, projectId)
+      )
+    )
+    .orderBy(desc(projectSyncTokens.createdAt));
+}
+
+export async function getProjectBySyncToken(token: string) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ token: projectSyncTokens, project: collaborationProjects })
+    .from(projectSyncTokens)
+    .innerJoin(
+      collaborationProjects,
+      eq(collaborationProjects.id, projectSyncTokens.projectId)
+    )
+    .where(
+      and(
+        eq(projectSyncTokens.tokenHash, hashSyncToken(token)),
+        isNull(projectSyncTokens.revokedAt)
+      )
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return undefined;
+  await db
+    .update(projectSyncTokens)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(projectSyncTokens.id, row.token.id));
+  return row;
 }
 
 export async function deleteProject(input: {

@@ -558,3 +558,15 @@ export const collaborationInvitations = mysqlTable(
     respondedAt: timestamp("respondedAt"),
   }
 );
+
+export const projectSyncTokens = mysqlTable("project_sync_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  teamId: int("teamId").notNull(),
+  projectId: int("projectId").notNull(),
+  createdBy: int("createdBy").notNull(),
+  tokenHash: varchar("tokenHash", { length: 128 }).notNull().unique(),
+  label: varchar("label", { length: 120 }).notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  revokedAt: timestamp("revokedAt"),
+});

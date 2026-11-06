@@ -1,3 +1,4 @@
+import { ZipArchive } from "archiver";
 import { ENV } from "./_core/env";
 
 export const PROJECT_STORAGE_FOLDERS = [
@@ -108,9 +109,15 @@ export async function ensureProjectBucket() {
       file_size_limit: 52428800,
     }),
   });
-  if (response.ok || response.status === 409)
-    return { bucket, created: response.ok };
   const message = await response.text().catch(() => response.statusText);
+  if (
+    response.ok ||
+    response.status === 409 ||
+    message.includes("BucketAlreadyExists") ||
+    message.includes("resource already exists")
+  ) {
+    return { bucket, created: response.ok };
+  }
   throw new Error(
     `Supabase bucket setup failed (${response.status}): ${message}`
   );
@@ -187,6 +194,89 @@ export async function listProjectFiles(projectFolder: string) {
     id?: string;
     metadata?: Record<string, unknown>;
   }>;
+}
+
+type ListedStorageFile = {
+  path: string;
+  relativePath: string;
+  size: number | null;
+  etag: string | null;
+  updatedAt: string | null;
+};
+
+async function listStoragePrefix(prefix: string) {
+  const response = await storageRequest(
+    `/object/list/${encodeURIComponent(ENV.supabaseStorageBucket)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prefix,
+        limit: 1000,
+        offset: 0,
+        sortBy: { column: "name", order: "asc" },
+      }),
+    }
+  );
+  return (await response.json()) as Array<{
+    name: string;
+    id?: string;
+    metadata?: {
+      size?: number;
+      eTag?: string;
+      etag?: string;
+      updated_at?: string;
+      lastModified?: string;
+    };
+  }>;
+}
+
+export async function downloadProjectFile(path: string) {
+  const response = await storageRequest(
+    `/object/${encodeURIComponent(ENV.supabaseStorageBucket)}/${encodePath(path)}`
+  );
+  return Buffer.from(await response.arrayBuffer());
+}
+
+export async function listProjectFilesForExport(projectFolder: string) {
+  const files: ListedStorageFile[] = [];
+  for (const folder of PROJECT_STORAGE_FOLDERS) {
+    const prefix = `${projectFolder}/${folder}`;
+    const entries = await listStoragePrefix(prefix);
+    for (const entry of entries) {
+      const relativePath = `${folder}/${entry.name}`;
+      files.push({
+        path: `${projectFolder}/${relativePath}`,
+        relativePath,
+        size: entry.metadata?.size ?? null,
+        etag: entry.metadata?.eTag ?? entry.metadata?.etag ?? null,
+        updatedAt:
+          entry.metadata?.updated_at ?? entry.metadata?.lastModified ?? null,
+      });
+    }
+  }
+  return files;
+}
+
+export async function createProjectZip(projectFolder: string) {
+  await ensureProjectBucket();
+  const files = await listProjectFilesForExport(projectFolder);
+  const chunks: Buffer[] = [];
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  const completed = new Promise<void>((resolve, reject) => {
+    archive.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    archive.on("end", () => resolve());
+    archive.on("error", reject);
+  });
+
+  for (const file of files) {
+    archive.append(await downloadProjectFile(file.path), {
+      name: file.relativePath,
+    });
+  }
+  await archive.finalize();
+  await completed;
+  return Buffer.concat(chunks);
 }
 
 export async function createProjectSignedUrl(path: string, expiresIn = 3600) {

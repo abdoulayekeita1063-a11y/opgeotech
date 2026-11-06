@@ -118,6 +118,71 @@ export const collaborationRouter = router({
       return { id, storageReady };
     }),
 
+  listSyncTokens: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        projectId: z.number().int().positive(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      await requireMembership(input.teamId, ctx.user.id);
+      const project = await db.getProjectForTeam(input.projectId, input.teamId);
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found in this team.",
+        });
+      return db.listProjectSyncTokens(input.teamId, input.projectId);
+    }),
+
+  createSyncToken: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        projectId: z.number().int().positive(),
+        label: z.string().trim().min(2).max(120).default("Windows sync"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can create Windows sync tokens.",
+        });
+      const project = await db.getProjectForTeam(input.projectId, input.teamId);
+      if (!project)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found in this team.",
+        });
+      return db.createProjectSyncToken({ ...input, createdBy: ctx.user.id });
+    }),
+
+  revokeSyncToken: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        id: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireMembership(input.teamId, ctx.user.id);
+      if (!canManage(membership.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only team managers can revoke Windows sync tokens.",
+        });
+      const revoked = await db.revokeProjectSyncToken(input);
+      if (!revoked)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Sync token not found.",
+        });
+      return { success: true } as const;
+    }),
+
   listProjects: protectedProcedure
     .input(z.object({ teamId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {

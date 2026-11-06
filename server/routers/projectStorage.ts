@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as collaborationDb from "../db/collaboration";
 import {
   createProjectSignedUrl,
+  createProjectZip,
   initializeProjectFolders,
   listProjectFiles,
   PROJECT_STORAGE_FOLDERS,
@@ -161,5 +162,25 @@ export const projectStorageRouter = router({
         });
       }
       return { url: await createProjectSignedUrl(input.path) };
+    }),
+
+  exportZip: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.number().int().positive(),
+        projectId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const access = await requireProjectAccess(
+        input.teamId,
+        input.projectId,
+        ctx.user.id
+      );
+      const archive = await createProjectZip(access.projectFolder);
+      return {
+        fileName: `${access.projectFolder.split("/").at(-1) ?? "opgeotech-project"}.zip`,
+        dataBase64: archive.toString("base64"),
+      };
     }),
 });

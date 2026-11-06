@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
 import {
+  Archive,
   FolderOpen,
   HardDriveUpload,
   Loader2,
   Download,
   RefreshCw,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -36,6 +39,81 @@ const folderLabels: Record<string, string> = {
   "13_Exports": "13 Exports",
 };
 
+function createWindowsSyncScript(token: string) {
+  const baseUrl = window.location.origin;
+  return `# OPGeotech Cloud -> Windows project synchronizer
+# This token is read-only and scoped to one OPGeotech project. Keep this file private.
+# Revoke the token from Team Workspace if this file is lost.
+
+param(
+  [switch]$RunOnce,
+  [switch]$Install,
+  [string]$LocalRoot = "C:\\OPGeotech\\Projects"
+)
+
+$BaseUrl = "${baseUrl}"
+$Token = "${token}"
+$IntervalSeconds = 900
+$Headers = @{ Authorization = "Bearer $Token" }
+
+function Sync-Project {
+  $manifest = Invoke-RestMethod -Uri "$BaseUrl/api/project-sync/$Token/manifest" -Headers $Headers
+  $safeName = [regex]::Replace([string]$manifest.project.name, '[^a-zA-Z0-9._-]', '-').Trim('-')
+  if ([string]::IsNullOrWhiteSpace($safeName)) { $safeName = "project" }
+  $projectRoot = Join-Path $LocalRoot "$safeName-$($manifest.project.id)"
+  New-Item -ItemType Directory -Force -Path $projectRoot | Out-Null
+  $statePath = Join-Path $projectRoot ".opgeotech-sync-state.json"
+  $state = @{}
+  if (Test-Path $statePath) {
+    $saved = Get-Content $statePath -Raw
+    if ($saved.Trim()) {
+      $parsed = $saved | ConvertFrom-Json
+      $parsed.PSObject.Properties | ForEach-Object { $state[$_.Name] = [string]$_.Value }
+    }
+  }
+
+  foreach ($entry in $manifest.files) {
+    $relative = ([string]$entry.relativePath).Replace('/', [IO.Path]::DirectorySeparatorChar)
+    $localPath = Join-Path $projectRoot $relative
+    $parent = Split-Path $localPath -Parent
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    if ($relative -eq '.keep' -or $relative.EndsWith('\\.keep')) { continue }
+    $fingerprint = "$($entry.etag)|$($entry.size)|$($entry.updatedAt)"
+    if ($state.ContainsKey($entry.relativePath) -and $state[$entry.relativePath] -eq $fingerprint -and (Test-Path $localPath)) { continue }
+    $temporaryPath = "$localPath.opgeotech-tmp"
+    Invoke-WebRequest -Uri "$BaseUrl/api/project-sync/$Token/file?path=$([uri]::EscapeDataString([string]$entry.path))" -Headers $Headers -OutFile $temporaryPath
+    Move-Item -Force $temporaryPath $localPath
+    $state[$entry.relativePath] = $fingerprint
+    Write-Host "Synced $($entry.relativePath)"
+  }
+  $state | ConvertTo-Json | Set-Content -Encoding UTF8 $statePath
+}
+
+if ($Install) {
+  $scriptPath = $MyInvocation.MyCommand.Path
+  $taskName = "OPGeotech Cloud Sync $($Token.Substring($Token.Length - 8))"
+  $quote = [char]34
+  $argument = "-NoProfile -ExecutionPolicy Bypass -File $quote$scriptPath$quote -RunOnce -LocalRoot $quote$LocalRoot$quote"
+  $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument $argument
+  $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration ([TimeSpan]::MaxValue)
+  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable) -Force | Out-Null
+  Write-Host "Installed $taskName. Cloud -> Windows sync runs every 15 minutes."
+  exit 0
+}
+
+try { Sync-Project } catch { Write-Warning $_.Exception.Message; exit 1 }
+`;
+}
+
+function downloadTextFile(fileName: string, content: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/plain" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ProjectDataRoom({
   teamId,
   projectId,
@@ -47,6 +125,10 @@ export function ProjectDataRoom({
   const [folder, setFolder] = useState("01_Project");
   const [initializing, setInitializing] = useState(false);
   const files = trpc.projectStorage.list.useQuery({ teamId, projectId });
+  const syncTokens = trpc.collaboration.listSyncTokens.useQuery({
+    teamId,
+    projectId,
+  });
   const initialize = trpc.projectStorage.initialize.useMutation({
     onSuccess: result => {
       setInitializing(false);
@@ -70,6 +152,44 @@ export function ProjectDataRoom({
   const download = trpc.projectStorage.download.useMutation({
     onSuccess: result =>
       window.open(result.url, "_blank", "noopener,noreferrer"),
+    onError: error => toast.error(error.message),
+  });
+  const exportZip = trpc.projectStorage.exportZip.useMutation({
+    onSuccess: result => {
+      const binary = atob(result.dataBase64);
+      const bytes = Uint8Array.from(binary, character =>
+        character.charCodeAt(0)
+      );
+      const url = URL.createObjectURL(
+        new Blob([bytes], { type: "application/zip" })
+      );
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = result.fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("Complete project ZIP downloaded.");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const createSyncToken = trpc.collaboration.createSyncToken.useMutation({
+    onSuccess: result => {
+      downloadTextFile(
+        `OPGeotech-Windows-Sync-${projectId}.ps1`,
+        createWindowsSyncScript(result.token)
+      );
+      void syncTokens.refetch();
+      toast.success(
+        "Windows sync script downloaded. Run it once as a test, then schedule it every 15 minutes."
+      );
+    },
+    onError: error => toast.error(error.message),
+  });
+  const revokeSyncToken = trpc.collaboration.revokeSyncToken.useMutation({
+    onSuccess: () => {
+      void syncTokens.refetch();
+      toast.success("Windows sync token revoked.");
+    },
     onError: error => toast.error(error.message),
   });
 
@@ -111,24 +231,102 @@ export function ProjectDataRoom({
             Supabase Storage folders for the complete OPGeotech project record.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={initializing}
-          onClick={() => {
-            setInitializing(true);
-            initialize.mutate({ teamId, projectId });
-          }}
-        >
-          {initializing ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="mr-2 h-4 w-4" />
-          )}{" "}
-          Initialize folders
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportZip.isPending || !files.data}
+            onClick={() => exportZip.mutate({ teamId, projectId })}
+          >
+            {exportZip.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Archive className="mr-2 h-4 w-4" />
+            )}
+            Export complete project to ZIP
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={initializing}
+            onClick={() => {
+              setInitializing(true);
+              initialize.mutate({ teamId, projectId });
+            }}
+          >
+            {initializing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}{" "}
+            Initialize folders
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded border border-red-200 bg-red-50/50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="flex items-center gap-2 font-medium">
+                <ShieldCheck className="h-4 w-4 text-red-600" /> Windows cloud
+                sync
+              </p>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Download a read-only PowerShell agent configured for this
+                project. It checks Supabase every 15 minutes and keeps local
+                files without deleting local data.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={createSyncToken.isPending}
+              onClick={() =>
+                createSyncToken.mutate({
+                  teamId,
+                  projectId,
+                  label: "Windows sync every 15 minutes",
+                })
+              }
+            >
+              {createSyncToken.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Download Windows sync agent
+            </Button>
+          </div>
+          {(syncTokens.data?.length ?? 0) > 0 && (
+            <div className="mt-3 space-y-2 border-t border-red-200 pt-3 text-xs">
+              <p className="font-medium">Active sync tokens</p>
+              {syncTokens.data?.map(token => (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2"
+                  key={token.id}
+                >
+                  <span>
+                    {token.label} · created{" "}
+                    {new Date(token.createdAt).toLocaleString()}
+                    {token.revokedAt ? " · revoked" : ""}
+                  </span>
+                  {!token.revokedAt && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={revokeSyncToken.isPending}
+                      onClick={() =>
+                        revokeSyncToken.mutate({ teamId, id: token.id })
+                      }
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" /> Revoke
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <Select value={folder} onValueChange={setFolder}>
             <SelectTrigger>
