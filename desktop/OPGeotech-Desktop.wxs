@@ -33,7 +33,7 @@
     </StandardDirectory>
 
     <ComponentGroup Id="ProgramFilesComponents" Directory="INSTALLFOLDER">
-      <Component Id="ProgramFilesScripts" Guid="*">
+      <Component Id="ProgramFilesScripts" Guid="A7E0B6D1-0B4D-4C9D-9D4C-202611060006">
         <File Id="InstallScript" Source="desktop\install-opgeotech.ps1" KeyPath="yes" />
         <File Id="SyncScript" Source="desktop\opgeotech-sync.ps1" />
         <File Id="LaunchScript" Source="desktop\opgeotech-launch.ps1" />
