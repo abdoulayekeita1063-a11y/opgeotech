@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ModuleHeader } from "@/components/ModuleHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,17 +18,69 @@ import {
 const SOURCE_PACKAGE_URL =
   "/manus-storage/OPGeotech-Desktop-Installer-Sources-v2_f30bf001.zip";
 
+type InstallerArtifact = {
+  fileName: string;
+  size: string | null;
+  sizeBytes: number | null;
+  sha256: string | null;
+  signed: boolean;
+  downloadUrl: string | null;
+};
+
+type DesktopRelease = {
+  product: string;
+  version: string;
+  published: boolean;
+  architecture: string;
+  artifacts: {
+    exe: InstallerArtifact;
+    msi: InstallerArtifact;
+  };
+};
+
+const FALLBACK_RELEASE: DesktopRelease = {
+  product: "OPGeotech Desktop",
+  version: "v1.0.0",
+  published: false,
+  architecture: "Windows x64",
+  artifacts: {
+    exe: {
+      fileName: "OPGeotech-Desktop-Setup-1.0.0.exe",
+      size: null,
+      sizeBytes: null,
+      sha256: null,
+      signed: false,
+      downloadUrl: null,
+    },
+    msi: {
+      fileName: "OPGeotech-Desktop-1.0.0.msi",
+      size: null,
+      sizeBytes: null,
+      sha256: null,
+      signed: false,
+      downloadUrl: null,
+    },
+  },
+};
+
 function InstallerCard({
   title,
   subtitle,
   description,
   format,
+  release,
 }: {
   title: string;
   subtitle: string;
   description: string;
   format: "EXE" | "MSI";
+  release: DesktopRelease;
 }) {
+  const artifact = release.artifacts[format.toLowerCase() as "exe" | "msi"];
+  const available = Boolean(
+    release.published && artifact.downloadUrl && artifact.signed
+  );
+
   return (
     <div className="flex h-full flex-col justify-between border border-foreground bg-white p-6">
       <div className="space-y-4">
@@ -39,8 +92,10 @@ function InstallerCard({
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             </div>
           </div>
-          <span className="border border-amber-400 bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
-            Build required
+          <span
+            className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${available ? "border-emerald-400 bg-emerald-50 text-emerald-800" : "border-amber-400 bg-amber-50 text-amber-800"}`}
+          >
+            {available ? "Ready" : "Build required"}
           </span>
         </div>
         <p className="text-sm leading-6 text-muted-foreground">{description}</p>
@@ -49,36 +104,62 @@ function InstallerCard({
             <p className="uppercase tracking-wider text-muted-foreground">
               Release
             </p>
-            <p className="mt-1 font-bold text-foreground">v1.0.0</p>
+            <p className="mt-1 font-bold text-foreground">{release.version}</p>
           </div>
           <div className="bg-slate-50 p-3">
             <p className="uppercase tracking-wider text-muted-foreground">
               Architecture
             </p>
-            <p className="mt-1 font-bold text-foreground">Windows x64</p>
+            <p className="mt-1 font-bold text-foreground">
+              {release.architecture}
+            </p>
           </div>
           <div className="bg-slate-50 p-3">
             <p className="uppercase tracking-wider text-muted-foreground">
               File size
             </p>
-            <p className="mt-1 font-bold text-amber-700">Pending build</p>
+            <p
+              className={`mt-1 font-bold ${artifact.size ? "text-foreground" : "text-amber-700"}`}
+            >
+              {artifact.size ?? "Pending build"}
+            </p>
           </div>
           <div className="bg-slate-50 p-3">
             <p className="uppercase tracking-wider text-muted-foreground">
               Signature
             </p>
-            <p className="mt-1 font-bold text-amber-700">Pending signing</p>
+            <p
+              className={`mt-1 font-bold ${artifact.signed ? "text-emerald-700" : "text-amber-700"}`}
+            >
+              {artifact.signed ? "Verified" : "Pending signing"}
+            </p>
           </div>
         </div>
       </div>
       <div className="mt-6 space-y-3">
-        <Button className="w-full font-bold uppercase tracking-wider" disabled>
-          <DownloadIcon className="mr-2 h-4 w-4" />
-          Download {format} installer
-        </Button>
+        {available ? (
+          <a
+            href={artifact.downloadUrl ?? undefined}
+            download={artifact.fileName}
+          >
+            <Button className="w-full font-bold uppercase tracking-wider">
+              <DownloadIcon className="mr-2 h-4 w-4" />
+              Download {format} installer
+            </Button>
+          </a>
+        ) : (
+          <Button
+            className="w-full font-bold uppercase tracking-wider"
+            disabled
+          >
+            <DownloadIcon className="mr-2 h-4 w-4" />
+            Download {format} installer
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground">
-          The signed {format} release artifact will be enabled after it is built
-          on Windows and published by the project administrator.
+          {available
+            ? `Signed ${format} release artifact ready for download.`
+            : `The signed ${format} release artifact will be enabled after it is built on Windows and published.`}
         </p>
       </div>
     </div>
@@ -86,6 +167,23 @@ function InstallerCard({
 }
 
 export default function Download() {
+  const [release, setRelease] = useState<DesktopRelease>(FALLBACK_RELEASE);
+
+  useEffect(() => {
+    fetch("/desktop-release.json", { cache: "no-store" })
+      .then(response => (response.ok ? response.json() : null))
+      .then((metadata: DesktopRelease | null) => {
+        if (
+          metadata?.version &&
+          metadata.artifacts?.exe &&
+          metadata.artifacts?.msi
+        ) {
+          setRelease(metadata);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <ModuleHeader
@@ -115,12 +213,14 @@ export default function Download() {
           title="Windows EXE"
           subtitle="Inno Setup · Windows 10/11 64-bit"
           format="EXE"
+          release={release}
           description="The guided installer creates the OPGeotech Desktop shortcut, local project folders and the 15-minute Windows Task Scheduler synchronization task."
         />
         <InstallerCard
           title="Windows MSI"
           subtitle="WiX Toolset · managed deployment"
           format="MSI"
+          release={release}
           description="Use the MSI package for managed company deployment, software distribution tools and administrator-controlled Windows installations."
         />
       </section>

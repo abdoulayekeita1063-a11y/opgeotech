@@ -1,0 +1,24 @@
+{
+  "product": "OPGeotech Desktop",
+  "version": "v1.0.0",
+  "published": false,
+  "architecture": "Windows x64",
+  "artifacts": {
+    "exe": {
+      "fileName": "OPGeotech-Desktop-Setup-1.0.0.exe",
+      "size": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "signed": false,
+      "downloadUrl": null
+    },
+    "msi": {
+      "fileName": "OPGeotech-Desktop-1.0.0.msi",
+      "size": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "signed": false,
+      "downloadUrl": null
+    }
+  }
+}

@@ -1,7 +1,9 @@
 ; OPGeotech Desktop Windows installer
 ; Compile this file with Inno Setup on Windows to produce OPGeotech-Desktop-Setup.exe.
 #define AppName "OPGeotech Desktop"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #define Publisher "OPGeotech"
 #define AppExeName "OPGeotech-Desktop-Setup"
 

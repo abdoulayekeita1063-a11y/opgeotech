@@ -3,7 +3,7 @@
   <Package
     Name="OPGeotech Desktop"
     Manufacturer="OPGeotech"
-    Version="1.0.0"
+    Version="$(var.ProductVersion)"
     UpgradeCode="A7E0B6D1-0B4D-4C9D-9D4C-202611060002"
     Scope="perMachine">
     <SummaryInformation Description="OPGeotech Desktop Windows client and project synchronizer" />
