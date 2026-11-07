@@ -199,10 +199,10 @@ export default function Download() {
           <div className="space-y-1 text-sm">
             <p className="font-bold text-red-900">Windows release status</p>
             <p className="leading-6 text-red-900/80">
-              The installer sources are ready. EXE and MSI buttons will become
-              active after the release binaries are compiled on Windows and
-              digitally signed with the organization certificate. Do not use an
-              unsigned or unofficial installer for production data.
+              The signed EXE and MSI installers are not published yet. The
+              source package below is for developers and cannot install
+              OPGeotech by itself. Do not rename a ZIP file to EXE or run the
+              PowerShell build scripts as an installer.
             </p>
           </div>
         </div>
@@ -231,13 +231,13 @@ export default function Download() {
             <FileArchive className="mt-0.5 h-6 w-6 text-red-600" />
             <div>
               <h2 className="text-lg font-bold uppercase">
-                Installer source package
+                Developer source package — not an installer
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                Download the EXE and MSI build definitions, PowerShell
-                installer, pairing support, bidirectional sync agent, WiX file
-                and signing script. Compile the final binaries on a trusted
-                Windows build machine.
+                This ZIP contains the EXE/MSI build definitions, PowerShell
+                scripts, WiX file and signing script. It is not a Windows
+                installer and requires a Windows build machine with Inno Setup
+                and WiX.
               </p>
               <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>
@@ -257,7 +257,7 @@ export default function Download() {
           >
             <Button className="font-bold uppercase tracking-wider">
               <DownloadIcon className="mr-2 h-4 w-4" />
-              Download source package
+              Download developer sources (ZIP)
             </Button>
           </a>
         </div>
