@@ -22,7 +22,7 @@
       <Directory Id="INSTALLFOLDER" Name="OPGeotech" />
     </StandardDirectory>
 
-    <StandardDirectory Id="WindowsVolume">
+    <StandardDirectory Id="WindowsFolder">
       <Directory Id="OPGEOTECHROOT" Name="OPGeotech">
         <Directory Id="OPGEOTECHPROJECTS" Name="Projects" />
       </Directory>
@@ -42,14 +42,14 @@
     </ComponentGroup>
 
     <ComponentGroup Id="ProjectFoldersComponents">
-      <Component Id="ProjectRootFolder" Directory="OPGEOTECHROOT" Guid="*">
+      <Component Id="ProjectRootFolder" Directory="OPGEOTECHROOT" Guid="A7E0B6D1-0B4D-4C9D-9D4C-202611060003">
         <CreateFolder />
         <RegistryValue Root="HKLM" Key="Software\OPGeotech" Name="InstallRoot" Type="string" Value="[OPGEOTECHROOT]" KeyPath="yes" />
       </Component>
-      <Component Id="ProjectFilesFolder" Directory="OPGEOTECHPROJECTS" Guid="*">
+      <Component Id="ProjectFilesFolder" Directory="OPGEOTECHPROJECTS" Guid="A7E0B6D1-0B4D-4C9D-9D4C-202611060004">
         <CreateFolder />
       </Component>
-      <Component Id="ProgramDataFolder" Directory="OPGEOTECHPROGRAMDATA" Guid="*">
+      <Component Id="ProgramDataFolder" Directory="OPGEOTECHPROGRAMDATA" Guid="A7E0B6D1-0B4D-4C9D-9D4C-202611060005">
         <CreateFolder />
       </Component>
     </ComponentGroup>
