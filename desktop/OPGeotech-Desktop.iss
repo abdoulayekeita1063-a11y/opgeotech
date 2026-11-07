@@ -34,12 +34,12 @@ Name: "C:\OPGeotech\Projects"
 Name: "C:\ProgramData\OPGeotech"
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File \"{app}\install-opgeotech.ps1\""; WorkingDir: "{app}"; Description: "Configure OPGeotech Desktop and project synchronization"; Flags: postinstall waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\install-opgeotech.ps1"""; WorkingDir: "{app}"; Description: "Configure OPGeotech Desktop and project synchronization"; Flags: postinstall waituntilterminated
 
 [UninstallRun]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command \"Unregister-ScheduledTask -TaskName 'OPGeotech Cloud Sync' -Confirm:$false -ErrorAction SilentlyContinue\""; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Unregister-ScheduledTask -TaskName 'OPGeotech Cloud Sync' -Confirm:$false -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated
 
 [Icons]
-Name: "{group}\OPGeotech Desktop"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File \"{app}\opgeotech-launch.ps1\""; WorkingDir: "{app}"
+Name: "{group}\OPGeotech Desktop"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\opgeotech-launch.ps1"""; WorkingDir: "{app}"
 Name: "{group}\OPGeotech Project Files"; Filename: "C:\OPGeotech\Projects"
-Name: "{commondesktop}\OPGeotech Desktop"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File \"{app}\opgeotech-launch.ps1\""; WorkingDir: "{app}"
+Name: "{commondesktop}\OPGeotech Desktop"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\opgeotech-launch.ps1"""; WorkingDir: "{app}"
