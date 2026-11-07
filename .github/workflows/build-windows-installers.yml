@@ -51,7 +51,8 @@ jobs:
       - name: Install WiX Toolset
         shell: pwsh
         run: |
-          dotnet tool install --global wix
+          # WiX 4 matches the v4 WXS schema and does not require the WiX 6/7 OSMF acknowledgement.
+          dotnet tool install --global wix --version 4.0.5
           wix --version
 
       - name: Prepare output directory
