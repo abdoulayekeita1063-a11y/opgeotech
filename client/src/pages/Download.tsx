@@ -187,9 +187,27 @@ export default function Download() {
             assets.find((asset: { name?: string }) =>
               asset.name?.toLowerCase().endsWith(`.${extension}`)
             );
+          const metadataAsset = assets.find(
+            (asset: { name?: string }) => asset.name === "desktop-release.json"
+          );
           const exe = findAsset("exe");
           const msi = findAsset("msi");
           if (exe && msi) {
+            let releaseMetadata: Partial<DesktopRelease> | null = null;
+            if (metadataAsset?.browser_download_url) {
+              try {
+                const metadataResponse = await fetch(
+                  metadataAsset.browser_download_url,
+                  { cache: "no-store" }
+                );
+                if (metadataResponse.ok) {
+                  releaseMetadata =
+                    (await metadataResponse.json()) as Partial<DesktopRelease>;
+                }
+              } catch {
+                releaseMetadata = null;
+              }
+            }
             setRelease({
               product: "OPGeotech Desktop",
               version: latest.tag_name ?? "v1.0.0",
@@ -204,7 +222,7 @@ export default function Download() {
                     ? `${(exe.size / 1024 / 1024).toFixed(1)} MB`
                     : null,
                   sha256: null,
-                  signed: true,
+                  signed: releaseMetadata?.artifacts?.exe?.signed ?? false,
                   downloadUrl: exe.browser_download_url ?? null,
                 },
                 msi: {
@@ -214,7 +232,7 @@ export default function Download() {
                     ? `${(msi.size / 1024 / 1024).toFixed(1)} MB`
                     : null,
                   sha256: null,
-                  signed: true,
+                  signed: releaseMetadata?.artifacts?.msi?.signed ?? false,
                   downloadUrl: msi.browser_download_url ?? null,
                 },
               },
