@@ -47,6 +47,10 @@ export default function Download() {
     setInstallPrompt(null);
   };
 
+  const openApp = () => {
+    window.location.assign("/");
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <ModuleHeader
@@ -74,9 +78,17 @@ export default function Download() {
 
         <div className="mt-8 flex justify-center">
           {installed ? (
-            <div className="flex items-center gap-2 border border-emerald-400 bg-emerald-50 px-5 py-3 font-bold text-emerald-800">
-              <CheckCircle2 className="h-5 w-5" />
-              OPGeotech is already installed
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <div className="flex items-center gap-2 border border-emerald-400 bg-emerald-50 px-5 py-3 font-bold text-emerald-800">
+                <CheckCircle2 className="h-5 w-5" />
+                OPGeotech is already installed
+              </div>
+              <Button
+                onClick={openApp}
+                className="h-12 px-8 font-bold uppercase tracking-wider"
+              >
+                Open OPGeotech app
+              </Button>
             </div>
           ) : installPrompt ? (
             <Button
