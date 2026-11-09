@@ -1,0 +1,19 @@
+{
+  "product": "OPGeotech",
+  "version": "v1.1.0",
+  "published": true,
+  "windows": {
+    "fileName": "OPGeotech-Desktop-Setup-1.1.0.exe",
+    "sizeBytes": 2099531,
+    "sha256": "863ef603ee3ba24747ef0821fd03166d74b6b82894edcddcb7ef39e2d71a0377",
+    "signed": false,
+    "downloadUrl": "https://github.com/abdoulayekeita1063-a11y/opgeotech/releases/download/v1.1.0/OPGeotech-Desktop-Setup-1.1.0.exe"
+  },
+  "android": {
+    "fileName": "OPGeotech-Android-1.1.0.apk",
+    "sizeBytes": 111239,
+    "sha256": "2486cf2f2588cefe4f55aa895c455da981b1faa5fb2719d77a146a1aca41f795",
+    "signed": true,
+    "downloadUrl": "https://github.com/abdoulayekeita1063-a11y/opgeotech/releases/download/v1.1.0/OPGeotech-Android-1.1.0.apk"
+  }
+}
