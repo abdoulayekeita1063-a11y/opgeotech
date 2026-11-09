@@ -11,6 +11,11 @@ on:
         required: true
         default: "1.0.0"
         type: string
+      verify_signature:
+        description: "Verify Authenticode trust chain (disable for self-signed test certificates)"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -98,18 +103,23 @@ jobs:
             -Password $securePassword
           "SIGNING_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Sign and verify EXE/MSI
+      - name: Sign and optionally verify EXE/MSI
         shell: pwsh
         env:
           PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGNING_PFX_PASSWORD }}
+          VERIFY_SIGNATURE: ${{ inputs.verify_signature }}
         run: |
           $pfxPath = Join-Path $env:RUNNER_TEMP 'opgeotech-signing.pfx'
           $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
           Get-ChildItem dist\installers\*.exe, dist\installers\*.msi | ForEach-Object {
             & $signtool sign /fd SHA256 /f $pfxPath /p "$env:PFX_PASSWORD" /tr http://timestamp.digicert.com /td SHA256 $_.FullName
             if ($LASTEXITCODE -ne 0) { throw "Signing failed for $($_.Name)." }
-            & $signtool verify /pa /all $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $($_.Name)." }
+            if ($env:VERIFY_SIGNATURE -eq "true") {
+              & $signtool verify /pa /all $_.FullName
+              if ($LASTEXITCODE -ne 0) { throw "Signature verification failed for $($_.Name)." }
+            } else {
+              Write-Host "Trust-chain verification skipped for $($_.Name) (test certificate mode)."
+            }
           }
 
       - name: Generate release metadata and checksums

@@ -32,6 +32,7 @@ type DesktopRelease = {
   version: string;
   published: boolean;
   architecture: string;
+  releaseUrl?: string | null;
   artifacts: {
     exe: InstallerArtifact;
     msi: InstallerArtifact;
@@ -170,18 +171,77 @@ export default function Download() {
   const [release, setRelease] = useState<DesktopRelease>(FALLBACK_RELEASE);
 
   useEffect(() => {
-    fetch("/desktop-release.json", { cache: "no-store" })
-      .then(response => (response.ok ? response.json() : null))
-      .then((metadata: DesktopRelease | null) => {
-        if (
-          metadata?.version &&
-          metadata.artifacts?.exe &&
-          metadata.artifacts?.msi
-        ) {
-          setRelease(metadata);
+    const loadRelease = async () => {
+      try {
+        const response = await fetch(
+          "https://api.github.com/repos/abdoulayekeita1063-a11y/opgeotech/releases/latest",
+          {
+            headers: { Accept: "application/vnd.github+json" },
+            cache: "no-store",
+          }
+        );
+        if (response.ok) {
+          const latest = await response.json();
+          const assets = Array.isArray(latest.assets) ? latest.assets : [];
+          const findAsset = (extension: "exe" | "msi") =>
+            assets.find((asset: { name?: string }) =>
+              asset.name?.toLowerCase().endsWith(`.${extension}`)
+            );
+          const exe = findAsset("exe");
+          const msi = findAsset("msi");
+          if (exe && msi) {
+            setRelease({
+              product: "OPGeotech Desktop",
+              version: latest.tag_name ?? "v1.0.0",
+              published: true,
+              architecture: "Windows x64",
+              releaseUrl: latest.html_url ?? null,
+              artifacts: {
+                exe: {
+                  fileName: exe.name,
+                  sizeBytes: exe.size ?? null,
+                  size: exe.size
+                    ? `${(exe.size / 1024 / 1024).toFixed(1)} MB`
+                    : null,
+                  sha256: null,
+                  signed: true,
+                  downloadUrl: exe.browser_download_url ?? null,
+                },
+                msi: {
+                  fileName: msi.name,
+                  sizeBytes: msi.size ?? null,
+                  size: msi.size
+                    ? `${(msi.size / 1024 / 1024).toFixed(1)} MB`
+                    : null,
+                  sha256: null,
+                  signed: true,
+                  downloadUrl: msi.browser_download_url ?? null,
+                },
+              },
+            });
+            return;
+          }
         }
-      })
-      .catch(() => undefined);
+
+        const fallbackResponse = await fetch("/desktop-release.json", {
+          cache: "no-store",
+        });
+        if (fallbackResponse.ok) {
+          const metadata = (await fallbackResponse.json()) as DesktopRelease;
+          if (
+            metadata?.version &&
+            metadata.artifacts?.exe &&
+            metadata.artifacts?.msi
+          ) {
+            setRelease(metadata);
+          }
+        }
+      } catch {
+        // Keep the local fallback metadata when GitHub is unavailable.
+      }
+    };
+
+    void loadRelease();
   }, []);
 
   return (
@@ -199,10 +259,9 @@ export default function Download() {
           <div className="space-y-1 text-sm">
             <p className="font-bold text-red-900">Windows release status</p>
             <p className="leading-6 text-red-900/80">
-              The signed EXE and MSI installers are not published yet. The
-              source package below is for developers and cannot install
-              OPGeotech by itself. Do not rename a ZIP file to EXE or run the
-              PowerShell build scripts as an installer.
+              {release.published
+                ? "The latest Windows installers are available below. Download one installer and run it on Windows 10 or Windows 11."
+                : "The signed EXE and MSI installers are not published yet. The source package below is for developers and cannot install OPGeotech by itself. Do not rename a ZIP file to EXE or run the PowerShell build scripts as an installer."}
             </p>
           </div>
         </div>
