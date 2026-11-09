@@ -78,9 +78,7 @@ function InstallerCard({
   release: DesktopRelease;
 }) {
   const artifact = release.artifacts[format.toLowerCase() as "exe" | "msi"];
-  const available = Boolean(
-    release.published && artifact.downloadUrl && artifact.signed
-  );
+  const available = Boolean(release.published && artifact.downloadUrl);
 
   return (
     <div className="flex h-full flex-col justify-between border border-foreground bg-white p-6">
@@ -132,7 +130,7 @@ function InstallerCard({
             <p
               className={`mt-1 font-bold ${artifact.signed ? "text-emerald-700" : "text-amber-700"}`}
             >
-              {artifact.signed ? "Verified" : "Pending signing"}
+              {artifact.signed ? "Verified" : "Unsigned test build"}
             </p>
           </div>
         </div>
@@ -159,8 +157,10 @@ function InstallerCard({
         )}
         <p className="text-xs text-muted-foreground">
           {available
-            ? `Signed ${format} release artifact ready for download.`
-            : `The signed ${format} release artifact will be enabled after it is built on Windows and published.`}
+            ? artifact.signed
+              ? `Signed ${format} release artifact ready for download.`
+              : `Test ${format} release artifact ready. Windows may display an unknown publisher warning.`
+            : `The ${format} release artifact will be enabled after it is built on Windows and published.`}
         </p>
       </div>
     </div>

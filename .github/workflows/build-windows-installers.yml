@@ -16,6 +16,11 @@ on:
         required: true
         default: false
         type: boolean
+      sign_installers:
+        description: "Sign installers with the configured PFX certificate"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -86,6 +91,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "WiX build failed." }
 
       - name: Import Authenticode certificate
+        if: ${{ inputs.sign_installers }}
         shell: pwsh
         env:
           PFX_B64: ${{ secrets.WINDOWS_CODESIGNING_PFX_B64 }}
@@ -104,6 +110,7 @@ jobs:
           "SIGNING_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Sign and optionally verify EXE/MSI
+        if: ${{ inputs.sign_installers }}
         shell: pwsh
         env:
           PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGNING_PFX_PASSWORD }}
@@ -135,7 +142,7 @@ jobs:
               sizeBytes = $file.Length
               size = "{0:N1} MB" -f ($file.Length / 1MB)
               sha256 = $hash
-              signed = $true
+              signed = [bool]::Parse("${{ inputs.sign_installers }}")
               downloadUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$env:PRODUCT_VERSION/$($file.Name)"
             }
           }
