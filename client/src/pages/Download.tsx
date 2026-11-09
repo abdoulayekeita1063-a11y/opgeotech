@@ -42,24 +42,28 @@ type DesktopRelease = {
 const FALLBACK_RELEASE: DesktopRelease = {
   product: "OPGeotech Desktop",
   version: "v1.0.0",
-  published: false,
+  published: true,
   architecture: "Windows x64",
+  releaseUrl:
+    "https://github.com/abdoulayekeita1063-a11y/opgeotech/releases/tag/v1.0.0",
   artifacts: {
     exe: {
       fileName: "OPGeotech-Desktop-Setup-1.0.0.exe",
-      size: null,
-      sizeBytes: null,
+      size: "2.0 MB",
+      sizeBytes: 2099531,
       sha256: null,
       signed: false,
-      downloadUrl: null,
+      downloadUrl:
+        "https://github.com/abdoulayekeita1063-a11y/opgeotech/releases/download/v1.0.0/OPGeotech-Desktop-Setup-1.0.0.exe",
     },
     msi: {
       fileName: "OPGeotech-Desktop-1.0.0.msi",
-      size: null,
-      sizeBytes: null,
+      size: "40.0 KB",
+      sizeBytes: 40960,
       sha256: null,
       signed: false,
-      downloadUrl: null,
+      downloadUrl:
+        "https://github.com/abdoulayekeita1063-a11y/opgeotech/releases/download/v1.0.0/OPGeotech-Desktop-1.0.0.msi",
     },
   },
 };
